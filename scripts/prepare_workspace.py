@@ -22,19 +22,21 @@ def main():
 
     bcore_gradle = os.path.join(WORKSPACE, "Bcore", "build.gradle")
     orig_app_gradle = os.path.join(WORKSPACE, "app", "build.gradle")
+    root_gradle = os.path.join(WORKSPACE, "build.gradle")
+    toml_path = os.path.join(WORKSPACE, "gradle", "libs.versions.toml")
 
     compile_sdk = "34"
     min_sdk = "21"
     java_ver = "VERSION_1_8"
 
-    for gpath in [orig_app_gradle, bcore_gradle]:
+    for gpath in [orig_app_gradle, bcore_gradle, root_gradle, toml_path]:
         if os.path.exists(gpath):
             with open(gpath, "r", encoding="utf-8", errors="ignore") as f:
                 txt = f.read()
-            m_comp = re.search(r'compileSdk(?:Version)?\s*[=:]?\s*(\d+)', txt)
+            m_comp = re.search(r'compileSdk(?:Version)?\s*[=:]?\s*["\']?(\d+)["\']?', txt)
             if m_comp:
                 compile_sdk = m_comp.group(1)
-            m_min = re.search(r'minSdk(?:Version)?\s*[=:]?\s*(\d+)', txt)
+            m_min = re.search(r'minSdk(?:Version)?\s*[=:]?\s*["\']?(\d+)["\']?', txt)
             if m_min:
                 min_sdk = m_min.group(1)
             m_java = re.search(r'JavaVersion\.(VERSION_[0-9_]+)', txt)
@@ -42,6 +44,16 @@ def main():
                 java_ver = m_java.group(1)
 
     print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}, Java: {java_ver}")
+
+    # Prevent any Manifest Merger attribute conflicts in Bcore's AndroidManifest.xml
+    bcore_manifest = os.path.join(WORKSPACE, "Bcore", "src", "main", "AndroidManifest.xml")
+    if os.path.exists(bcore_manifest):
+        with open(bcore_manifest, "r", encoding="utf-8", errors="ignore") as f:
+            bm = f.read()
+        for attr in ["android:label", "android:icon", "android:roundIcon", "android:allowBackup", "android:supportsRtl", "android:theme"]:
+            bm = re.sub(rf'\s+{attr}="[^"]*"', '', bm)
+        with open(bcore_manifest, "w", encoding="utf-8") as f:
+            f.write(bm)
 
     # Replace sample app with VeyraVault app module
     ws_app = os.path.join(WORKSPACE, "app")
@@ -137,15 +149,19 @@ dependencies {{
     with open(os.path.join(ws_app, "build.gradle"), "w", encoding="utf-8") as f:
         f.write(app_gradle_content)
 
-    # Configure settings.gradle with pluginManagement & dependencyResolutionManagement for Gradle 8+
+    # Extract only valid module includes (e.g., ':app', ':Bcore') ignoring includeGroupByRegex
     settings_gradle = os.path.join(WORKSPACE, "settings.gradle")
-    existing_includes = "include ':app', ':Bcore'"
+    modules = ["':app'", "':Bcore'"]
     if os.path.exists(settings_gradle):
         with open(settings_gradle, "r", encoding="utf-8", errors="ignore") as f:
             stxt = f.read()
-        inc_lines = [line.strip() for line in stxt.splitlines() if line.strip().startswith("include")]
-        if inc_lines:
-            existing_includes = "\n".join(inc_lines)
+        found_mods = re.findall(r"['\"](:[a-zA-Z0-9_\-:]+)['\"]", stxt)
+        for m in found_mods:
+            q = f"'{m}'"
+            if q not in modules:
+                modules.append(q)
+
+    inc_block = "\n".join([f"include {m}" for m in modules])
 
     new_settings = f"""pluginManagement {{
     repositories {{
@@ -164,23 +180,29 @@ dependencyResolutionManagement {{
     }}
 }}
 rootProject.name = "VeyraVault"
-{existing_includes}
+{inc_block}
 """
     with open(settings_gradle, "w", encoding="utf-8") as f:
         f.write(new_settings)
 
-    # Configure gradle.properties for JDK 17 + AGP 8+ compatibility
+    # Preserve existing gradle.properties and append required flags
     gradle_props = os.path.join(WORKSPACE, "gradle.properties")
-    props_content = """org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 --add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+    existing_props = ""
+    if os.path.exists(gradle_props):
+        with open(gradle_props, "r", encoding="utf-8", errors="ignore") as f:
+            existing_props = f.read()
+
+    extra_props = """
+org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
 android.useAndroidX=true
 android.enableJetifier=true
 android.nonTransitiveRClass=false
 android.defaults.buildfeatures.buildconfig=true
 """
     with open(gradle_props, "w", encoding="utf-8") as f:
-        f.write(props_content)
+        f.write(existing_props + "\n" + extra_props)
 
-    print("[+] Workspace prepared and aligned successfully for Gradle 8 / AGP 8!")
+    print(f"[+] Workspace prepared! Modules included: {modules}")
 
 if __name__ == "__main__":
     main()
