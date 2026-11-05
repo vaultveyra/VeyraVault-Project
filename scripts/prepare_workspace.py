@@ -1,24 +1,90 @@
 #!/usr/bin/env python3
-import os, re, shutil, subprocess
+import os, re, sys, glob, shutil, stat, subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKSPACE = os.path.join(ROOT, "build_workspace")
 BUNDLED_ENGINE = os.path.join(ROOT, "engine_source")
+OUTPUT_DIR = os.path.join(ROOT, "output_artifacts")
 
-def run(cmd, cwd=None):
+def run(cmd, cwd=None, check=True):
     print(f"[+] Executing: {cmd}")
-    subprocess.check_call(cmd, shell=True, cwd=cwd)
+    subprocess.run(cmd, shell=True, cwd=cwd, check=check)
+
+def accept_android_sdk_licenses():
+    print("[*] Accepting all Android SDK & NDK licenses...")
+    sdk_dirs = [
+        os.environ.get("ANDROID_HOME"),
+        os.environ.get("ANDROID_SDK_ROOT"),
+        "/usr/local/lib/android/sdk"
+    ]
+    for sdk in sdk_dirs:
+        if sdk and os.path.exists(sdk):
+            lic_dir = os.path.join(sdk, "licenses")
+            os.makedirs(lic_dir, exist_ok=True)
+            hashes = [
+                "8933bad161af4178b1185d1a37fbf41ea5269c55",
+                "d56f5187479451eabf01fb78af6dfcb131a6481e",
+                "24333f8a63b6825ea9c5514f83c2829b004d1fee",
+                "859f317696f67ef3d7f30a50a5560e7834b43903"
+            ]
+            with open(os.path.join(lic_dir, "android-sdk-license"), "w", encoding="utf-8") as f:
+                f.write("\n" + "\n".join(hashes) + "\n")
+            preview_hashes = [
+                "84831b9409646a918e30573bab4c9c91346d8abd",
+                "504667f4c0de7af1a06de9f4b1727b84351f2910"
+            ]
+            with open(os.path.join(lic_dir, "android-sdk-preview-license"), "w", encoding="utf-8") as f:
+                f.write("\n" + "\n".join(preview_hashes) + "\n")
+
+            sdkmgr = os.path.join(sdk, "cmdline-tools", "latest", "bin", "sdkmanager")
+            if os.path.exists(sdkmgr):
+                run(f"yes | {sdkmgr} --licenses", check=False)
+
+def post_build():
+    print("[*] Collecting Signed APK and running Stage-2 Binary Audit...")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    apks = glob.glob(os.path.join(WORKSPACE, "app", "build", "outputs", "apk", "release", "*.apk"))
+    if not apks:
+        print("[-] ERROR: No release APK found!")
+        sys.exit(1)
+    apk_out = os.path.join(OUTPUT_DIR, "VeyraVault-release.apk")
+    shutil.copy2(apks[0], apk_out)
+
+    ks_path = os.path.join(WORKSPACE, "app", "release.keystore")
+    if os.path.exists(ks_path):
+        shutil.copy2(ks_path, os.path.join(OUTPUT_DIR, "release.keystore"))
+
+    src_rep = os.path.join(ROOT, "source_audit_report.txt")
+    if os.path.exists(src_rep):
+        shutil.copy2(src_rep, os.path.join(OUTPUT_DIR, "source_audit_report.txt"))
+
+    run(f'python3 "{os.path.join(ROOT, "scripts", "audit_apk.py")}" "{apk_out}"')
+    apk_rep = os.path.join(ROOT, "apk_audit_report.txt")
+    if os.path.exists(apk_rep):
+        shutil.copy2(apk_rep, os.path.join(OUTPUT_DIR, "apk_audit_report.txt"))
+    print("[+] All release artifacts collected in output_artifacts/!")
 
 def main():
+    if "--post-build" in sys.argv:
+        post_build()
+        return
+
+    accept_android_sdk_licenses()
+
     if os.path.exists(WORKSPACE):
         shutil.rmtree(WORKSPACE)
 
     if os.path.exists(os.path.join(BUNDLED_ENGINE, "Bcore")):
-        print("[+] Found locally bundled Bcore C++/Java engine! Copying to build_workspace...")
+        print("[+] Copying bundled Bcore engine to build_workspace...")
         shutil.copytree(BUNDLED_ENGINE, WORKSPACE)
     else:
         print("[*] Cloning upstream BlackBox engine into build_workspace...")
         run(f'git clone --depth 1 https://github.com/ALEX5402/NewBlackbox.git "{WORKSPACE}"')
+
+    gradlew_path = os.path.join(WORKSPACE, "gradlew")
+    if os.path.exists(gradlew_path):
+        st = os.stat(gradlew_path)
+        os.chmod(gradlew_path, st.st_mode | stat.S_IEXEC)
 
     bcore_gradle = os.path.join(WORKSPACE, "Bcore", "build.gradle")
     orig_app_gradle = os.path.join(WORKSPACE, "app", "build.gradle")
@@ -45,7 +111,6 @@ def main():
 
     print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}, Java: {java_ver}")
 
-    # Prevent any Manifest Merger attribute conflicts in Bcore's AndroidManifest.xml
     bcore_manifest = os.path.join(WORKSPACE, "Bcore", "src", "main", "AndroidManifest.xml")
     if os.path.exists(bcore_manifest):
         with open(bcore_manifest, "r", encoding="utf-8", errors="ignore") as f:
@@ -55,13 +120,11 @@ def main():
         with open(bcore_manifest, "w", encoding="utf-8") as f:
             f.write(bm)
 
-    # Replace sample app with VeyraVault app module
     ws_app = os.path.join(WORKSPACE, "app")
     if os.path.exists(ws_app):
         shutil.rmtree(ws_app)
     shutil.copytree(os.path.join(ROOT, "app"), ws_app)
 
-    # Remove deprecated package attribute from AndroidManifest.xml for AGP 8+ compatibility
     manifest_path = os.path.join(ws_app, "src", "main", "AndroidManifest.xml")
     if os.path.exists(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as f:
@@ -70,7 +133,6 @@ def main():
         with open(manifest_path, "w", encoding="utf-8") as f:
             f.write(m_txt)
 
-    # Write AGP 8+ and Gradle 8+ compatible app/build.gradle
     app_gradle_content = f"""plugins {{
     id 'com.android.application'
 }}
@@ -149,7 +211,6 @@ dependencies {{
     with open(os.path.join(ws_app, "build.gradle"), "w", encoding="utf-8") as f:
         f.write(app_gradle_content)
 
-    # Extract only valid module includes (e.g., ':app', ':Bcore') ignoring includeGroupByRegex
     settings_gradle = os.path.join(WORKSPACE, "settings.gradle")
     modules = ["':app'", "':Bcore'"]
     if os.path.exists(settings_gradle):
@@ -162,7 +223,6 @@ dependencies {{
                 modules.append(q)
 
     inc_block = "\n".join([f"include {m}" for m in modules])
-
     new_settings = f"""pluginManagement {{
     repositories {{
         google()
@@ -185,24 +245,28 @@ rootProject.name = "VeyraVault"
     with open(settings_gradle, "w", encoding="utf-8") as f:
         f.write(new_settings)
 
-    # Preserve existing gradle.properties and append required flags
     gradle_props = os.path.join(WORKSPACE, "gradle.properties")
-    existing_props = ""
-    if os.path.exists(gradle_props):
-        with open(gradle_props, "r", encoding="utf-8", errors="ignore") as f:
-            existing_props = f.read()
-
-    extra_props = """
-org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
+    props_content = """org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8 --add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
 android.useAndroidX=true
 android.enableJetifier=true
 android.nonTransitiveRClass=false
-android.defaults.buildfeatures.buildconfig=true
 """
     with open(gradle_props, "w", encoding="utf-8") as f:
-        f.write(existing_props + "\n" + extra_props)
+        f.write(props_content)
 
-    print(f"[+] Workspace prepared! Modules included: {modules}")
+    # Generate Dedicated Release Keystore directly inside Python
+    ks_file = os.path.join(ws_app, "release.keystore")
+    if not os.path.exists(ks_file):
+        print("[*] Generating dedicated RSA-2048 Release Keystore...")
+        ks_cmd = (
+            f'keytool -genkeypair -v -keystore "{ks_file}" '
+            f'-alias veyravault_key -keyalg RSA -keysize 2048 -validity 10000 '
+            f'-storepass VeyraVaultPass2025 -keypass VeyraVaultPass2025 '
+            f'-dname "CN=VeyraVault, OU=Security, O=VeyraVault, L=Global, S=Global, C=US"'
+        )
+        run(ks_cmd)
+
+    print("[+] Workspace, NDK licenses, and Release Keystore prepared successfully!")
 
 if __name__ == "__main__":
     main()
