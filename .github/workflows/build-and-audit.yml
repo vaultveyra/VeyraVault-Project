@@ -1,68 +1,43 @@
-Run chmod +x gradlew
-Downloading https://services.gradle.org/distributions/gradle-8.14.5-bin.zip
-.............10%.............20%.............30%.............40%.............50%.............60%..............70%.............80%.............90%.............100%
+name: Build VeyraVault APK
 
-Welcome to Gradle 8.14.5!
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
-Here are the highlights of this release:
- - Java 24 support
- - GraalVM Native Image toolchain selection
- - Enhancements to test reporting
- - Build Authoring improvements
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
 
-For more details see https://docs.gradle.org/8.14.5/release-notes.html
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
-Daemon will be stopped at the end of the build 
+      - name: 3. Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-> Configure project :app
-WARNING: The option setting 'android.defaults.buildfeatures.buildconfig=true' is deprecated.
-The current default is 'false'.
-It will be removed in version 10.0 of the Android Gradle plugin.
-To keep using this feature, add the following to your module-level build.gradle files:
-    android.buildFeatures.buildConfig = true
-or from Android Studio, click: `Refactor` > `Migrate BuildConfig to Gradle Build Files`.
+      - name: 4. Prepare Workspace, NDK Licenses & Keystore
+        run: python3 scripts/prepare_workspace.py
 
+      - name: 5. Run Stage-1 Source Audit
+        run: python3 scripts/audit_source.py
 
-FAILURE: Build failed with an exception.
-> Configure project :Bcore
+      - name: 6. Compile Signed Release APK
+        working-directory: ./build_workspace
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
-Checking the license for package NDK (Side by side) 29.0.13846066 in /usr/local/lib/android/sdk/licenses
-* What went wrong:
-Warning: License for package NDK (Side by side) 29.0.13846066 not accepted.
-A problem occurred configuring project ':Bcore'.
+      - name: 7. Package & Audit Final APK
+        run: python3 scripts/prepare_workspace.py --post-build
 
-> com.android.builder.sdk.LicenceNotAcceptedException: Failed to install the following Android SDK packages as some licences have not been accepted.
-[Incubating] Problems report is available at: file:///home/runner/work/VeyraVault-Project/VeyraVault-Project/build_workspace/build/reports/problems/problems-report.html
-     ndk;29.0.13846066 NDK (Side by side) 29.0.13846066
-	at org.gradle.internal.daemon.clientinput.ClientInputForwarder.forwardInput(ClientInputForwarder.java:80)
-	at org.gradle.launcher.daemon.server.exec.ForwardClientInput.execute(ForwardClientInput.java:37)
-	at org.gradle.launcher.daemon.server.api.DaemonCommandExecution.proceed(DaemonCommandExecution.java:104)
-	at org.gradle.launcher.daemon.server.exec.LogAndCheckHealth.execute(LogAndCheckHealth.java:53)
-	at org.gradle.launcher.daemon.server.api.DaemonCommandExecution.proceed(DaemonCommandExecution.java:104)
-	at org.gradle.launcher.daemon.server.exec.LogToClient.doBuild(LogToClient.java:63)
-	at org.gradle.launcher.daemon.server.exec.BuildCommandOnly.execute(BuildCommandOnly.java:37)
-	at org.gradle.launcher.daemon.server.api.DaemonCommandExecution.proceed(DaemonCommandExecution.java:104)
-	at org.gradle.launcher.daemon.server.exec.EstablishBuildEnvironment.doBuild(EstablishBuildEnvironment.java:84)
-	at org.gradle.launcher.daemon.server.exec.BuildCommandOnly.execute(BuildCommandOnly.java:37)
-	at org.gradle.launcher.daemon.server.api.DaemonCommandExecution.proceed(DaemonCommandExecution.java:104)
-	at org.gradle.launcher.daemon.server.exec.StartBuildOrRespondWithBusy$1.run(StartBuildOrRespondWithBusy.java:52)
-	at org.gradle.launcher.daemon.server.DaemonStateCoordinator.lambda$runCommand$0(DaemonStateCoordinator.java:321)
-	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
-	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
-Caused by: com.android.builder.sdk.LicenceNotAcceptedException: Failed to install the following Android SDK packages as some licences have not been accepted.
-   ndk;29.0.13846066 NDK (Side by side) 29.0.13846066
-To build this project, accept the SDK license agreements and install the missing components using the Android Studio SDK Manager.
-All licenses can be accepted using the sdkmanager command line tool:
-sdkmanager.bat --licenses
-Or, to transfer the license agreements from one workstation to another, see https://developer.android.com/studio/intro/update.html#download-with-gradle
-
-Using Android SDK: /usr/local/lib/android/sdk
-	at com.android.builder.sdk.DefaultSdkLoader.checkResults(DefaultSdkLoader.java:534)
-	at com.android.builder.sdk.DefaultSdkLoader.installSdkTool(DefaultSdkLoader.java:460)
-	at com.android.build.gradle.internal.SdkHandler.installNdk(SdkHandler.java:329)
-	... 187 more
-
-
-BUILD FAILED in 38s
-Error: Process completed with exit code 1.
+      - name: 8. Upload Signed APK Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-Release-Bundle
+          path: output_artifacts/
