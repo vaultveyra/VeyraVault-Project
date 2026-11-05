@@ -1,0 +1,71 @@
+name: Build, Sign & Security Audit VeyraVault APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Checkout VeyraVault Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up JDK 11 (Required for Bcore AIDL & JNI Reflection)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: 3. Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 4. Prepare & Auto-Align Bcore Engine Workspace
+        run: python3 scripts/prepare_workspace.py
+
+      - name: 5. Run Stage-1 Source Code Security Audit
+        run: python3 scripts/audit_source.py
+
+      - name: 6. Generate Dedicated Release Keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore build_workspace/app/release.keystore \
+            -alias veyravault_key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass VeyraVaultPass2025 \
+            -keypass VeyraVaultPass2025 \
+            -dname "CN=VeyraVault, OU=Security, O=VeyraVault, L=Global, S=Global, C=US"
+
+      - name: 7. Compile Signed Release APK (32-bit & 64-bit ARM)
+        working-directory: ./build_workspace
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: 8. Collect & Verify Signed APK
+        run: |
+          mkdir -p output_artifacts
+          APK_PATH=$(find build_workspace/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: APK was not generated!"
+            exit 1
+          fi
+          cp "$APK_PATH" output_artifacts/VeyraVault-release.apk
+          cp build_workspace/app/release.keystore output_artifacts/release.keystore
+          cp source_audit_report.txt output_artifacts/source_audit_report.txt
+
+      - name: 9. Run Stage-2 Compiled APK Binary Audit
+        run: |
+          python3 scripts/audit_apk.py output_artifacts/VeyraVault-release.apk
+          cp apk_audit_report.txt output_artifacts/apk_audit_report.txt
+
+      - name: 10. Upload Signed APK & Security Audit Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-Release-Bundle
+          path: output_artifacts/
