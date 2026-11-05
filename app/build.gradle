@@ -1,0 +1,57 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion __COMPILE_SDK__
+
+    defaultConfig {
+        applicationId "com.veyravault.space"
+        minSdkVersion 21
+        targetSdkVersion __TARGET_SDK__
+        versionCode 200
+        versionName "2.0.0-Enterprise"
+
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword System.getenv("V_KS_PASS") ?: "VeyraVaultKeyPass2025"
+            keyAlias System.getenv("V_KEY_ALIAS") ?: "veyravault"
+            keyPassword System.getenv("V_KEY_PASS") ?: "VeyraVaultKeyPass2025"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation project(':Bcore')
+    implementation 'androidx.appcompat:appcompat:1.4.2'
+    implementation 'com.google.android.material:material:1.6.1'
+    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'org.osmdroid:osmdroid-android:6.1.14'
+}

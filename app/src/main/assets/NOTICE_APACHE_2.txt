@@ -1,0 +1,2 @@
+VeyraVault uses the open-source BlackBox virtualization engine
+(https://github.com/ALEX5402/NewBlackbox), licensed under the Apache License, Version 2.0.

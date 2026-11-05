@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VeyraVault</string>
+    <string name="disguise_calc">Calculator</string>
+    <string name="disguise_calendar">Calendar</string>
+    <string name="disguise_notes">Notes</string>
+    <string name="disguise_weather">Weather</string>
+    <string name="my_clones">My Clones</string>
+    <string name="space_label">Space</string>
+    <string name="my_apps">My apps</string>
+    <string name="batch_clone">Batch clone</string>
+    <string name="search_apps">Search apps...</string>
+    <string name="set_location">Set Location</string>
+    <string name="set_mock_location">Set mock location</string>
+    <string name="no_location_set">No location set</string>
+    <string name="configuration">Configuration</string>
+    <string name="add_to_home">Add to Home</string>
+    <string name="rename">Rename</string>
+    <string name="duplicate">Duplicate</string>
+    <string name="device_identity">Device Identity</string>
+    <string name="permissions">Permissions</string>
+    <string name="stop_app">Stop</string>
+    <string name="clear_data">Clear Data</string>
+    <string name="uninstall">Uninstall</string>
+    <string name="batch_uninstall">Batch uninstall</string>
+    <string name="nav_clones">Clones</string>
+    <string name="nav_global_env">Device &amp; GMS</string>
+    <string name="nav_security">Security</string>
+    <string name="nav_about">About</string>
+    <string name="anti_uninstall_title">Anti-Uninstall Protection</string>
+    <string name="anti_uninstall_desc">Prevents VeyraVault from being uninstalled until you turn this switch off inside Security Settings.</string>
+    <string name="lang_switch">فارسی / EN</string>
+</resources>

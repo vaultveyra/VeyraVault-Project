@@ -1,0 +1,5 @@
+-keep class top.niunaijun.blackbox.** { *; }
+-keep class com.vcore.** { *; }
+-keep class com.veyravault.space.** { *; }
+-dontwarn top.niunaijun.blackbox.**
+-dontwarn org.osmdroid.**

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VeyraVault</string>
+    <string name="disguise_calc">ماشین‌حساب</string>
+    <string name="disguise_calendar">تقویم</string>
+    <string name="disguise_notes">یادداشت‌ها</string>
+    <string name="disguise_weather">آب‌وهوا</string>
+    <string name="my_clones">کلون‌های من</string>
+    <string name="space_label">فضای</string>
+    <string name="my_apps">برنامه‌های من</string>
+    <string name="batch_clone">کلون گروهی</string>
+    <string name="search_apps">جستجوی برنامه‌ها...</string>
+    <string name="set_location">تنظیم موقعیت</string>
+    <string name="set_mock_location">ثبت موقعیت مجازی (Set mock location)</string>
+    <string name="no_location_set">بدون موقعیت مجازی</string>
+    <string name="configuration">تنظیمات کلون</string>
+    <string name="add_to_home">افزودن به صفحه اصلی</string>
+    <string name="rename">تغییر نام</string>
+    <string name="duplicate">تکثیر کلون</string>
+    <string name="device_identity">هویت دستگاه (نشست)</string>
+    <string name="permissions">مجوزهای برنامه</string>
+    <string name="stop_app">توقف اجباری</string>
+    <string name="clear_data">پاکسازی داده</string>
+    <string name="uninstall">حذف کلون</string>
+    <string name="batch_uninstall">حذف گروهی</string>
+    <string name="nav_clones">فضاها</string>
+    <string name="nav_global_env">مدل گوشی و گوگل</string>
+    <string name="nav_security">امنیت و قفل</string>
+    <string name="nav_about">درباره ما</string>
+    <string name="anti_uninstall_title">جلوگیری از حذف برنامه (Anti-Uninstall)</string>
+    <string name="anti_uninstall_desc">با فعال بودن این گزینه، هیچ کاربری یا برنامه‌ای قادر به حذف VeyraVault نخواهد بود تا زمانی که خودتان این کلید را خاموش کنید.</string>
+    <string name="lang_switch">EN / فارسی</string>
+</resources>
