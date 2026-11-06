@@ -12,7 +12,7 @@ Handles:
   * VeyraApplication.java
   * JalaliClockUtil.java (Accurate Solar Hijri / Jalali Calendar + World Clocks)
   * LocaleHelper.java
-  * BaseActivity.java
+  * BaseActivity.java (Includes isPersian, switchLanguageInstant, triggerQuickLock)
   * GmsSupportManager.java (Fixes YouTube, Viber, GMS Services)
   * AppDisguiseManager.java (Calculator / Calendar / Notes Icon & Name Disguise)
   * PatternLockView.java (Custom 9-dot Pattern View supporting both Listener interfaces)
@@ -21,6 +21,7 @@ Handles:
   * Engine.java (Independent APK Vault, Chrome Main Activity Fix, Split APK & Native .so Sync)
   * SecurityManager.java (Simultaneous Dual Lock: PIN + Pattern with Priority & Auto-Fallback)
   * VaultDeviceAdminReceiver.java (Stealth Anti-Uninstall Blocker locking session immediately)
+- Auto-patching scripts/upgrade_v3_part2.py before Part 2 executes
 """
 
 import os
@@ -363,7 +364,7 @@ public class VeyraApplication extends Application {
 }
 """)
 
-    # 2. JalaliClockUtil.java (Accurate Gregorian -> Solar Hijri / Jalali + World Clocks)
+    # 2. JalaliClockUtil.java (Supports both getNewYorkGregorianDate() and getNewYorkGregorianDate(boolean))
     write_file("app/src/main/java/com/veyravault/space/helper/JalaliClockUtil.java", """
 package com.veyravault.space.helper;
 
@@ -452,6 +453,10 @@ public class JalaliClockUtil {
         return sdf.format(new Date());
     }
 
+    public static String getNewYorkGregorianDate(boolean isFa) {
+        return getNewYorkGregorianDate();
+    }
+
     public static String toPersianDigits(String input) {
         if (input == null) return "";
         char[] persian = {'۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'};
@@ -526,19 +531,22 @@ public class LocaleHelper {
 }
 """)
 
-    # 4. BaseActivity.java
+    # 4. BaseActivity.java (Includes isPersian, switchLanguageInstant, triggerQuickLock)
     write_file("app/src/main/java/com/veyravault/space/ui/BaseActivity.java", """
 package com.veyravault.space.ui;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.veyravault.space.helper.LocaleHelper;
+import com.veyravault.space.security.SecurityManager;
 
 public abstract class BaseActivity extends AppCompatActivity {
 
@@ -566,8 +574,35 @@ public abstract class BaseActivity extends AppCompatActivity {
         return LocaleHelper.isPersian(this);
     }
 
+    protected boolean isPersian() {
+        return LocaleHelper.isPersian(this);
+    }
+
     protected String tr(String faText, String enText) {
         return isFa() ? faText : enText;
+    }
+
+    protected void switchLanguageInstant() {
+        LocaleHelper.toggleLanguage(this);
+        recreate();
+    }
+
+    protected void triggerQuickLock() {
+        if (SecurityManager.isLockEnabled(this)) {
+            SecurityManager.setSessionUnlocked(false);
+            Intent lockIntent = new Intent(this, SecurityLockActivity.class);
+            startActivity(lockIntent);
+        } else {
+            Toast.makeText(
+                    this,
+                    isFa()
+                            ? "🔒 ابتدا از بخش «امنیت و قفل دوگانه» یک رمز پین یا الگو ثبت کنید."
+                            : "🔒 Please configure a PIN or Pattern in Security Settings first.",
+                    Toast.LENGTH_SHORT
+            ).show();
+            Intent secIntent = new Intent(this, SecuritySettingsActivity.class);
+            startActivity(secIntent);
+        }
     }
 }
 """)
@@ -849,7 +884,7 @@ public class PatternLockView extends View {
 }
 """)
 
-    # 8. CloneMetadataStore.java (Space Renaming, Apple Models, Global/Per-App Region & Proxy, Independent Vault Registry)
+    # 8. CloneMetadataStore.java (Includes 3-arg and 4-arg overloads for setGlobalDeviceIdentity and setGlobalProxy)
     write_file("app/src/main/java/com/veyravault/space/core/CloneMetadataStore.java", """
 package com.veyravault.space.core;
 
@@ -858,7 +893,6 @@ import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -1038,13 +1072,24 @@ public class CloneMetadataStore {
         return prefs(ctx).getString(key(pkg, spaceId, "label"), "");
     }
 
-    // --- Global Device Identity ---
+    // --- Global Device Identity (Both 3-arg and 4-arg overloads) ---
     public static void setGlobalDeviceIdentity(Context ctx, String brand, String model, String device) {
         prefs(ctx).edit()
                 .putString("global_brand", brand == null ? "Apple" : brand.trim())
                 .putString("global_model", model == null ? "iPhone 16 Pro Max" : model.trim())
                 .putString("global_device", device == null ? "iPhone17,2" : device.trim())
                 .apply();
+    }
+
+    public static void setGlobalDeviceIdentity(Context ctx, String brand, String model) {
+        String safeDevice = TextUtils.isEmpty(model) ? "e3q" : model.trim().replaceAll("\\\\s+", "_");
+        for (DevicePreset dp : getDevicePresets()) {
+            if (dp.model.equalsIgnoreCase(model) || dp.title.equalsIgnoreCase(model)) {
+                safeDevice = dp.device;
+                break;
+            }
+        }
+        setGlobalDeviceIdentity(ctx, brand, model, safeDevice);
     }
 
     public static String getGlobalBrand(Context ctx) {
@@ -1148,13 +1193,18 @@ public class CloneMetadataStore {
         return prefs(ctx).getString("global_virtual_ip", "88.198.48.10");
     }
 
-    // --- Optional Global SOCKS5 / HTTP Proxy for Active Session IP Alignment ---
+    // --- Optional Global SOCKS5 / HTTP Proxy (Both 3-arg and 4-arg overloads) ---
     public static void setGlobalProxy(Context ctx, boolean enabled, String host, int port) {
         prefs(ctx).edit()
                 .putBoolean("global_proxy_enabled", enabled)
                 .putString("global_proxy_host", host == null ? "" : host.trim())
                 .putInt("global_proxy_port", port)
                 .apply();
+    }
+
+    public static void setGlobalProxy(Context ctx, String host, int port) {
+        boolean enabled = (host != null && !host.trim().isEmpty() && port > 0);
+        setGlobalProxy(ctx, enabled, host, port);
     }
 
     public static boolean isGlobalProxyEnabled(Context ctx) {
@@ -1456,7 +1506,6 @@ package com.veyravault.space.core;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -2199,14 +2248,25 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
 
 def patch_part2_if_present():
     part2_path = os.path.join(ROOT, "scripts", "upgrade_v3_part2.py")
-    if os.path.exists(part2_path):
-        with open(part2_path, "r", encoding="utf-8") as f:
-            txt = f.read()
-        if "CENTER_horizontal" in txt:
-            txt = txt.replace("CENTER_horizontal", "CENTER_HORIZONTAL")
-            with open(part2_path, "w", encoding="utf-8") as f:
-                f.write(txt)
-            print("[v3-part1] Auto-fixed Gravity.CENTER_HORIZONTAL in scripts/upgrade_v3_part2.py")
+    if not os.path.exists(part2_path):
+        return
+    with open(part2_path, "r", encoding="utf-8") as f:
+        txt = f.read()
+
+    # 1. Fix Gravity.CENTER_HORIZONTAL casing
+    txt = txt.replace("CENTER_horizontal", "CENTER_HORIZONTAL")
+
+    # 2. Wrap 2nd argument of Toast.makeText(AddAppActivity.this, ..., Toast.LENGTH_*) in String.valueOf(...)
+    #    so javac never sees an ambiguous overload
+    txt = re.sub(
+        r"Toast\.makeText\(\s*AddAppActivity\.this\s*,\s*([^;]*?),\s*(Toast\.LENGTH_(?:LONG|SHORT))\s*\)",
+        r"Toast.makeText(AddAppActivity.this, String.valueOf(\1), \2)",
+        txt
+    )
+
+    with open(part2_path, "w", encoding="utf-8") as f:
+        f.write(txt)
+    print("[v3-part1] Auto-patched scripts/upgrade_v3_part2.py successfully.")
 
 
 if __name__ == "__main__":
