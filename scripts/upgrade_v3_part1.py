@@ -1095,18 +1095,11 @@ public class Engine {
     }
 
     public static List<InstallOptionCandidate> getInstallCandidates(Context ctx) {
-        List<AppModel> raw = getInstalledHostApps(ctx);
-        List<InstallOptionCandidate> out = new ArrayList<>();
-        for (AppModel m : raw) {
-            InstallOptionCandidate c = new InstallOptionCandidate();
-            c.packageName = m.packageName; c.name = m.name; c.icon = m.icon; c.isSystem = m.isSystem;
-            out.add(c);
-        }
-        return out;
+        return getInstalledHostApps(ctx);
     }
 
-    public static List<AppModel> getInstalledHostApps(Context ctx) {
-        List<AppModel> res = new ArrayList<>();
+    public static List<InstallOptionCandidate> getInstalledHostApps(Context ctx) {
+        List<InstallOptionCandidate> res = new ArrayList<>();
         PackageManager pm = ctx.getPackageManager();
         String own = ctx.getPackageName();
         Intent mi = new Intent(Intent.ACTION_MAIN, null);
@@ -1120,7 +1113,7 @@ public class Engine {
             seen.add(pkg);
             try {
                 ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                AppModel m = new AppModel();
+                InstallOptionCandidate m = new InstallOptionCandidate();
                 m.packageName = pkg;
                 CharSequence lb = ai.loadLabel(pm);
                 m.name = lb != null ? lb.toString() : pkg;
@@ -1129,8 +1122,8 @@ public class Engine {
                 res.add(m);
             } catch (Throwable ignored) {}
         }
-        Collections.sort(res, new Comparator<AppModel>() {
-            @Override public int compare(AppModel a, AppModel b) {
+        Collections.sort(res, new Comparator<InstallOptionCandidate>() {
+            @Override public int compare(InstallOptionCandidate a, InstallOptionCandidate b) {
                 if (a.isSystem != b.isSystem) return a.isSystem ? 1 : -1;
                 return a.name.compareToIgnoreCase(b.name);
             }
@@ -1208,6 +1201,7 @@ public class Engine {
         } catch (Throwable t) { return null; }
     }
 
+    public static boolean cloneApp(Context ctx, String pkg, int userId) { return clonePackage(ctx, pkg, userId); }
     public static boolean cloneAppToSpace(Context ctx, String pkg, int userId) { return clonePackage(ctx, pkg, userId); }
 
     public static boolean clonePackage(Context ctx, String pkg, int userId) {
