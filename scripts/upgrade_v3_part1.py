@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-VeyraVault v3.0 Upgrade - Part 1 (Core Engine, APK Vault, Native Libs, Hooks, Dual Lock, SVG Icons, Helpers)
+VeyraVault v3.0 Upgrade - Part 1 (Self-contained Infrastructure, Gradle/Manifest, Core Engine, APK Vault, Hooks, Dual Lock, SVG Icons)
 """
 import os
+import re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 JAVA_BASE = os.path.join(ROOT, "app", "src", "main", "java", "com", "veyravault", "space")
 RES_BASE = os.path.join(ROOT, "app", "src", "main", "res")
+MANIFEST_PATH = os.path.join(ROOT, "app", "src", "main", "AndroidManifest.xml")
+APP_GRADLE_PATH = os.path.join(ROOT, "app", "build.gradle")
 
 def write_file(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -15,7 +18,160 @@ def write_file(path, content):
     print(f"[v3-part1] Wrote {os.path.relpath(path, ROOT)}")
 
 # ---------------------------------------------------------------------------
-# 0. SVG Vector Drawables for Bottom Navigation
+# 0. Clean up legacy v1.0 files & Patch app/build.gradle + AndroidManifest.xml
+# ---------------------------------------------------------------------------
+stale_files = [
+    os.path.join(JAVA_BASE, "security", "PinLockActivity.java"),
+    os.path.join(JAVA_BASE, "ui", "LocationPickerActivity.java"),
+]
+for sf in stale_files:
+    if os.path.exists(sf):
+        os.remove(sf)
+        print(f"[v3-part1] Removed legacy file: {os.path.relpath(sf, ROOT)}")
+
+if os.path.exists(APP_GRADLE_PATH):
+    with open(APP_GRADLE_PATH, "r", encoding="utf-8") as f:
+        gradle_txt = f.read()
+    if "osmdroid-android" not in gradle_txt:
+        gradle_txt = gradle_txt.replace(
+            "dependencies {",
+            "dependencies {\n    implementation 'org.osmdroid:osmdroid-android:6.1.14'"
+        )
+    gradle_txt = re.sub(r"versionCode\s+\d+", "versionCode 3", gradle_txt)
+    gradle_txt = re.sub(r'versionName\s+"[^"]+"', 'versionName "3.0.0"', gradle_txt)
+    with open(APP_GRADLE_PATH, "w", encoding="utf-8") as f:
+        f.write(gradle_txt)
+    print("[v3-part1] Patched app/build.gradle with osmdroid & v3.0.0")
+
+DEVICE_ADMIN_XML = """
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>
+"""
+write_file(os.path.join(RES_BASE, "xml", "device_admin_policies.xml"), DEVICE_ADMIN_XML)
+
+ANDROID_MANIFEST = """
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.veyravault.space">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application
+        android:name=".VeyraApplication"
+        android:allowBackup="false"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="VeyraVault"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.AppCompat.NoActionBar"
+        tools:replace="android:label,android:allowBackup,android:icon">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:configChanges="locale|layoutDirection|orientation|screenSize">
+        </activity>
+
+        <!-- Disguise Mode 0: Default VeyraVault -->
+        <activity-alias
+            android:name=".LauncherDefault"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@android:drawable/sym_def_app_icon"
+            android:label="VeyraVault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Disguise Mode 1: Calculator -->
+        <activity-alias
+            android:name=".LauncherCalc"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@android:drawable/ic_dialog_dialer"
+            android:label="Calculator">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Disguise Mode 2: Calendar -->
+        <activity-alias
+            android:name=".LauncherCalendar"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@android:drawable/ic_menu_my_calendar"
+            android:label="Calendar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Disguise Mode 3: Notepad -->
+        <activity-alias
+            android:name=".LauncherNotes"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@android:drawable/ic_menu_edit"
+            android:label="Notes">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity android:name=".ui.AddAppActivity" android:exported="false" />
+        <activity android:name=".ui.GlobalEnvironmentActivity" android:exported="false" />
+        <activity android:name=".ui.SetLocationActivity" android:exported="false" />
+        <activity android:name=".ui.SecuritySettingsActivity" android:exported="false" />
+        <activity android:name=".ui.SecurityLockActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ui.GuideActivity" android:exported="false" />
+        <activity android:name=".ui.AboutActivity" android:exported="false" />
+
+        <receiver
+            android:name=".security.VaultDeviceAdminReceiver"
+            android:description="@string/app_name"
+            android:label="VeyraVault Security Guard"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>
+"""
+write_file(MANIFEST_PATH, ANDROID_MANIFEST)
+
+# ---------------------------------------------------------------------------
+# 1. SVG Vector Drawables for Bottom Navigation
 # ---------------------------------------------------------------------------
 IC_DASHBOARD = """
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -64,7 +220,7 @@ write_file(os.path.join(RES_BASE, "drawable", "ic_nav_guide.xml"), IC_GUIDE)
 write_file(os.path.join(RES_BASE, "drawable", "ic_nav_settings.xml"), IC_SETTINGS)
 
 # ---------------------------------------------------------------------------
-# 1. Jalali (Solar Hijri) & World Clock Utility + LocaleHelper + BaseActivity
+# 2. Jalali (Solar Hijri) & World Clock Utility + LocaleHelper + BaseActivity
 # ---------------------------------------------------------------------------
 JALALI_UTIL = """
 package com.veyravault.space.util;
@@ -248,6 +404,8 @@ package com.veyravault.space.core;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.lang.reflect.Method;
+
 import top.niunaijun.blackbox.BlackBoxCore;
 
 public class GmsSupportManager {
@@ -259,17 +417,19 @@ public class GmsSupportManager {
             return true;
         }
         try {
-            return BlackBoxCore.get().isInstallGms(userId);
-        } catch (Throwable t) {
-            return true;
-        }
+            Method m = BlackBoxCore.class.getMethod("isInstallGms", int.class);
+            Object r = m.invoke(BlackBoxCore.get(), userId);
+            if (r instanceof Boolean) return (Boolean) r;
+        } catch (Throwable ignored) {}
+        return true;
     }
 
     public static boolean installGms(Context ctx, int userId) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putBoolean("gms_enabled_" + userId, true).apply();
         try {
-            BlackBoxCore.get().installGms(userId);
+            Method m = BlackBoxCore.class.getMethod("installGms", int.class);
+            m.invoke(BlackBoxCore.get(), userId);
         } catch (Throwable ignored) {}
         return true;
     }
@@ -278,7 +438,8 @@ public class GmsSupportManager {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putBoolean("gms_enabled_" + userId, false).apply();
         try {
-            BlackBoxCore.get().uninstallGms(userId);
+            Method m = BlackBoxCore.class.getMethod("uninstallGms", int.class);
+            m.invoke(BlackBoxCore.get(), userId);
         } catch (Throwable ignored) {}
     }
 
@@ -468,7 +629,7 @@ public class PatternLockView extends View {
 write_file(os.path.join(JAVA_BASE, "ui", "PatternLockView.java"), PATTERN_VIEW)
 
 # ---------------------------------------------------------------------------
-# 2. CloneMetadataStore (Apple models, Space custom names, Region City/Country, Proxy/IP, APK Vault registry)
+# 3. CloneMetadataStore
 # ---------------------------------------------------------------------------
 CLONE_METADATA_STORE = """
 package com.veyravault.space.core;
@@ -544,7 +705,6 @@ public class CloneMetadataStore {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    // --- Space Custom Naming ---
     public static String getSpaceName(Context ctx, int userId, boolean isFa) {
         String custom = prefs(ctx).getString("space_custom_name_" + userId, "");
         if (custom != null && !custom.trim().isEmpty()) {
@@ -564,7 +724,6 @@ public class CloneMetadataStore {
         return custom != null && !custom.trim().isEmpty();
     }
 
-    // --- Independent Cloned Package Registry (survives host uninstall) ---
     public static void registerClonedPackage(Context ctx, String pkg, int userId, String appLabel) {
         SharedPreferences sp = prefs(ctx);
         String key = "registered_pkgs_space_" + userId;
@@ -624,7 +783,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getString("vault_apk_" + pkg, "");
     }
 
-    // --- Clone Alias ---
     private static String key(String pkg, int userId, String suffix) {
         return pkg + "_u" + userId + "_" + suffix;
     }
@@ -638,7 +796,6 @@ public class CloneMetadataStore {
         prefs(ctx).edit().putString(key(pkg, userId, "alias"), alias == null ? "" : alias.trim()).apply();
     }
 
-    // --- Global Device Identity ---
     public static boolean isGlobalSpoofEnabled(Context ctx) {
         return prefs(ctx).getBoolean("global_spoof_enabled", true);
     }
@@ -668,7 +825,6 @@ public class CloneMetadataStore {
                 .apply();
     }
 
-    // --- Global Region, Location & Proxy Shield ---
     public static String getGlobalRegionName(Context ctx) {
         return prefs(ctx).getString("global_region_name", "Falkenstein, Germany");
     }
@@ -731,7 +887,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getInt("global_proxy_port", 1080);
     }
 
-    // --- Per-Clone Device Identity (Priority #1 over Global) ---
     public static boolean hasCustomDeviceIdentity(Context ctx, String pkg, int userId) {
         return prefs(ctx).getBoolean(key(pkg, userId, "has_custom_device"), false);
     }
@@ -765,7 +920,6 @@ public class CloneMetadataStore {
         return getGlobalDeviceIdentity(ctx);
     }
 
-    // --- Per-Clone Mock Location & Region (Priority #1 over Global) ---
     public static boolean hasMockLocation(Context ctx, String pkg, int userId) {
         return prefs(ctx).getBoolean(key(pkg, userId, "has_loc"), false);
     }
@@ -844,7 +998,7 @@ public class CloneMetadataStore {
 write_file(os.path.join(JAVA_BASE, "core", "CloneMetadataStore.java"), CLONE_METADATA_STORE)
 
 # ---------------------------------------------------------------------------
-# 3. VirtualHookManager (Priority Spoofing, Region/Timezone/Proxy IP Shield, GMS & WebView fixes)
+# 4. VirtualHookManager
 # ---------------------------------------------------------------------------
 VIRTUAL_HOOK_MANAGER = """
 package com.veyravault.space.core;
@@ -895,7 +1049,6 @@ public class VirtualHookManager {
 
     public static void prepareForCloneLaunch(Context context, String packageName, int userId) {
         try {
-            // 1. Device Identity Priority: Per-Clone Custom > Global
             if (CloneMetadataStore.hasCustomDeviceIdentity(context, packageName, userId)) {
                 CloneMetadataStore.DeviceIdentity customId = CloneMetadataStore.getEffectiveDeviceIdentity(context, packageName, userId);
                 applyBuildFields(customId);
@@ -904,7 +1057,6 @@ public class VirtualHookManager {
                 applyBuildFields(globalId);
             }
 
-            // 2. Location & Region Priority: Per-Clone Custom > Global
             if (CloneMetadataStore.hasMockLocation(context, packageName, userId)) {
                 double[] coords = CloneMetadataStore.getMockLocation(context, packageName, userId);
                 activeLat = coords[0];
@@ -923,10 +1075,7 @@ public class VirtualHookManager {
                 locationSpoofActive = false;
             }
 
-            // 3. Apply Region TimeZone, Network Proxy & Virtual IP Properties
             applyRegionTimeZoneAndNetworkProps(context);
-
-            // 4. Ensure GMS availability for YouTube / Viber / Chrome
             installGmsAvailabilityBypass();
         } catch (Throwable t) {
             Log.w(TAG, "prepareForCloneLaunch error: " + t.getMessage());
@@ -1063,8 +1212,7 @@ public class VirtualHookManager {
 write_file(os.path.join(JAVA_BASE, "core", "VirtualHookManager.java"), VIRTUAL_HOOK_MANAGER)
 
 # ---------------------------------------------------------------------------
-# 4. Engine.java (Fixes Chrome WebView DevTools, Instagram/Soroush/Gap Split APK & Native .so,
-#    Independent APK Vault surviving host uninstall, YouTube/Viber GMS auto-enable)
+# 5. Engine.java
 # ---------------------------------------------------------------------------
 ENGINE_JAVA = """
 package com.veyravault.space.core;
@@ -1072,7 +1220,6 @@ package com.veyravault.space.core;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -1160,7 +1307,6 @@ public class Engine {
         PackageManager pm = context.getPackageManager();
         Set<String> seen = new HashSet<>();
 
-        // 1. Check BlackBox internal installed applications
         try {
             List<ApplicationInfo> installed = BlackBoxCore.get().getInstalledApplications(0, userId);
             if (installed != null) {
@@ -1176,12 +1322,10 @@ public class Engine {
             Log.e(TAG, "getClonedApps BCore error", t);
         }
 
-        // 2. Check Independent Vault Registry (ensures apps remain even if uninstalled from host phone!)
         List<String> registered = CloneMetadataStore.getRegisteredPackagesForSpace(context, userId);
         for (String pkg : registered) {
             if (seen.contains(pkg)) continue;
             seen.add(pkg);
-            // Auto-heal inside BlackBox if host uninstallation affected virtual reference
             String vaultApk = CloneMetadataStore.getVaultedApkPath(context, pkg);
             if (vaultApk != null && !vaultApk.isEmpty() && new File(vaultApk).exists()) {
                 try {
@@ -1202,7 +1346,6 @@ public class Engine {
             String baseName = null;
             Drawable icon = ICON_CACHE.get(pkg);
 
-            // Try host PM first
             try {
                 ApplicationInfo hostInfo = pm.getApplicationInfo(pkg, 0);
                 baseName = hostInfo.loadLabel(pm).toString();
@@ -1212,7 +1355,6 @@ public class Engine {
                 }
             } catch (Throwable ignored) {}
 
-            // Fallback to Vaulted APK if app was uninstalled from phone!
             if (baseName == null || icon == null) {
                 String vaultApk = CloneMetadataStore.getVaultedApkPath(context, pkg);
                 if (vaultApk != null && !vaultApk.isEmpty() && new File(vaultApk).exists()) {
@@ -1229,7 +1371,6 @@ public class Engine {
                 }
             }
 
-            // Fallback to BCore ApplicationInfo
             if ((baseName == null || icon == null) && bcoreInfo != null) {
                 if (baseName == null) baseName = bcoreInfo.loadLabel(pm).toString();
                 if (icon == null) icon = bcoreInfo.loadIcon(pm);
@@ -1256,10 +1397,8 @@ public class Engine {
             ApplicationInfo appInfo = pm.getApplicationInfo(packageName, 0);
             String appLabel = appInfo.loadLabel(pm).toString();
 
-            // 1. Backup APK + Splits into VeyraVault Independent APK Vault
             File vaultedBaseApk = backupPackageToVault(context, packageName, appInfo);
 
-            // 2. Install from Standalone Vault APK so uninstalling host app NEVER breaks the clone!
             InstallResult res;
             if (vaultedBaseApk != null && vaultedBaseApk.exists()) {
                 res = BlackBoxCore.get().installPackageAsUser(vaultedBaseApk, userId);
@@ -1269,13 +1408,11 @@ public class Engine {
 
             boolean ok = res != null && res.success;
             if (!ok) {
-                // Fallback direct install
                 res = BlackBoxCore.get().installPackageAsUser(packageName, userId);
                 ok = res != null && res.success;
             }
 
             if (ok) {
-                // 3. Extract native .so libraries from base + split APKs (fixes Instagram, Soroush, Gap)
                 extractNativeLibsToVirtualApp(context, packageName, appInfo);
                 CloneMetadataStore.registerClonedPackage(context, packageName, userId, appLabel);
             }
@@ -1352,11 +1489,9 @@ public class Engine {
             File vaultLibDir = new File(context.getFilesDir(), "apk_vault/" + pkg + "/lib");
             if (!vaultLibDir.exists()) vaultLibDir.mkdirs();
 
-            // Extract from base APK
             if (appInfo.sourceDir != null) {
                 extractAbiFromApkZip(new File(appInfo.sourceDir), vaultLibDir);
             }
-            // Extract from all split APKs (critical for Instagram, Soroush, Gap split config.arm64_v8a.apk)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && appInfo.splitSourceDirs != null) {
                 for (String split : appInfo.splitSourceDirs) {
                     extractAbiFromApkZip(new File(split), vaultLibDir);
@@ -1430,13 +1565,11 @@ public class Engine {
             GmsSupportManager.installGms(context, userId);
             VirtualHookManager.prepareForCloneLaunch(context, packageName, userId);
 
-            // Ensure vaulted native libs are synced before launch (fixes Instagram, Soroush, Gap)
             File vaultLibDir = new File(context.getFilesDir(), "apk_vault/" + packageName + "/lib");
             if (vaultLibDir.exists()) {
                 syncLibsToBlackBoxDir(context, packageName, vaultLibDir);
             }
 
-            // Special Fix for Chrome opening WebView DevTools instead of Main Browser Activity
             Intent explicitIntent = resolveRealMainLauncherIntent(context, packageName);
             if (explicitIntent != null) {
                 try {
@@ -1473,7 +1606,6 @@ public class Engine {
                 for (ResolveInfo ri : resolves) {
                     if (ri.activityInfo != null && ri.activityInfo.name != null) {
                         String actName = ri.activityInfo.name.toLowerCase();
-                        // Skip any DevTools / DevUI / Crash /Debug activities
                         if (actName.contains("devui") || actName.contains("devtools") || actName.contains("debug")) {
                             continue;
                         }
@@ -1542,7 +1674,7 @@ public class Engine {
 write_file(os.path.join(JAVA_BASE, "core", "Engine.java"), ENGINE_JAVA)
 
 # ---------------------------------------------------------------------------
-# 5. SecurityManager & VaultDeviceAdminReceiver (Dual Simultaneous Lock + Priority + Anti-Uninstall Blocker)
+# 6. SecurityManager & VaultDeviceAdminReceiver
 # ---------------------------------------------------------------------------
 SECURITY_MANAGER = """
 package com.veyravault.space.security;
@@ -1554,10 +1686,9 @@ import java.security.MessageDigest;
 public class SecurityManager {
     private static final String PREFS = "veyra_security_v3";
     private static final String KEY_LOCK_ENABLED = "lock_enabled";
-    private static final String KEY_PRIMARY_MODE = "primary_mode"; // 1 = PIN priority, 2 = Pattern priority
+    private static final String KEY_PRIMARY_MODE = "primary_mode";
     private static final String KEY_PIN_HASH = "pin_hash";
     private static final String KEY_PATTERN_HASH = "pattern_hash";
-    private static final String KEY_UNINSTALL_GUARD = "uninstall_guard";
 
     public static final int MODE_PIN = 1;
     public static final int MODE_PATTERN = 2;
@@ -1697,7 +1828,6 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
     @Override
     public CharSequence onDisableRequested(Context context, Intent intent) {
         if (!SecurityManager.isUninstallGuardAuthorizedRemoval(context)) {
-            // Immediately lock session & launch VeyraVault Lock Screen over Settings to block unauthorized deactivation!
             SecurityManager.setSessionUnlocked(false);
             try {
                 Intent lockIntent = new Intent(context, SecurityLockActivity.class);
@@ -1707,7 +1837,7 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
             } catch (Throwable ignored) {}
             Toast.makeText(context, "⛔ حذف مقدور نمی‌باشد! ابتدا رمز VeyraVault را وارد کنید.", Toast.LENGTH_LONG).show();
         }
-        return "⛔ حذف مقدور نمی‌باشد VeyraVault با رمز عبور مجاز است.";
+        return "⛔ حذف مقدور نمی‌باشد! غیرفعال‌سازی فقط از داخل تنظیمات امنیتی VeyraVault با رمز عبور مجاز است.";
     }
 
     @Override
