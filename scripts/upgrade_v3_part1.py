@@ -12,6 +12,7 @@ JAVA_BASE = os.path.join(ROOT, "app", "src", "main", "java", "com", "veyravault"
 RES_BASE = os.path.join(ROOT, "app", "src", "main", "res")
 MANIFEST_PATH = os.path.join(ROOT, "app", "src", "main", "AndroidManifest.xml")
 APP_GRADLE_PATH = os.path.join(ROOT, "app", "build.gradle")
+PART2_SCRIPT_PATH = os.path.join(ROOT, "scripts", "upgrade_v3_part2.py")
 
 def write_file(rel_dir, filename, content, base=JAVA_BASE):
     target_dir = os.path.join(base, rel_dir) if rel_dir else base
@@ -45,6 +46,22 @@ def patch_app_build_gradle():
         f.write(txt)
     print("[v3-Part1] Patched app/build.gradle with osmdroid & version 3.0.0")
 
+def sanitize_part2_anti_uninstall_messages():
+    if not os.path.exists(PART2_SCRIPT_PATH):
+        return
+    with open(PART2_SCRIPT_PATH, "r", encoding="utf-8") as f:
+        txt = f.read()
+    txt = txt.replace(
+        "برای هرگونه تغییر ابتدا قفل امنیتی را باز کنید.",
+        "دسترسی غیرمجاز مسدود شد."
+    ).replace(
+        "غیرفعال‌سازی فقط از داخل تنظیمات امنیتی برنامه مجاز است.",
+        "عملیات حذف مسدود است."
+    )
+    with open(PART2_SCRIPT_PATH, "w", encoding="utf-8") as f:
+        f.write(txt)
+    print("[v3-Part1] Sanitized anti-uninstall messages in upgrade_v3_part2.py")
+
 # ---------------------------------------------------------------------------
 # 0. ANDROID MANIFEST, STRINGS, STYLES, DEVICE ADMIN XML & APPLICATION CLASS
 # ---------------------------------------------------------------------------
@@ -70,13 +87,12 @@ ANDROID_MANIFEST_XML = r'''
         android:name=".VeyraApplication"
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
-        android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:largeHeap="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme"
-        tools:replace="android:allowBackup,android:icon,android:roundIcon,android:label,android:theme">
+        tools:replace="android:allowBackup,android:icon,android:label,android:theme">
 
         <activity
             android:name=".ui.MainActivity"
@@ -202,7 +218,7 @@ STRINGS_XML = r'''
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VeyraVault</string>
-    <string name="device_admin_desc">حفاظت در برابر حذف غیرمجاز برنامه VeyraVault</string>
+    <string name="device_admin_desc">حفاظت امنیتی سیستم</string>
 </resources>
 '''
 
@@ -593,6 +609,8 @@ package com.veyravault.space.core;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import top.niunaijun.blackbox.BlackBoxCore;
 
 public class GmsSupportManager {
@@ -607,7 +625,10 @@ public class GmsSupportManager {
 
     public static boolean isGmsInstalled(int spaceId) {
         try {
-            return BlackBoxCore.get().isInstallGms(spaceId);
+            Object core = BlackBoxCore.get();
+            Method m = core.getClass().getMethod("isInstallGms", int.class);
+            Object r = m.invoke(core, spaceId);
+            return (r instanceof Boolean) && (Boolean) r;
         } catch (Throwable t) {
             return false;
         }
@@ -615,8 +636,20 @@ public class GmsSupportManager {
 
     public static boolean installGms(int spaceId) {
         try {
-            if (!BlackBoxCore.get().isInstallGms(spaceId)) {
-                return BlackBoxCore.get().installGms(spaceId);
+            if (!isGmsInstalled(spaceId)) {
+                Object core = BlackBoxCore.get();
+                Method m = core.getClass().getMethod("installGms", int.class);
+                Object res = m.invoke(core, spaceId);
+                if (res instanceof Boolean) {
+                    return (Boolean) res;
+                }
+                if (res != null) {
+                    try {
+                        Field f = res.getClass().getField("success");
+                        return f.getBoolean(res);
+                    } catch (Throwable ignored) {}
+                    return true;
+                }
             }
             return true;
         } catch (Throwable t) {
@@ -641,6 +674,7 @@ package com.veyravault.space.helper;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 
 public class AppDisguiseManager {
@@ -652,7 +686,8 @@ public class AppDisguiseManager {
     public static final int MODE_NOTEPAD = 2;
 
     public static int getCurrentDisguise(Context ctx) {
-        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_MODE, MODE_DEFAULT);
+        SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return sp.getInt(KEY_MODE, MODE_DEFAULT);
     }
 
     public static void applyDisguise(Context ctx, int mode) {
@@ -1422,7 +1457,7 @@ public class Engine {
         File[] soFiles = vaultLibDir.listFiles();
         if (soFiles == null || soFiles.length == 0) return;
 
-        File dataRoot = ctx.getDataDir();
+        File dataRoot = Build.VERSION.SDK_INT >= 24 ? ctx.getDataDir() : ctx.getFilesDir().getParentFile();
         File[] candidates = new File[]{
             new File(dataRoot, "virtual/data/app/" + pkg + "/lib"),
             new File(dataRoot, "virtual/data/user/0/" + pkg + "/lib"),
@@ -1758,7 +1793,7 @@ public class Engine {
 '''
 
 # ---------------------------------------------------------------------------
-# 7. SECURITY MANAGER & DEVICE ADMIN RECEIVER
+# 7. SECURITY MANAGER & DEVICE ADMIN RECEIVER (STEALTH ANTI-UNINSTALL)
 # ---------------------------------------------------------------------------
 SECURITY_MANAGER_JAVA = r'''
 package com.veyravault.space.security;
@@ -1911,8 +1946,8 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
     public void onEnabled(Context context, Intent intent) {
         boolean fa = LocaleHelper.isPersian(context);
         Toast.makeText(context,
-            fa ? "🛡️ قفل ضدحذف VeyraVault فعال شد (حذف برنامه مسدود است)"
-               : "🛡️ VeyraVault Anti-Uninstall Protection Enabled",
+            fa ? "🛡️ حفاظت سیستم فعال شد"
+               : "🛡️ System Protection Enabled",
             Toast.LENGTH_LONG).show();
     }
 
@@ -1931,13 +1966,13 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
             } catch (Throwable ignored) {}
 
             Toast.makeText(context,
-                fa ? "⛔ حذف مقدور نمی‌باشد! غیرفعال‌سازی فقط از داخل تنظیمات امنیتی برنامه مجاز است."
-                   : "⛔ Uninstallation is not permitted! Disable only inside VeyraVault Security Settings.",
+                fa ? "⛔ حذف مقدور نمی‌باشد! عملیات مسدود شد."
+                   : "⛔ Uninstallation is not permitted! Operation blocked.",
                 Toast.LENGTH_LONG).show();
         }
         return fa
-            ? "⛔ حذف مقدور نمی‌باشد!\nاین برنامه توسط قفل امنیتی VeyraVault محافظت می‌شود و خارج از محیط برنامه قابل غیرفعال‌سازی یا حذف نیست."
-            : "⛔ Uninstallation is NOT permitted!\nProtected by VeyraVault Security Lock.";
+            ? "⛔ حذف مقدور نمی‌باشد!\nعملیات حذف یا غیرفعال‌سازی این برنامه مسدود است."
+            : "⛔ Uninstallation is NOT permitted!\nRemoving or deactivating this application is blocked.";
     }
 
     @Override
@@ -1950,6 +1985,7 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
 def main():
     clean_legacy_sources()
     patch_app_build_gradle()
+    sanitize_part2_anti_uninstall_messages()
 
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         f.write(ANDROID_MANIFEST_XML.strip() + "\n")
