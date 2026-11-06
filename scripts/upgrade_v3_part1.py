@@ -69,13 +69,14 @@ ANDROID_MANIFEST_XML = r'''
     <application
         android:name=".VeyraApplication"
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:largeHeap="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme"
-        tools:replace="android:allowBackup,android:label,android:theme">
+        tools:replace="android:allowBackup,android:icon,android:roundIcon,android:label,android:theme">
 
         <activity
             android:name=".ui.MainActivity"
@@ -168,6 +169,24 @@ ANDROID_MANIFEST_XML = r'''
 
     </application>
 </manifest>
+'''
+
+IC_LAUNCHER_XML = r'''
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z"/>
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M54,16L22,30v24c0,22.2 13.6,42.9 32,48c18.4,-5.1 32,-25.8 32,-48V30L54,16z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,32c-8.8,0 -16,7.2 -16,16v6h-4v22h40V54h-4v-6c0,-8.8 -7.2,-16 -16,-16zM44,48c0,-5.5 4.5,-10 10,-10s10,4.5 10,10v6H44v-6z"/>
+</vector>
 '''
 
 DEVICE_ADMIN_XML = r'''
@@ -333,7 +352,7 @@ public class JalaliClockUtil {
         int gy = cal.get(Calendar.YEAR);
         int gm = cal.get(Calendar.MONTH) + 1;
         int gd = cal.get(Calendar.DAY_OF_MONTH);
-        int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun .. 7=Sat
+        int dow = cal.get(Calendar.DAY_OF_WEEK);
         int[] jalali = gregorianToJalali(gy, gm, gd);
         if (persian) {
             String wd = PERSIAN_WEEKDAYS_FA[dow - 1];
@@ -514,7 +533,6 @@ public class BaseActivity extends Activity {
         LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         bar.addView(title, tLp);
 
-        // Quick Lock Button (Item 4)
         TextView lockBtn = new TextView(this);
         lockBtn.setText(fa ? "🔒 قفل سریع" : "🔒 Lock");
         lockBtn.setTextColor(Color.parseColor("#FDE047"));
@@ -546,7 +564,6 @@ public class BaseActivity extends Activity {
         });
         bar.addView(lockBtn, lockLp);
 
-        // Language Toggle Button
         TextView langBtn = new TextView(this);
         langBtn.setText(fa ? "EN" : "فارسی");
         langBtn.setTextColor(Color.WHITE);
@@ -624,7 +641,6 @@ package com.veyravault.space.helper;
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 
 public class AppDisguiseManager {
@@ -1942,6 +1958,7 @@ def main():
     write_file("xml", "device_admin_policies.xml", DEVICE_ADMIN_XML, base=RES_BASE)
     write_file("values", "strings.xml", STRINGS_XML, base=RES_BASE)
     write_file("values", "styles.xml", STYLES_XML, base=RES_BASE)
+    write_file("drawable", "ic_launcher.xml", IC_LAUNCHER_XML, base=RES_BASE)
     write_file("drawable", "ic_nav_dashboard.xml", IC_DASHBOARD_XML, base=RES_BASE)
     write_file("drawable", "ic_nav_spaces.xml", IC_SPACES_XML, base=RES_BASE)
     write_file("drawable", "ic_nav_add.xml", IC_ADD_XML, base=RES_BASE)
