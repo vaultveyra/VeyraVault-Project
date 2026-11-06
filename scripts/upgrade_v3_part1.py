@@ -1,27 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-VeyraVault v3.0 Upgrade Script - Part 1
-Handles:
-- Wiping legacy Java & layout files to prevent duplicate/broken class conflicts
-- Updating app/build.gradle (osmdroid dependency, version 3.0.0)
-- Updating AndroidManifest.xml (New v3.0 Activities, Disguise activity-aliases, Permissions)
-- Updating strings.xml & styles.xml (Bilingual FA/EN + Stealth Anti-Uninstall strings)
-- Creating Vector Drawables for Bottom Navigation & App Icon
-- Creating Helper & Core classes:
-  * VeyraApplication.java
-  * JalaliClockUtil.java (Accurate Solar Hijri / Jalali Calendar + World Clocks)
-  * LocaleHelper.java
-  * BaseActivity.java (Includes isPersian, switchLanguageInstant, triggerQuickLock)
-  * GmsSupportManager.java (Fixes YouTube, Viber, GMS Services)
-  * AppDisguiseManager.java (Calculator / Calendar / Notes Icon & Name Disguise)
-  * PatternLockView.java (Custom 9-dot Pattern View supporting both Listener interfaces)
-  * CloneMetadataStore.java (Space Renaming, Apple Models, Global/Per-App Region & Proxy, Vaulted APKs)
-  * VirtualHookManager.java (Strict Priority: Per-Clone > Global, IP/Proxy Shield, GMS Bypass)
-  * Engine.java (Independent APK Vault, Chrome Main Activity Fix, Split APK & Native .so Sync)
-  * SecurityManager.java (Simultaneous Dual Lock: PIN + Pattern with Priority & Auto-Fallback)
-  * VaultDeviceAdminReceiver.java (Stealth Anti-Uninstall Blocker locking session immediately)
-- Auto-patching scripts/upgrade_v3_part2.py before Part 2 executes
+VeyraVault v3.0 Upgrade Script - Part 1 (Fully Synchronized with Part 2 UI)
 """
 
 import os
@@ -319,7 +299,7 @@ package com.veyravault.space;
 import android.app.Application;
 import android.content.Context;
 
-import com.veyravault.space.core.GmsSupportManager;
+import com.veyravault.space.helper.GmsSupportManager;
 import com.veyravault.space.core.VirtualHookManager;
 import com.veyravault.space.helper.LocaleHelper;
 
@@ -364,7 +344,7 @@ public class VeyraApplication extends Application {
 }
 """)
 
-    # 2. JalaliClockUtil.java (Supports both getNewYorkGregorianDate() and getNewYorkGregorianDate(boolean))
+    # 2. JalaliClockUtil.java
     write_file("app/src/main/java/com/veyravault/space/helper/JalaliClockUtil.java", """
 package com.veyravault.space.helper;
 
@@ -427,7 +407,7 @@ public class JalaliClockUtil {
         int gy = cal.get(Calendar.YEAR);
         int gm = cal.get(Calendar.MONTH) + 1;
         int gd = cal.get(Calendar.DAY_OF_MONTH);
-        int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun .. 7=Sat
+        int dow = cal.get(Calendar.DAY_OF_WEEK);
         int[] jalali = gregorianToJalali(gy, gm, gd);
         if (isFa) {
             String dayName = WEEKDAYS_FA[dow - 1];
@@ -497,7 +477,7 @@ public class LocaleHelper {
 
     public static String getLanguage(Context context) {
         SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        return sp.getString(KEY_LANG, "fa"); // Default Persian Priority
+        return sp.getString(KEY_LANG, "fa");
     }
 
     public static boolean isPersian(Context context) {
@@ -531,7 +511,7 @@ public class LocaleHelper {
 }
 """)
 
-    # 4. BaseActivity.java (Includes isPersian, switchLanguageInstant, triggerQuickLock)
+    # 4. BaseActivity.java
     write_file("app/src/main/java/com/veyravault/space/ui/BaseActivity.java", """
 package com.veyravault.space.ui;
 
@@ -607,9 +587,9 @@ public abstract class BaseActivity extends AppCompatActivity {
 }
 """)
 
-    # 5. GmsSupportManager.java (Fixes YouTube, Viber, GMS Services)
-    write_file("app/src/main/java/com/veyravault/space/core/GmsSupportManager.java", """
-package com.veyravault.space.core;
+    # 5A. GmsSupportManager.java in com.veyravault.space.helper (Used by GlobalEnvironmentActivity & VeyraApplication)
+    write_file("app/src/main/java/com/veyravault/space/helper/GmsSupportManager.java", """
+package com.veyravault.space.helper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -632,6 +612,13 @@ public class GmsSupportManager {
                 .edit().putBoolean(KEY_GMS_ENABLED, enabled).apply();
         if (enabled) {
             autoInitializeGms(ctx);
+        }
+    }
+
+    public static void enableGmsAcrossAllSpaces(Context ctx) {
+        setGmsEnabled(ctx, true);
+        for (int spaceId = 0; spaceId < 5; spaceId++) {
+            ensureGmsForSpace(spaceId);
         }
     }
 
@@ -666,7 +653,36 @@ public class GmsSupportManager {
 }
 """)
 
-    # 6. AppDisguiseManager.java (Icon & Name Disguise)
+    # 5B. GmsSupportManager.java in com.veyravault.space.core (Delegates to helper so both packages work)
+    write_file("app/src/main/java/com/veyravault/space/core/GmsSupportManager.java", """
+package com.veyravault.space.core;
+
+import android.content.Context;
+
+public class GmsSupportManager {
+    public static boolean isGmsEnabled(Context ctx) {
+        return com.veyravault.space.helper.GmsSupportManager.isGmsEnabled(ctx);
+    }
+
+    public static void setGmsEnabled(Context ctx, boolean enabled) {
+        com.veyravault.space.helper.GmsSupportManager.setGmsEnabled(ctx, enabled);
+    }
+
+    public static void enableGmsAcrossAllSpaces(Context ctx) {
+        com.veyravault.space.helper.GmsSupportManager.enableGmsAcrossAllSpaces(ctx);
+    }
+
+    public static void autoInitializeGms(Context ctx) {
+        com.veyravault.space.helper.GmsSupportManager.autoInitializeGms(ctx);
+    }
+
+    public static boolean ensureGmsForSpace(int spaceId) {
+        return com.veyravault.space.helper.GmsSupportManager.ensureGmsForSpace(spaceId);
+    }
+}
+""")
+
+    # 6. AppDisguiseManager.java (String constants matching SecuritySettingsActivity)
     write_file("app/src/main/java/com/veyravault/space/helper/AppDisguiseManager.java", """
 package com.veyravault.space.helper;
 
@@ -677,12 +693,19 @@ import android.content.pm.PackageManager;
 
 public class AppDisguiseManager {
     private static final String PREFS = "veyra_disguise_prefs";
-    private static final String KEY_MODE = "disguise_mode";
+    private static final String KEY_MODE = "disguise_mode_str";
 
-    public static final int MODE_DEFAULT = 0;
-    public static final int MODE_CALCULATOR = 1;
-    public static final int MODE_CALENDAR = 2;
-    public static final int MODE_NOTES = 3;
+    public static final String MODE_DEFAULT = "default";
+    public static final String MODE_CALCULATOR = "calculator";
+    public static final String MODE_CALENDAR = "calendar";
+    public static final String MODE_NOTES = "notes";
+
+    private static final String[] MODES = {
+        MODE_DEFAULT,
+        MODE_CALCULATOR,
+        MODE_CALENDAR,
+        MODE_NOTES
+    };
 
     private static final String[] ALIASES = {
         "com.veyravault.space.AliasDefault",
@@ -691,19 +714,26 @@ public class AppDisguiseManager {
         "com.veyravault.space.AliasNotes"
     };
 
-    public static int getDisguiseMode(Context ctx) {
-        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_MODE, MODE_DEFAULT);
+    public static String getCurrentDisguiseMode(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_MODE, MODE_DEFAULT);
     }
 
-    public static void applyDisguiseMode(Context ctx, int mode) {
-        if (mode < 0 || mode >= ALIASES.length) mode = MODE_DEFAULT;
+    public static void applyDisguiseMode(Context ctx, String mode) {
+        if (mode == null) mode = MODE_DEFAULT;
+        int targetIdx = 0;
+        for (int i = 0; i < MODES.length; i++) {
+            if (MODES[i].equalsIgnoreCase(mode)) {
+                targetIdx = i;
+                break;
+            }
+        }
         SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        sp.edit().putInt(KEY_MODE, mode).apply();
+        sp.edit().putString(KEY_MODE, MODES[targetIdx]).apply();
 
         PackageManager pm = ctx.getPackageManager();
         for (int i = 0; i < ALIASES.length; i++) {
             ComponentName cn = new ComponentName(ctx.getPackageName(), ALIASES[i]);
-            int state = (i == mode)
+            int state = (i == targetIdx)
                     ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                     : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
             try {
@@ -715,7 +745,7 @@ public class AppDisguiseManager {
 }
 """)
 
-    # 7. PatternLockView.java (Custom 9-dot Pattern View supporting both Listener interfaces)
+    # 7. PatternLockView.java
     write_file("app/src/main/java/com/veyravault/space/ui/PatternLockView.java", """
 package com.veyravault.space.ui;
 
@@ -884,7 +914,7 @@ public class PatternLockView extends View {
 }
 """)
 
-    # 8. CloneMetadataStore.java (Includes 3-arg and 4-arg overloads for setGlobalDeviceIdentity and setGlobalProxy)
+    # 8. CloneMetadataStore.java (All overloads included)
     write_file("app/src/main/java/com/veyravault/space/core/CloneMetadataStore.java", """
 package com.veyravault.space.core;
 
@@ -940,7 +970,6 @@ public class CloneMetadataStore {
         }
     }
 
-    // Updated Presets including Apple iPhone & iPad Models
     public static List<DevicePreset> getDevicePresets() {
         List<DevicePreset> list = new ArrayList<>();
         list.add(new DevicePreset("Apple iPhone 16 Pro Max", "Apple", "iPhone 16 Pro Max", "iPhone17,2"));
@@ -958,7 +987,6 @@ public class CloneMetadataStore {
         return list;
     }
 
-    // Updated Region Presets with Falkenstein, Germany first
     public static List<RegionPreset> getRegionPresets() {
         List<RegionPreset> list = new ArrayList<>();
         list.add(new RegionPreset(
@@ -1026,7 +1054,6 @@ public class CloneMetadataStore {
         return pkg + "_s" + spaceId + "_" + suffix;
     }
 
-    // --- Space Custom Naming ---
     public static void setSpaceCustomName(Context ctx, int spaceId, String name) {
         prefs(ctx).edit().putString("space_custom_name_" + spaceId, name == null ? "" : name.trim()).apply();
     }
@@ -1044,7 +1071,6 @@ public class CloneMetadataStore {
         return isFa ? ("فضای " + num) : ("Space " + num);
     }
 
-    // --- Independent Cloned Apps Registry per Space ---
     public static void registerClonedPackage(Context ctx, String pkg, int spaceId) {
         SharedPreferences sp = prefs(ctx);
         Set<String> existing = new HashSet<>(sp.getStringSet("space_pkgs_" + spaceId, new HashSet<String>()));
@@ -1063,7 +1089,6 @@ public class CloneMetadataStore {
         return new HashSet<>(prefs(ctx).getStringSet("space_pkgs_" + spaceId, new HashSet<String>()));
     }
 
-    // --- Clone Alias ---
     public static void setCustomLabel(Context ctx, String pkg, int spaceId, String label) {
         prefs(ctx).edit().putString(key(pkg, spaceId, "label"), label == null ? "" : label.trim()).apply();
     }
@@ -1072,7 +1097,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getString(key(pkg, spaceId, "label"), "");
     }
 
-    // --- Global Device Identity (Both 3-arg and 4-arg overloads) ---
     public static void setGlobalDeviceIdentity(Context ctx, String brand, String model, String device) {
         prefs(ctx).edit()
                 .putString("global_brand", brand == null ? "Apple" : brand.trim())
@@ -1104,7 +1128,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getString("global_device", "e3q");
     }
 
-    // --- Per-Clone Custom Device Identity (Takes Priority #1 over Global) ---
     public static void setDeviceIdentity(Context ctx, String pkg, int spaceId, String brand, String model) {
         prefs(ctx).edit()
                 .putString(key(pkg, spaceId, "brand"), brand == null ? "" : brand.trim())
@@ -1143,7 +1166,7 @@ public class CloneMetadataStore {
         return "";
     }
 
-    // --- Global Region, GPS, Timezone & Session IP/Proxy ---
+    // Both 7-arg and 6-arg overloads for setGlobalRegionLocation
     public static void setGlobalRegionLocation(Context ctx, String cityCountry, double lat, double lon,
                                                String timeZoneId, String simIso, String virtualIp) {
         prefs(ctx).edit()
@@ -1155,6 +1178,18 @@ public class CloneMetadataStore {
                 .putString("global_sim_iso", simIso)
                 .putString("global_virtual_ip", virtualIp)
                 .apply();
+    }
+
+    public static void setGlobalRegionLocation(Context ctx, String cityCountry, double lat, double lon,
+                                               String timeZoneId, String virtualIp) {
+        String simIso = "de";
+        for (RegionPreset rp : getRegionPresets()) {
+            if (rp.cityCountry.equalsIgnoreCase(cityCountry)) {
+                simIso = rp.defaultSimIso;
+                break;
+            }
+        }
+        setGlobalRegionLocation(ctx, cityCountry, lat, lon, timeZoneId, simIso, virtualIp);
     }
 
     public static boolean isGlobalLocationEnabled(Context ctx) {
@@ -1193,7 +1228,7 @@ public class CloneMetadataStore {
         return prefs(ctx).getString("global_virtual_ip", "88.198.48.10");
     }
 
-    // --- Optional Global SOCKS5 / HTTP Proxy (Both 3-arg and 4-arg overloads) ---
+    // Both 4-arg and 3-arg overloads for setGlobalProxy
     public static void setGlobalProxy(Context ctx, boolean enabled, String host, int port) {
         prefs(ctx).edit()
                 .putBoolean("global_proxy_enabled", enabled)
@@ -1219,7 +1254,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getInt("global_proxy_port", 1080);
     }
 
-    // --- Per-Clone Custom Location & Region (Takes Priority #1 over Global) ---
     public static void setCustomLocation(Context ctx, String pkg, int spaceId,
                                          double lat, double lon, String regionCityCountry) {
         prefs(ctx).edit()
@@ -1311,7 +1345,7 @@ public class CloneMetadataStore {
 }
 """)
 
-    # 9. VirtualHookManager.java (Strict Priority: Per-Clone > Global, IP/Proxy Shield, GMS Bypass)
+    # 9. VirtualHookManager.java
     write_file("app/src/main/java/com/veyravault/space/core/VirtualHookManager.java", """
 package com.veyravault.space.core;
 
@@ -1326,8 +1360,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.TimeZone;
-
-import top.niunaijun.blackbox.BlackBoxCore;
 
 public class VirtualHookManager {
 
@@ -1344,13 +1376,7 @@ public class VirtualHookManager {
         installGmsAvailabilityBypass();
     }
 
-    /**
-     * Enforces Strict Priority Rule:
-     * 1. If the clone has a Per-Clone Device Identity, apply it. Otherwise apply Global Device Identity.
-     * 2. If the clone has a Per-Clone Location/Region, apply it. Otherwise apply Global Location/Region.
-     */
     public static void prepareForCloneLaunch(Context ctx, String pkg, int spaceId) {
-        // 1. Device Identity Priority
         String brand = CloneMetadataStore.getEffectiveBrand(ctx, pkg, spaceId);
         String model = CloneMetadataStore.getEffectiveModel(ctx, pkg, spaceId);
         String device = CloneMetadataStore.hasCustomDeviceIdentity(ctx, pkg, spaceId)
@@ -1358,12 +1384,10 @@ public class VirtualHookManager {
                 : CloneMetadataStore.getGlobalDevice(ctx);
         applyBuildFields(brand, model, device);
 
-        // 2. Location & Region Priority
         double[] coords = CloneMetadataStore.getEffectiveCoordinates(ctx, pkg, spaceId);
         String regionName = CloneMetadataStore.getEffectiveRegionName(ctx, pkg, spaceId);
         injectVirtualGpsLocation(spaceId, pkg, coords[0], coords[1]);
 
-        // Match timezone & SIM ISO to region so active sessions show the target country (e.g. Falkenstein, Germany)
         String tz = CloneMetadataStore.getGlobalTimeZone(ctx);
         String simIso = CloneMetadataStore.getGlobalSimIso(ctx);
         String virtualIp = CloneMetadataStore.getGlobalVirtualIp(ctx);
@@ -1419,7 +1443,6 @@ public class VirtualHookManager {
             if (!TextUtils.isEmpty(virtualIp)) {
                 System.setProperty("veyra.virtual.ip", virtualIp);
             }
-            // Apply SOCKS5 / HTTP Proxy if configured for IP routing
             if (CloneMetadataStore.isGlobalProxyEnabled(ctx)) {
                 String host = CloneMetadataStore.getGlobalProxyHost(ctx);
                 int port = CloneMetadataStore.getGlobalProxyPort(ctx);
@@ -1455,7 +1478,6 @@ public class VirtualHookManager {
                 loc.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
             }
 
-            // Try BlackBox BLocationManager reflection so all BlackBox versions work cleanly
             Class<?> bLocMgrClass = Class.forName("top.niunaijun.blackbox.fake.frameworks.BLocationManager");
             Method getMethod = bLocMgrClass.getDeclaredMethod("get");
             Object mgr = getMethod.invoke(null);
@@ -1499,7 +1521,7 @@ public class VirtualHookManager {
 }
 """)
 
-    # 10. Engine.java (Independent APK Vault, Chrome Main Activity Fix, Split APK & Native .so Extraction)
+    # 10. Engine.java (Provides ClonedApp, InstallOptionCandidate, getInstallCandidates, cloneAppToSpace, installExternalApkFileToSpace)
     write_file("app/src/main/java/com/veyravault/space/core/Engine.java", """
 package com.veyravault.space.core;
 
@@ -1541,6 +1563,13 @@ public class Engine {
         public Drawable icon;
         public String sourceDir;
         public boolean isIndependentVaulted;
+        public boolean isVaultBacked;
+    }
+
+    public static class ClonedApp extends AppModel {
+    }
+
+    public static class InstallOptionCandidate extends AppModel {
     }
 
     private static final LruCache<String, Drawable> ICON_CACHE = new LruCache<>(120);
@@ -1557,12 +1586,6 @@ public class Engine {
         return new File(getApkVaultDir(ctx, pkg), "base.apk");
     }
 
-    /**
-     * Copies the host app's base APK and any split APKs into VeyraVault's independent APK vault
-     * and extracts native .so libraries so that:
-     * 1) If the user uninstalls the app from their phone, the clone remains 100% intact.
-     * 2) Heavy Split-APK apps (Instagram, Soroush, Gap, YouTube, Viber) have all their native .so libs ready.
-     */
     public static File backupPackageToVault(Context ctx, String pkg) {
         try {
             PackageManager pm = ctx.getPackageManager();
@@ -1577,7 +1600,6 @@ public class Engine {
                 }
             }
 
-            // Copy Split APKs if present (Android 5.0+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && ai.splitSourceDirs != null) {
                 int idx = 1;
                 for (String splitPath : ai.splitSourceDirs) {
@@ -1592,7 +1614,6 @@ public class Engine {
                 }
             }
 
-            // Extract native .so libraries from base & split APKs into vault lib folder
             extractNativeLibrariesFromVault(ctx, pkg, vaultDir);
             return dstBase.exists() ? dstBase : null;
         } catch (Throwable ignored) {
@@ -1619,7 +1640,6 @@ public class Engine {
                     ZipEntry entry = entries.nextElement();
                     String name = entry.getName();
                     if (!name.startsWith("lib/") || !name.endsWith(".so")) continue;
-                    // Match device ABI or arm64/armeabi fallback
                     if (name.contains(primaryAbi) || name.contains("arm64-v8a") || name.contains("armeabi-v7a")) {
                         String soFileName = name.substring(name.lastIndexOf('/') + 1);
                         File outSo = new File(libOutDir, soFileName);
@@ -1644,7 +1664,6 @@ public class Engine {
             }
         }
 
-        // Also mirror extracted .so files into BlackBox's internal virtual app data lib directory if it exists
         syncNativeLibsToBlackBoxDataDir(ctx, pkg, libOutDir);
     }
 
@@ -1686,10 +1705,10 @@ public class Engine {
         fis.close();
     }
 
-    public static List<AppModel> getInstalledApps(Context ctx) {
+    public static List<InstallOptionCandidate> getInstallCandidates(Context ctx) {
         PackageManager pm = ctx.getPackageManager();
         List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        List<AppModel> result = new ArrayList<>();
+        List<InstallOptionCandidate> result = new ArrayList<>();
         String myPkg = ctx.getPackageName();
 
         for (ApplicationInfo ai : apps) {
@@ -1697,7 +1716,7 @@ public class Engine {
             Intent launchIntent = pm.getLaunchIntentForPackage(ai.packageName);
             if (launchIntent == null) continue;
 
-            AppModel m = new AppModel();
+            InstallOptionCandidate m = new InstallOptionCandidate();
             m.packageName = ai.packageName;
             m.name = ai.loadLabel(pm).toString();
             m.icon = loadCachedIcon(pm, ai, ai.packageName);
@@ -1705,21 +1724,20 @@ public class Engine {
             result.add(m);
         }
 
-        Collections.sort(result, new Comparator<AppModel>() {
+        Collections.sort(result, new Comparator<InstallOptionCandidate>() {
             @Override
-            public int compare(AppModel a, AppModel b) {
+            public int compare(InstallOptionCandidate a, InstallOptionCandidate b) {
                 return a.name.compareToIgnoreCase(b.name);
             }
         });
         return result;
     }
 
-    public static List<AppModel> getClonedApps(Context ctx, int spaceId) {
+    public static List<ClonedApp> getClonedApps(Context ctx, int spaceId) {
         PackageManager pm = ctx.getPackageManager();
-        List<AppModel> list = new ArrayList<>();
+        List<ClonedApp> list = new ArrayList<>();
         Set<String> seenPackages = new HashSet<>();
 
-        // 1. Query BlackBoxCore installed packages for this space
         try {
             List<PackageInfo> installed = BlackBoxCore.get().getInstalledPackages(0, spaceId);
             if (installed != null) {
@@ -1731,15 +1749,13 @@ public class Engine {
                     }
                     seenPackages.add(pi.packageName);
                     CloneMetadataStore.registerClonedPackage(ctx, pi.packageName, spaceId);
-                    AppModel m = buildClonedAppModel(ctx, pm, pi.packageName, pi.applicationInfo, spaceId);
+                    ClonedApp m = buildClonedAppModel(ctx, pm, pi.packageName, pi.applicationInfo, spaceId);
                     if (m != null) list.add(m);
                 }
             }
         } catch (Throwable ignored) {
         }
 
-        // 2. Also include all independently registered packages in our APK Vault
-        //    (Guarantees that even if the user uninstalled the host app from their phone, the clone stays!)
         Set<String> registered = CloneMetadataStore.getRegisteredPackagesForSpace(ctx, spaceId);
         for (String pkg : registered) {
             if (seenPackages.contains(pkg)) continue;
@@ -1757,7 +1773,7 @@ public class Engine {
                 }
             }
             if (stillInBlackBox || vaultedApk.exists()) {
-                AppModel m = buildClonedAppModel(ctx, pm, pkg, null, spaceId);
+                ClonedApp m = buildClonedAppModel(ctx, pm, pkg, null, spaceId);
                 if (m != null) {
                     seenPackages.add(pkg);
                     list.add(m);
@@ -1768,19 +1784,19 @@ public class Engine {
         return list;
     }
 
-    private static AppModel buildClonedAppModel(Context ctx, PackageManager pm, String pkg,
-                                                ApplicationInfo fallbackAi, int spaceId) {
-        AppModel m = new AppModel();
+    private static ClonedApp buildClonedAppModel(Context ctx, PackageManager pm, String pkg,
+                                                 ApplicationInfo fallbackAi, int spaceId) {
+        ClonedApp m = new ClonedApp();
         m.packageName = pkg;
 
-        // Try host PackageManager first
         try {
             ApplicationInfo hostAi = pm.getApplicationInfo(pkg, 0);
             m.name = hostAi.loadLabel(pm).toString();
             m.icon = loadCachedIcon(pm, hostAi, pkg);
-            m.isIndependentVaulted = getVaultedBaseApk(ctx, pkg).exists();
+            boolean vaulted = getVaultedBaseApk(ctx, pkg).exists();
+            m.isIndependentVaulted = vaulted;
+            m.isVaultBacked = vaulted;
         } catch (Throwable notOnHost) {
-            // Host app was uninstalled from phone! Load label & icon directly from our Independent APK Vault
             File vaultedApk = getVaultedBaseApk(ctx, pkg);
             if (vaultedApk.exists()) {
                 PackageInfo archiveInfo = pm.getPackageArchiveInfo(vaultedApk.getAbsolutePath(), 0);
@@ -1792,6 +1808,7 @@ public class Engine {
                     m.name = lbl != null ? lbl.toString() : pkg;
                     m.icon = pm.getApplicationIcon(aInfo);
                     m.isIndependentVaulted = true;
+                    m.isVaultBacked = true;
                 }
             }
             if (m.name == null && fallbackAi != null) {
@@ -1825,10 +1842,10 @@ public class Engine {
         }
     }
 
-    /**
-     * Clones an installed app into the specified space AND backs up its APK + native libs
-     * into VeyraVault's Independent Vault so uninstalling the original app never deletes the clone.
-     */
+    public static boolean cloneAppToSpace(Context ctx, String pkg, int spaceId) {
+        return cloneApp(ctx, pkg, spaceId);
+    }
+
     public static boolean cloneApp(Context ctx, String pkg, int spaceId) {
         try {
             GmsSupportManager.ensureGmsForSpace(spaceId);
@@ -1852,10 +1869,10 @@ public class Engine {
         }
     }
 
-    /**
-     * Installs an external APK file directly into VeyraVault's Independent Space
-     * without requiring the app to be installed on the host phone!
-     */
+    public static boolean installExternalApkFileToSpace(Context ctx, File externalApkFile, int spaceId) {
+        return installApkFileIntoSpace(ctx, externalApkFile, spaceId) != null;
+    }
+
     public static String installApkFileIntoSpace(Context ctx, File externalApkFile, int spaceId) {
         if (externalApkFile == null || !externalApkFile.exists()) return null;
         try {
@@ -1901,19 +1918,11 @@ public class Engine {
         }
     }
 
-    /**
-     * Launches a cloned app inside the specified space with fixes for:
-     * - Chrome (Prevents opening Android System WebView DevTools instead of Chrome Main Browser)
-     * - Split APK & Native .so syncing (Instagram, Soroush, Gap)
-     * - GMS Initialization (YouTube, Viber)
-     * - Per-Clone vs Global Device & Location Priority
-     */
     public static boolean launchClone(Context ctx, String pkg, int spaceId) {
         try {
             GmsSupportManager.ensureGmsForSpace(spaceId);
             VirtualHookManager.prepareForCloneLaunch(ctx, pkg, spaceId);
 
-            // Ensure vaulted APK & native libraries remain synced even if host app was removed
             File vaultDir = getApkVaultDir(ctx, pkg);
             File vaultLibDir = new File(vaultDir, "lib");
             if (vaultLibDir.exists()) {
@@ -1922,7 +1931,6 @@ public class Engine {
                 backupPackageToVault(ctx, pkg);
             }
 
-            // Re-ensure package is registered inside BlackBox if host app was uninstalled
             if (!BlackBoxCore.get().isInstalled(pkg, spaceId)) {
                 File vaultedBase = getVaultedBaseApk(ctx, pkg);
                 if (vaultedBase.exists()) {
@@ -1930,7 +1938,6 @@ public class Engine {
                 }
             }
 
-            // Special Fix for Google Chrome & Browsers opening WebView DevTools instead of Main Activity
             Intent explicitMainIntent = resolveRealMainLauncherIntent(ctx, pkg);
             if (explicitMainIntent != null) {
                 try {
@@ -1955,7 +1962,6 @@ public class Engine {
     private static Intent resolveRealMainLauncherIntent(Context ctx, String pkg) {
         try {
             PackageManager pm = ctx.getPackageManager();
-            // Explicit Chrome Main Browser entry point (avoids org.chromium.android_webview.devui.MainActivity)
             if ("com.android.chrome".equals(pkg) || "com.chrome.beta".equals(pkg) || "com.chrome.dev".equals(pkg)) {
                 Intent chromeIntent = new Intent(Intent.ACTION_MAIN);
                 chromeIntent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -1965,7 +1971,6 @@ public class Engine {
                 return chromeIntent;
             }
 
-            // General resolution filtering out any DevTools/WebView DevUI activity
             Intent query = new Intent(Intent.ACTION_MAIN);
             query.addCategory(Intent.CATEGORY_LAUNCHER);
             query.setPackage(pkg);
@@ -1996,10 +2001,11 @@ public class Engine {
 }
 """)
 
-    # 11. SecurityManager.java (Simultaneous Dual Lock: PIN + Pattern with Priority & Auto-Fallback)
+    # 11. SecurityManager.java (Includes requestEnableAntiUninstall and disableAntiUninstall)
     write_file("app/src/main/java/com/veyravault/space/security/SecurityManager.java", """
 package com.veyravault.space.security;
 
+import android.app.Activity;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -2007,13 +2013,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
 
+import com.veyravault.space.R;
+
 import java.security.MessageDigest;
 
 public class SecurityManager {
 
     private static final String PREFS = "veyra_security_v3";
     private static final String KEY_LOCK_ENABLED = "lock_enabled";
-    private static final String KEY_PRIMARY_TYPE = "primary_lock_type"; // "PIN" or "PATTERN"
+    private static final String KEY_PRIMARY_TYPE = "primary_lock_type";
     private static final String KEY_PIN_HASH = "pin_hash";
     private static final String KEY_PATTERN_HASH = "pattern_hash";
     private static final String KEY_LEGACY_HASH = "secret_hash";
@@ -2166,7 +2174,6 @@ public class SecurityManager {
         }
     }
 
-    // --- Anti-Uninstall Protection (Device Administrator) ---
     public static ComponentName getAdminComponent(Context ctx) {
         return new ComponentName(ctx, VaultDeviceAdminReceiver.class);
     }
@@ -2187,6 +2194,19 @@ public class SecurityManager {
         return intent;
     }
 
+    public static void requestEnableAntiUninstall(Activity activity, int requestCode) {
+        try {
+            String desc = activity.getString(R.string.device_admin_desc);
+            Intent intent = createActivateAdminIntent(activity, desc);
+            activity.startActivityForResult(intent, requestCode);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void disableAntiUninstall(Context ctx) {
+        deactivateAntiUninstall(ctx);
+    }
+
     public static void deactivateAntiUninstall(Context ctx) {
         try {
             DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
@@ -2199,7 +2219,7 @@ public class SecurityManager {
 }
 """)
 
-    # 12. VaultDeviceAdminReceiver.java (Stealth Anti-Uninstall Blocker - NO hint on how to disable)
+    # 12. VaultDeviceAdminReceiver.java
     write_file("app/src/main/java/com/veyravault/space/security/VaultDeviceAdminReceiver.java", """
 package com.veyravault.space.security;
 
@@ -2220,9 +2240,6 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
 
     @Override
     public CharSequence onDisableRequested(Context context, Intent intent) {
-        // Immediately lock the app session and pop SecurityLockActivity over Settings
-        // so an unauthorized person cannot tap "Deactivate" in Android Settings.
-        // Strictly NO mention of where or how this protection can be turned off!
         SecurityManager.setSessionUnlocked(false);
         try {
             Intent blockIntent = new Intent(context, SecurityLockActivity.class);
@@ -2253,16 +2270,7 @@ def patch_part2_if_present():
     with open(part2_path, "r", encoding="utf-8") as f:
         txt = f.read()
 
-    # 1. Fix Gravity.CENTER_HORIZONTAL casing
     txt = txt.replace("CENTER_horizontal", "CENTER_HORIZONTAL")
-
-    # 2. Wrap 2nd argument of Toast.makeText(AddAppActivity.this, ..., Toast.LENGTH_*) in String.valueOf(...)
-    #    so javac never sees an ambiguous overload
-    txt = re.sub(
-        r"Toast\.makeText\(\s*AddAppActivity\.this\s*,\s*([^;]*?),\s*(Toast\.LENGTH_(?:LONG|SHORT))\s*\)",
-        r"Toast.makeText(AddAppActivity.this, String.valueOf(\1), \2)",
-        txt
-    )
 
     with open(part2_path, "w", encoding="utf-8") as f:
         f.write(txt)
