@@ -23,20 +23,23 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 4. Prepare Workspace, NDK Licenses & Keystore
+      - name: 4. Apply v3.0 Upgrades
+        run: python3 scripts/upgrade_v3_part1.py && python3 scripts/upgrade_v3_part2.py
+
+      - name: 5. Prepare Workspace, NDK Licenses & Keystore
         run: python3 scripts/prepare_workspace.py
 
-      - name: 5. Run Stage-1 Source Audit
+      - name: 6. Run Stage-1 Source Audit
         run: python3 scripts/audit_source.py
 
-      - name: 6. Compile Signed Release APK
+      - name: 7. Compile Signed Release APK
         working-directory: ./build_workspace
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
-      - name: 7. Package & Audit Final APK
+      - name: 8. Package & Audit Final APK
         run: python3 scripts/prepare_workspace.py --post-build
 
-      - name: 8. Upload Signed APK Bundle
+      - name: 9. Upload Signed APK Bundle
         uses: actions/upload-artifact@v4
         with:
           name: VeyraVault-Release-Bundle
