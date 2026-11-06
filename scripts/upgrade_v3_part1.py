@@ -298,10 +298,18 @@ public class JalaliClockUtil {
         return sdf.format(new Date());
     }
 
+    public static String getTehranTime() {
+        return getTehranTimeString();
+    }
+
     public static String getNewYorkTimeString() {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
         return sdf.format(new Date());
+    }
+
+    public static String getNewYorkTime() {
+        return getNewYorkTimeString();
     }
 
     public static String getNewYorkGregorianDate() {
@@ -541,6 +549,14 @@ public class AppDisguiseManager {
 
     public static String getCurrentDisguiseMode(Context ctx) { return getCurrentMode(ctx); }
 
+    public static String getDisguiseTitle(Context ctx, boolean isFa) {
+        String m = getCurrentMode(ctx);
+        if (MODE_CALCULATOR.equals(m)) return isFa ? "ماشین‌حساب+" : "Calculator+";
+        if (MODE_CALENDAR.equals(m)) return isFa ? "تقویم هوشمند" : "Smart Calendar";
+        if (MODE_NOTES.equals(m)) return isFa ? "یادداشت‌های خصوصی" : "Private Notes";
+        return "VeyraVault";
+    }
+
     public static void applyDisguiseMode(Context ctx, String mode) {
         if (mode == null) mode = MODE_DEFAULT;
         ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString(KEY, mode).apply();
@@ -662,7 +678,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class CloneMetadataStore {
@@ -692,6 +710,14 @@ public class CloneMetadataStore {
         l.add(new DevicePreset("Xiaomi 14 Ultra", "Xiaomi", "24030PN60G", "aurora"));
         l.add(new DevicePreset("OnePlus 12 (Global)", "OnePlus", "CPH2581", "waffle"));
         return l;
+    }
+
+    public static Map<String, String> getAvailableDevicePresets() {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (DevicePreset dp : getDevicePresets()) {
+            map.put(dp.displayTitle + " (" + dp.model + ")", dp.brand);
+        }
+        return map;
     }
 
     public static List<RegionPreset> getRegionPresets() {
@@ -728,6 +754,14 @@ public class CloneMetadataStore {
         return isFa ? ("فضای " + (spaceId + 1)) : ("Space " + (spaceId + 1));
     }
 
+    public static String getSpaceDisplayName(Context c, int spaceId, boolean isFa) {
+        return getSpaceName(c, spaceId, isFa);
+    }
+
+    public static String getSpaceCustomName(Context c, int spaceId) {
+        return sp(c).getString("space_custom_name_" + spaceId, "");
+    }
+
     public static void setSpaceCustomName(Context c, int spaceId, String name) {
         sp(c).edit().putString("space_custom_name_" + spaceId, name == null ? "" : name.trim()).apply();
     }
@@ -761,8 +795,10 @@ public class CloneMetadataStore {
     public static String getGlobalRegionName(Context c) { ensureDefaultsInitialized(c); return sp(c).getString("global_region", "Falkenstein, Germany"); }
     public static double getGlobalLat(Context c) { try { return Double.parseDouble(sp(c).getString("global_lat", "50.4779")); } catch (Exception e) { return 50.4779; } }
     public static double getGlobalLon(Context c) { try { return Double.parseDouble(sp(c).getString("global_lon", "12.3713")); } catch (Exception e) { return 12.3713; } }
+    public static double[] getGlobalCoordinates(Context c) { return new double[]{ getGlobalLat(c), getGlobalLon(c) }; }
     public static String getGlobalTimezone(Context c) { return sp(c).getString("global_tz", "Europe/Berlin"); }
     public static String getGlobalSimulatedIp(Context c) { return sp(c).getString("global_sim_ip", "88.198.48.21"); }
+    public static String getGlobalVirtualIp(Context c) { return getGlobalSimulatedIp(c); }
 
     public static void setGlobalProxy(Context c, String host, int port) { setGlobalProxy(c, host, String.valueOf(Math.max(0, port))); }
     public static void setGlobalProxy(Context c, String host, String port) {
@@ -776,6 +812,12 @@ public class CloneMetadataStore {
     public static void setCustomAlias(Context c, String pkg, int u, String a) { sp(c).edit().putString(k(pkg, u, "alias"), a == null ? "" : a.trim()).apply(); }
     public static String getCustomAlias(Context c, String pkg, int u) { return sp(c).getString(k(pkg, u, "alias"), ""); }
 
+    public static void setCustomDeviceIdentity(Context c, String pkg, int u, String brand, String model) {
+        String b = brand == null ? "samsung" : brand.trim();
+        String m = model == null ? "SM-S928B" : model.trim();
+        setCustomDeviceIdentity(c, pkg, u, m.contains(b) ? m : (b + " " + m), b, m);
+    }
+
     public static void setCustomDeviceIdentity(Context c, String pkg, int u, String d, String b, String m) {
         sp(c).edit().putBoolean(k(pkg, u, "has_dev"), true).putString(k(pkg, u, "dev_display"), d).putString(k(pkg, u, "dev_brand"), b).putString(k(pkg, u, "dev_model"), m).apply();
     }
@@ -783,7 +825,9 @@ public class CloneMetadataStore {
     public static boolean hasCustomDeviceIdentity(Context c, String pkg, int u) { return sp(c).getBoolean(k(pkg, u, "has_dev"), false); }
     public static String getEffectiveDeviceDisplay(Context c, String pkg, int u) { return hasCustomDeviceIdentity(c, pkg, u) ? sp(c).getString(k(pkg, u, "dev_display"), getGlobalDeviceDisplay(c)) : getGlobalDeviceDisplay(c); }
     public static String getEffectiveBrand(Context c, String pkg, int u) { return hasCustomDeviceIdentity(c, pkg, u) ? sp(c).getString(k(pkg, u, "dev_brand"), getGlobalDeviceBrand(c)) : getGlobalDeviceBrand(c); }
+    public static String getEffectiveDeviceBrand(Context c, String pkg, int u) { return getEffectiveBrand(c, pkg, u); }
     public static String getEffectiveModel(Context c, String pkg, int u) { return hasCustomDeviceIdentity(c, pkg, u) ? sp(c).getString(k(pkg, u, "dev_model"), getGlobalDeviceModel(c)) : getGlobalDeviceModel(c); }
+    public static String getEffectiveDeviceModel(Context c, String pkg, int u) { return getEffectiveModel(c, pkg, u); }
 
     public static void setCustomLocation(Context c, String pkg, int u, String r, double lat, double lon, String tz, String ip) {
         sp(c).edit().putBoolean(k(pkg, u, "has_loc"), true)
@@ -795,8 +839,10 @@ public class CloneMetadataStore {
     public static void clearCustomLocation(Context c, String pkg, int u) { sp(c).edit().putBoolean(k(pkg, u, "has_loc"), false).apply(); }
     public static boolean hasCustomLocation(Context c, String pkg, int u) { return sp(c).getBoolean(k(pkg, u, "has_loc"), false); }
     public static String getEffectiveRegionDisplay(Context c, String pkg, int u) { return hasCustomLocation(c, pkg, u) ? sp(c).getString(k(pkg, u, "loc_region"), getGlobalRegionName(c)) : getGlobalRegionName(c); }
+    public static String getEffectiveRegionName(Context c, String pkg, int u) { return getEffectiveRegionDisplay(c, pkg, u); }
     public static double getEffectiveLat(Context c, String pkg, int u) { if (hasCustomLocation(c, pkg, u)) { try { return Double.parseDouble(sp(c).getString(k(pkg, u, "loc_lat"), "50.4779")); } catch (Exception ignored) {} } return getGlobalLat(c); }
     public static double getEffectiveLon(Context c, String pkg, int u) { if (hasCustomLocation(c, pkg, u)) { try { return Double.parseDouble(sp(c).getString(k(pkg, u, "loc_lon"), "12.3713")); } catch (Exception ignored) {} } return getGlobalLon(c); }
+    public static double[] getEffectiveCoordinates(Context c, String pkg, int u) { return new double[]{ getEffectiveLat(c, pkg, u), getEffectiveLon(c, pkg, u) }; }
     public static String getEffectiveTimezone(Context c, String pkg, int u) { return hasCustomLocation(c, pkg, u) ? sp(c).getString(k(pkg, u, "loc_tz"), getGlobalTimezone(c)) : getGlobalTimezone(c); }
     public static String getEffectiveSimulatedIp(Context c, String pkg, int u) { return hasCustomLocation(c, pkg, u) ? sp(c).getString(k(pkg, u, "loc_ip"), getGlobalSimulatedIp(c)) : getGlobalSimulatedIp(c); }
 
@@ -950,6 +996,10 @@ public class Engine {
     public static class InstallOptionCandidate extends AppModel {}
 
     private static final LruCache<String, Drawable> ICON_CACHE = new LruCache<>(120);
+
+    public static int[] getSpaces() {
+        return new int[]{0, 1, 2};
+    }
 
     public static File getApkVaultDir(Context ctx, String pkg) {
         File d = new File(ctx.getFilesDir(), "apk_vault/" + pkg);
@@ -1250,6 +1300,10 @@ public class Engine {
         return null;
     }
 
+    public static void removeClone(Context ctx, String pkg, int userId) {
+        uninstallClone(ctx, pkg, userId);
+    }
+
     public static void uninstallClone(Context ctx, String pkg, int userId) {
         try { BlackBoxCore.get().uninstallPackageAsUser(pkg, userId); } catch (Throwable ignored) {}
         CloneMetadataStore.unregisterVaultedClone(ctx, pkg, userId);
@@ -1299,7 +1353,9 @@ public class SecurityManager {
     public static boolean isSessionUnlocked() { return sUnlocked; }
     public static void setSessionUnlocked(boolean u) { sUnlocked = u; }
     public static boolean isPinConfigured(Context c) { return !sp(c).getString(KEY_PIN, "").isEmpty(); }
+    public static boolean hasPin(Context c) { return isPinConfigured(c); }
     public static boolean isPatternConfigured(Context c) { return !sp(c).getString(KEY_PAT, "").isEmpty(); }
+    public static boolean hasPattern(Context c) { return isPatternConfigured(c); }
     public static boolean isLockEnabled(Context c) { return isPinConfigured(c) || isPatternConfigured(c); }
     public static boolean hasBothLocksConfigured(Context c) { return isPinConfigured(c) && isPatternConfigured(c); }
 
@@ -1334,6 +1390,10 @@ public class SecurityManager {
             DevicePolicyManager dpm = (DevicePolicyManager) c.getSystemService(Context.DEVICE_POLICY_SERVICE);
             return dpm != null && dpm.isAdminActive(new ComponentName(c, VaultDeviceAdminReceiver.class));
         } catch (Throwable t) { return false; }
+    }
+
+    public static boolean isDeviceAdminActive(Context c) {
+        return isAntiUninstallActive(c);
     }
 
     public static void requestEnableAntiUninstall(Activity act, int reqCode) {
@@ -1395,7 +1455,6 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
 """,
     )
 
-    # Auto-patch upgrade_v3_part2.py to guarantee MainActivity extends BaseActivity with proper imports
     part2_path = os.path.join(ROOT, "scripts", "upgrade_v3_part2.py")
     if os.path.exists(part2_path):
         with open(part2_path, "r", encoding="utf-8") as f:
