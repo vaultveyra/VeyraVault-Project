@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-VeyraVault v3.0 Upgrade Script - Part 1
-Core Virtualization Engine, Independent APK Vault, Split-APK Native Libs,
-Apple/iPhone Profiles, Region (City, Country) + IP/Proxy Shield,
-Dual Lock (PIN + Pattern with Priority & Fallback), Solar Hijri Clock & SVG Icons.
+VeyraVault v3.0 Upgrade Script - Part 1 (Complete & Synchronized)
+Includes all helper classes (LocaleHelper, BaseActivity, GmsSupportManager,
+AppDisguiseManager, PatternLockView) + Core Engine, Independent APK Vault,
+Split-APK Native Libs, Apple/iPhone Profiles, Region/IP Shield & Dual Lock.
 """
 import os
 
@@ -18,7 +18,7 @@ def write_file(rel_path, content):
     print(f"[v3-Part1] Updated: {rel_path}")
 
 def apply_part1():
-    # 1. SVG Vector Drawables for Bottom Navigation & Top Quick Lock
+    # 1. SVG Vector Drawables for Bottom Navigation & Quick Lock
     write_file("app/src/main/res/drawable/ic_nav_dashboard.xml", """
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="22dp" android:height="22dp"
@@ -73,7 +73,350 @@ def apply_part1():
 </vector>
 """)
 
-    # 2. Solar Hijri (Jalali) & World Clock Utility for Stealth Dashboard
+    # 2. Synchronized LocaleHelper & BaseActivity
+    write_file("app/src/main/java/com/veyravault/space/util/LocaleHelper.java", """
+package com.veyravault.space.util;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.os.Build;
+import android.view.View;
+
+import java.util.Locale;
+
+public class LocaleHelper {
+    private static final String PREF_NAME = "veyravault_locale_prefs";
+    private static final String KEY_LANG = "app_language";
+
+    public static Context onAttach(Context context) {
+        String lang = getLanguage(context);
+        return setLocale(context, lang);
+    }
+
+    public static String getLanguage(Context context) {
+        SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        return sp.getString(KEY_LANG, "fa");
+    }
+
+    public static Context setLocale(Context context, String language) {
+        SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        sp.edit().putString(KEY_LANG, language).apply();
+
+        Locale locale = new Locale(language);
+        Locale.setDefault(locale);
+
+        Resources res = context.getResources();
+        Configuration config = new Configuration(res.getConfiguration());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            config.setLocale(locale);
+            config.setLayoutDirection(locale);
+        } else {
+            config.locale = locale;
+        }
+        res.updateConfiguration(config, res.getDisplayMetrics());
+        return context;
+    }
+
+    public static String toggleLanguage(Context context) {
+        String current = getLanguage(context);
+        String next = "fa".equals(current) ? "en" : "fa";
+        setLocale(context, next);
+        return next;
+    }
+
+    public static void applyDirection(Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            boolean isFa = "fa".equals(getLanguage(activity));
+            activity.getWindow().getDecorView().setLayoutDirection(
+                    isFa ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        }
+    }
+}
+""")
+
+    write_file("app/src/main/java/com/veyravault/space/ui/BaseActivity.java", """
+package com.veyravault.space.ui;
+
+import android.app.Activity;
+import android.content.Context;
+import android.os.Bundle;
+import com.veyravault.space.util.LocaleHelper;
+
+public class BaseActivity extends Activity {
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.onAttach(newBase));
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        LocaleHelper.applyDirection(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        LocaleHelper.applyDirection(this);
+    }
+}
+""")
+
+    # 3. Synchronized GmsSupportManager
+    write_file("app/src/main/java/com/veyravault/space/core/GmsSupportManager.java", """
+package com.veyravault.space.core;
+
+import java.lang.reflect.Method;
+import top.niunaijun.blackbox.BlackBoxCore;
+
+public class GmsSupportManager {
+
+    public static boolean isGmsInstalled(int userId) {
+        try {
+            Method m = BlackBoxCore.class.getDeclaredMethod("isInstallGms", int.class);
+            m.setAccessible(true);
+            Object res = m.invoke(BlackBoxCore.get(), userId);
+            if (res instanceof Boolean) return (Boolean) res;
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean installGms(int userId) {
+        try {
+            Method m = BlackBoxCore.class.getDeclaredMethod("installGms", int.class);
+            m.setAccessible(true);
+            Object res = m.invoke(BlackBoxCore.get(), userId);
+            if (res instanceof Boolean) return (Boolean) res;
+            if (res != null) {
+                try {
+                    return res.getClass().getDeclaredField("success").getBoolean(res);
+                } catch (Throwable ignored) {}
+            }
+            return true;
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean uninstallGms(int userId) {
+        try {
+            Method m = BlackBoxCore.class.getDeclaredMethod("uninstallGms", int.class);
+            m.setAccessible(true);
+            Object res = m.invoke(BlackBoxCore.get(), userId);
+            if (res instanceof Boolean) return (Boolean) res;
+            return true;
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean toggleGmsForUser(int userId) {
+        if (isGmsInstalled(userId)) {
+            return uninstallGms(userId);
+        } else {
+            return installGms(userId);
+        }
+    }
+
+    public static boolean toggleGms(int userId) {
+        return toggleGmsForUser(userId);
+    }
+}
+""")
+
+    # 4. Synchronized AppDisguiseManager & PatternLockView
+    write_file("app/src/main/java/com/veyravault/space/security/AppDisguiseManager.java", """
+package com.veyravault.space.security;
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+
+public class AppDisguiseManager {
+    private static final String PREF = "veyravault_disguise_prefs";
+    private static final String KEY_MODE = "active_disguise_mode";
+
+    public static final String MODE_DEFAULT = "AliasDefault";
+    public static final String MODE_CALCULATOR = "AliasCalculator";
+    public static final String MODE_CALENDAR = "AliasCalendar";
+    public static final String MODE_NOTES = "AliasNotes";
+    public static final String MODE_WEATHER = "AliasWeather";
+
+    private static final String[] ALL_MODES = {
+        MODE_DEFAULT, MODE_CALCULATOR, MODE_CALENDAR, MODE_NOTES, MODE_WEATHER
+    };
+
+    public static String getCurrentDisguise(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        return sp.getString(KEY_MODE, MODE_DEFAULT);
+    }
+
+    public static void applyDisguise(Context ctx, String targetMode) {
+        PackageManager pm = ctx.getPackageManager();
+        String pkg = ctx.getPackageName();
+
+        for (String mode : ALL_MODES) {
+            ComponentName cn = new ComponentName(pkg, pkg + "." + mode);
+            int state = mode.equals(targetMode)
+                    ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+            try {
+                pm.setComponentEnabledSetting(cn, state, PackageManager.DONT_KILL_APP);
+            } catch (Throwable ignored) {}
+        }
+
+        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                .edit().putString(KEY_MODE, targetMode).apply();
+    }
+}
+""")
+
+    write_file("app/src/main/java/com/veyravault/space/security/PatternLockView.java", """
+package com.veyravault.space.security;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.view.MotionEvent;
+import android.view.View;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class PatternLockView extends View {
+
+    public interface OnPatternListener {
+        void onPatternComplete(List<Integer> pattern);
+    }
+
+    private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint activeDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private final List<Integer> selectedDots = new ArrayList<>();
+    private float currentX = -1;
+    private float currentY = -1;
+    private boolean isDrawing = false;
+    private OnPatternListener listener;
+
+    public PatternLockView(Context context) {
+        super(context);
+        dotPaint.setColor(Color.parseColor("#64748B"));
+        dotPaint.setStyle(Paint.Style.FILL);
+
+        activeDotPaint.setColor(Color.parseColor("#3B82F6"));
+        activeDotPaint.setStyle(Paint.Style.FILL);
+
+        linePaint.setColor(Color.parseColor("#60A5FA"));
+        linePaint.setStrokeWidth(10f);
+        linePaint.setStyle(Paint.Style.STROKE);
+        linePaint.setStrokeCap(Paint.Cap.ROUND);
+    }
+
+    public void setOnPatternListener(OnPatternListener listener) {
+        this.listener = listener;
+    }
+
+    public void clearPattern() {
+        selectedDots.clear();
+        isDrawing = false;
+        invalidate();
+    }
+
+    public static String patternToString(List<Integer> pattern) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < pattern.size(); i++) {
+            if (i > 0) sb.append("-");
+            sb.append(pattern.get(i));
+        }
+        return sb.toString();
+    }
+
+    private float getDotCenterX(int index) {
+        int col = index % 3;
+        float step = getWidth() / 3f;
+        return step * col + step / 2f;
+    }
+
+    private float getDotCenterY(int index) {
+        int row = index / 3;
+        float step = getHeight() / 3f;
+        return step * row + step / 2f;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+
+        for (int i = 0; i < selectedDots.size() - 1; i++) {
+            int a = selectedDots.get(i);
+            int b = selectedDots.get(i + 1);
+            canvas.drawLine(getDotCenterX(a), getDotCenterY(a), getDotCenterX(b), getDotCenterY(b), linePaint);
+        }
+
+        if (isDrawing && !selectedDots.isEmpty() && currentX >= 0 && currentY >= 0) {
+            int last = selectedDots.get(selectedDots.size() - 1);
+            canvas.drawLine(getDotCenterX(last), getDotCenterY(last), currentX, currentY, linePaint);
+        }
+
+        float radius = Math.min(getWidth(), getHeight()) / 18f;
+        for (int i = 0; i < 9; i++) {
+            float cx = getDotCenterX(i);
+            float cy = getDotCenterY(i);
+            boolean active = selectedDots.contains(i);
+            canvas.drawCircle(cx, cy, active ? radius * 1.3f : radius, active ? activeDotPaint : dotPaint);
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        float x = event.getX();
+        float y = event.getY();
+
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                selectedDots.clear();
+                isDrawing = true;
+                checkHit(x, y);
+                invalidate();
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                currentX = x;
+                currentY = y;
+                checkHit(x, y);
+                invalidate();
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                isDrawing = false;
+                if (listener != null && !selectedDots.isEmpty()) {
+                    listener.onPatternComplete(new ArrayList<>(selectedDots));
+                }
+                invalidate();
+                return true;
+        }
+        return super.onTouchEvent(event);
+    }
+
+    private void checkHit(float x, float y) {
+        float hitRadius = Math.min(getWidth(), getHeight()) / 7f;
+        for (int i = 0; i < 9; i++) {
+            if (selectedDots.contains(i)) continue;
+            float dx = x - getDotCenterX(i);
+            float dy = y - getDotCenterY(i);
+            if (Math.sqrt(dx * dx + dy * dy) <= hitRadius) {
+                selectedDots.add(i);
+                break;
+            }
+        }
+    }
+}
+""")
+
+    # 5. Solar Hijri (Jalali) & World Clock Utility
     write_file("app/src/main/java/com/veyravault/space/util/JalaliClockUtil.java", """
 package com.veyravault.space.util;
 
@@ -102,7 +445,7 @@ public class JalaliClockUtil {
             "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
         };
         String mName = (j[1] >= 1 && j[1] <= 12) ? months[j[1] - 1] : String.valueOf(j[1]);
-        String formatted = String.format(Locale.US, "%04d/%02d/%02d (%s %s)", j[0], j[1], j[2], j[2], mName);
+        String formatted = String.format(Locale.US, "%04d/%02d/%02d (%d %s)", j[0], j[1], j[2], j[2], mName);
         return toPersianDigits(formatted);
     }
 
@@ -149,7 +492,7 @@ public class JalaliClockUtil {
 }
 """)
 
-    # 3. Upgraded CloneMetadataStore: Space Renaming + Independent Vault Registry + Region (City, Country) + IP/Proxy
+    # 6. CloneMetadataStore
     write_file("app/src/main/java/com/veyravault/space/core/CloneMetadataStore.java", """
 package com.veyravault.space.core;
 
@@ -169,7 +512,6 @@ public class CloneMetadataStore {
         return pkg + "_u" + userId + "_" + suffix;
     }
 
-    // --- Independent Clone Registry (Survives Host App Uninstall) ---
     public static void registerClonedApp(Context ctx, String pkg, int userId) {
         SharedPreferences sp = prefs(ctx);
         Set<String> all = new HashSet<>(sp.getStringSet("registered_clones_u" + userId, new HashSet<String>()));
@@ -198,7 +540,6 @@ public class CloneMetadataStore {
         return prefs(ctx).getString("cached_label_" + pkg, pkg);
     }
 
-    // --- Space Custom Naming ---
     public static void setSpaceCustomName(Context ctx, int userId, String customName) {
         prefs(ctx).edit().putString("space_custom_name_" + userId, customName == null ? "" : customName.trim()).apply();
     }
@@ -215,7 +556,6 @@ public class CloneMetadataStore {
         return defaultPrefix + " " + (userId + 1);
     }
 
-    // --- Per-Clone Custom Alias ---
     public static void setAlias(Context ctx, String pkg, int userId, String alias) {
         prefs(ctx).edit().putString(key(pkg, userId, "alias"), alias == null ? "" : alias.trim()).apply();
     }
@@ -225,7 +565,6 @@ public class CloneMetadataStore {
         return (val == null || val.isEmpty()) ? defaultName : val;
     }
 
-    // --- Per-Clone Mock Location & Region (City, Country + Coordinates) with Global Fallback ---
     public static void setMockLocationWithRegion(Context ctx, String pkg, int userId, double lat, double lon, String cityCountry, String timezoneId) {
         prefs(ctx).edit()
             .putBoolean(key(pkg, userId, "loc_enabled"), true)
@@ -268,7 +607,6 @@ public class CloneMetadataStore {
                 return new double[]{50.4779, 12.3713};
             }
         }
-        // Fallback to Global Coordinates if Global Spoof or Global Location is active
         return getGlobalCoordinates(ctx);
     }
 
@@ -299,7 +637,6 @@ public class CloneMetadataStore {
         return String.format(java.util.Locale.US, "🌐 %s (%.4f, %.4f) [سراسری]", globalReg, gc[0], gc[1]);
     }
 
-    // --- Per-Clone Custom Device Identity (Priority 1 over Global) ---
     public static void setCustomDeviceIdentity(Context ctx, String pkg, int userId, String brand, String model, String deviceCode) {
         prefs(ctx).edit()
             .putBoolean(key(pkg, userId, "dev_custom"), true)
@@ -339,7 +676,6 @@ public class CloneMetadataStore {
         return "🌐 " + getGlobalDeviceSummary(ctx) + " (سراسری)";
     }
 
-    // --- Tier 1: Global Device, Region (City, Country), Coordinates & Network Proxy ---
     public static void setGlobalDeviceSpoof(Context ctx, boolean enabled, String brand, String model,
                                             String device, String countryIso, String simOp, String simName) {
         prefs(ctx).edit()
@@ -426,7 +762,7 @@ public class CloneMetadataStore {
 }
 """)
 
-    # 4. Upgraded VirtualHookManager: Priority Order + Region/Timezone/Proxy + GMS Availability Bypass
+    # 7. VirtualHookManager
     write_file("app/src/main/java/com/veyravault/space/core/VirtualHookManager.java", """
 package com.veyravault.space.core;
 
@@ -441,7 +777,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.InetAddress;
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -451,7 +786,6 @@ public class VirtualHookManager {
 
     private static volatile double activeLat = 50.4779;
     private static volatile double activeLon = 12.3713;
-    private static volatile boolean activeMockForCurrentLaunch = true;
 
     public static boolean isMockGpsEnabled(Context ctx) {
         return prefs(ctx).getBoolean(KEY_MOCK_GPS_MASTER, true);
@@ -461,30 +795,18 @@ public class VirtualHookManager {
         prefs(ctx).edit().putBoolean(KEY_MOCK_GPS_MASTER, enabled).apply();
     }
 
-    /**
-     * Prepare hooks before launching a specific clone.
-     * STRICT PRIORITY RULE:
-     * 1) Per-Clone Custom Device Identity & Location override Global Settings.
-     * 2) If Per-Clone is not set, Global Device Identity & Global Region (e.g. Falkenstein, Germany) apply.
-     */
     public static void prepareForCloneLaunch(Context ctx, String pkg, int userId) {
-        // 1. Determine Effective Location & Region
         double[] coords = CloneMetadataStore.getMockLocation(ctx, pkg, userId);
         activeLat = coords[0];
         activeLon = coords[1];
-        activeMockForCurrentLaunch = isMockGpsEnabled(ctx) || CloneMetadataStore.hasMockLocation(ctx, pkg, userId);
 
         String effectiveTz = CloneMetadataStore.getEffectiveTimezone(ctx, pkg, userId);
         String effectiveRegion = CloneMetadataStore.getEffectiveRegionLabel(ctx, pkg, userId);
 
-        // Apply TimeZone & Locale so sessions report the target region instead of host phone
         applyRegionAndNetworkShield(ctx, effectiveRegion, effectiveTz);
-
-        // Apply GPS Location to BlackBox BLocationManager + In-process Hook
         applyBlackBoxVirtualLocation(pkg, userId, activeLat, activeLon, true);
         installLocationHook(ctx);
 
-        // 2. Determine Effective Device Model (Per-App Priority -> Global Fallback)
         if (CloneMetadataStore.hasCustomDeviceIdentity(ctx, pkg, userId)) {
             String[] customDev = CloneMetadataStore.getCustomDeviceIdentity(ctx, pkg, userId);
             if (customDev != null) {
@@ -499,7 +821,6 @@ public class VirtualHookManager {
                     globalDev[3], globalDev[4], globalDev[5]);
         }
 
-        // 3. Bypass Google Play Services (GMS) check for YouTube, Viber, etc.
         installGmsAvailabilityBypass();
     }
 
@@ -539,7 +860,6 @@ public class VirtualHookManager {
             System.setProperty("user.region", iso.toUpperCase(Locale.US));
             System.setProperty("veyravault.active.region", cityCountry);
 
-            // Apply SOCKS5 / HTTP Proxy tunnel if configured by user so real phone IP is never used
             String proxyHost = CloneMetadataStore.getGlobalProxyHost(ctx);
             int proxyPort = CloneMetadataStore.getGlobalProxyPort(ctx);
             if (proxyHost != null && !proxyHost.isEmpty() && proxyPort > 0) {
@@ -704,7 +1024,7 @@ public class VirtualHookManager {
 }
 """)
 
-    # 5. Upgraded Engine.java: Independent APK Vault + Split-APK Native Libs (Instagram/Soroush/Gap) + Chrome Main Activity Fix + LruCache
+    # 8. Engine.java (With Safe Reflection for BlackBoxCore methods)
     write_file("app/src/main/java/com/veyravault/space/core/Engine.java", """
 package com.veyravault.space.core;
 
@@ -763,11 +1083,6 @@ public class Engine {
         return new File(getVaultDirForPackage(ctx, pkg), "base.apk");
     }
 
-    /**
-     * Backs up the host app's base.apk AND all split APKs into our Independent APK Vault,
-     * and extracts native .so libraries so Instagram, Soroush, Gap, Viber work seamlessly
-     * AND survive even if the original app is uninstalled from the phone!
-     */
     public static File backupPackageToVault(Context ctx, String pkg) {
         try {
             PackageManager pm = ctx.getPackageManager();
@@ -782,7 +1097,6 @@ public class Engine {
                 }
             }
 
-            // Copy Split APKs (critical for Instagram, Soroush, Gap, Chrome)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && ai.splitSourceDirs != null) {
                 int idx = 0;
                 for (String splitPath : ai.splitSourceDirs) {
@@ -813,10 +1127,6 @@ public class Engine {
         }
     }
 
-    /**
-     * Extracts .so libraries from base or split APKs directly into BlackBox's virtual app lib folder
-     * so apps like Instagram, Soroush, Gap, Viber never hang on missing native libraries.
-     */
     private static void extractNativeLibsFromApk(Context ctx, String pkg, File apkFile) {
         ZipFile zf = null;
         try {
@@ -944,7 +1254,6 @@ public class Engine {
                 for (ApplicationInfo info : installed) {
                     if (info == null || info.packageName == null) continue;
                     if (info.packageName.equals(context.getPackageName())) continue;
-                    // Hide internal GMS packages from user app grid
                     if (info.packageName.equals("com.google.android.gms") || info.packageName.equals("com.google.android.gsf")) continue;
 
                     added.add(info.packageName);
@@ -954,8 +1263,6 @@ public class Engine {
             }
         } catch (Throwable ignored) {}
 
-        // Also check our Independent Registry: if the user uninstalled the original app from their phone,
-        // automatically re-verify/keep the clone alive from our Independent APK Vault!
         Set<String> registered = CloneMetadataStore.getRegisteredClones(context, userId);
         for (String pkg : registered) {
             if (!added.contains(pkg)) {
@@ -985,7 +1292,6 @@ public class Engine {
                 if (icon != null) ICON_CACHE.put(pkg, icon);
             }
         } catch (Throwable notOnHost) {
-            // Host app was uninstalled from phone! Load icon & label directly from our Independent APK Vault!
             File vaultedApk = getVaultedBaseApk(context, pkg);
             if (vaultedApk.exists()) {
                 try {
@@ -1027,11 +1333,6 @@ public class Engine {
         return 0;
     }
 
-    /**
-     * Installs a clone using the Independent APK Vault so that:
-     * 1) Uninstalling the app from the real phone NEVER deletes the clone inside VeyraVault.
-     * 2) Split APKs & native .so libs (Instagram, Soroush, Gap, Chrome) are properly linked.
-     */
     public static boolean installClone(Context ctx, String pkg, int userId) {
         try {
             GmsSupportManager.installGms(userId);
@@ -1055,9 +1356,6 @@ public class Engine {
         }
     }
 
-    /**
-     * Installs an external APK file directly into a virtual space (without needing it installed on the phone).
-     */
     public static boolean installExternalApkFile(Context ctx, File apkFile, int userId) {
         try {
             if (apkFile == null || !apkFile.exists()) return false;
@@ -1088,29 +1386,19 @@ public class Engine {
         }
     }
 
-    /**
-     * Launches a cloned app with:
-     * 1) Strict Priority Device & Location/Region Hooks
-     * 2) Automatic GMS support (for YouTube, Viber, etc.)
-     * 3) Explicit Main Browser Activity resolution (fixes Chrome opening WebView DevTools!)
-     */
     public static boolean launchClone(Context ctx, String pkg, int userId) {
         try {
-            // Ensure GMS is enabled for YouTube, Viber, etc.
             if (!GmsSupportManager.isGmsInstalled(userId)) {
                 GmsSupportManager.installGms(userId);
             }
 
-            // Re-sync any Split APK native libraries for Instagram, Soroush, Gap
             File vaultLibDir = new File(getVaultDirForPackage(ctx, pkg), "lib");
             if (vaultLibDir.exists()) {
                 syncVaultLibsToBlackBoxDataDir(ctx, pkg, vaultLibDir);
             }
 
-            // Apply Priority 1 (Per-App) or Priority 2 (Global) Device, Region & Location Hooks
             VirtualHookManager.prepareForCloneLaunch(ctx, pkg, userId);
 
-            // Special fix for Chrome & Browsers: prevent opening WebView DevTools!
             Intent explicitLauncher = resolveRealMainLauncherIntent(ctx, pkg);
             if (explicitLauncher != null) {
                 try {
@@ -1146,7 +1434,6 @@ public class Engine {
                 for (ResolveInfo ri : list) {
                     if (ri.activityInfo != null && ri.activityInfo.name != null) {
                         String actName = ri.activityInfo.name;
-                        // Never pick WebView DevTools!
                         if (!actName.toLowerCase().contains("devui") && !actName.toLowerCase().contains("devtools")) {
                             Intent launch = new Intent(Intent.ACTION_MAIN);
                             launch.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -1162,27 +1449,32 @@ public class Engine {
     }
 
     public static void stopClone(String pkg, int userId) {
-        try {
-            BlackBoxCore.get().stopPackage(pkg, userId);
-        } catch (Throwable ignored) {}
+        invokeBlackBoxMethod(new String[]{"stopPackageAsUser", "stopPackage"}, pkg, userId);
     }
 
     public static void clearCloneData(String pkg, int userId) {
-        try {
-            BlackBoxCore.get().clearPackage(pkg, userId);
-        } catch (Throwable ignored) {}
+        invokeBlackBoxMethod(new String[]{"clearPackageAsUser", "clearPackage"}, pkg, userId);
     }
 
     public static void uninstallClone(Context ctx, String pkg, int userId) {
-        try {
-            CloneMetadataStore.clearAllForClone(ctx, pkg, userId);
-            BlackBoxCore.get().uninstallPackageAsUser(pkg, userId);
-        } catch (Throwable ignored) {}
+        CloneMetadataStore.clearAllForClone(ctx, pkg, userId);
+        invokeBlackBoxMethod(new String[]{"uninstallPackageAsUser", "uninstallPackage"}, pkg, userId);
+    }
+
+    private static void invokeBlackBoxMethod(String[] methodNames, String pkg, int userId) {
+        for (String name : methodNames) {
+            try {
+                Method m = BlackBoxCore.class.getDeclaredMethod(name, String.class, int.class);
+                m.setAccessible(true);
+                m.invoke(BlackBoxCore.get(), pkg, userId);
+                return;
+            } catch (Throwable ignored) {}
+        }
     }
 }
 """)
 
-    # 6. Upgraded SecurityManager: Simultaneous PIN & Pattern + Priority Selector + Auto-Fallback
+    # 9. SecurityManager
     write_file("app/src/main/java/com/veyravault/space/security/SecurityManager.java", """
 package com.veyravault.space.security;
 
@@ -1195,7 +1487,7 @@ import java.util.UUID;
 public class SecurityManager {
     private static final String PREF = "veyravault_security_v3";
     private static final String KEY_LOCK_ENABLED = "lock_enabled";
-    private static final String KEY_PRIORITY_MODE = "priority_mode"; // "PIN" or "PATTERN"
+    private static final String KEY_PRIORITY_MODE = "priority_mode";
     private static final String KEY_PIN_SALT = "pin_salt";
     private static final String KEY_PIN_HASH = "pin_hash";
     private static final String KEY_PAT_SALT = "pat_salt";
@@ -1226,7 +1518,7 @@ public class SecurityManager {
     }
 
     public static boolean hasBothConfigured(Context ctx) {
-        return hasPinConfigured(ctx) && hasPatternConfigured(ctx);
+        return hasPinConfigured(ctx) && hasPatternConfigured(ctx));
     }
 
     public static void setPriorityMode(Context ctx, String mode) {
@@ -1335,7 +1627,7 @@ public class SecurityManager {
 }
 """)
 
-    print("[v3-Part1] Core Engine, Vault, Hooks, Dual Lock & SVG Icons updated successfully.")
+    print("[v3-Part1] All Helper Classes, Core Engine, Vault, Hooks & Dual Lock synchronized.")
 
 if __name__ == "__main__":
     apply_part1()
