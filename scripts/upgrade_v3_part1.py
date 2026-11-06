@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-VeyraVault v3.0 Upgrade - Part 1 (Self-contained Infrastructure, Gradle/Manifest, Core Engine, APK Vault, Hooks, Dual Lock, SVG Icons)
+VeyraVault v3.0 Upgrade - Part 1 (Clean Slate + VeyraApplication + Core Engine + APK Vault + Dual Lock + SVG Icons)
 """
 import os
 import re
+import shutil
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 JAVA_BASE = os.path.join(ROOT, "app", "src", "main", "java", "com", "veyravault", "space")
@@ -18,16 +19,16 @@ def write_file(path, content):
     print(f"[v3-part1] Wrote {os.path.relpath(path, ROOT)}")
 
 # ---------------------------------------------------------------------------
-# 0. Clean up legacy v1.0 files & Patch app/build.gradle + AndroidManifest.xml
+# 0. Wipe all legacy v1.0 Java & Layout files so zero stale classes remain
 # ---------------------------------------------------------------------------
-stale_files = [
-    os.path.join(JAVA_BASE, "security", "PinLockActivity.java"),
-    os.path.join(JAVA_BASE, "ui", "LocationPickerActivity.java"),
-]
-for sf in stale_files:
-    if os.path.exists(sf):
-        os.remove(sf)
-        print(f"[v3-part1] Removed legacy file: {os.path.relpath(sf, ROOT)}")
+if os.path.exists(JAVA_BASE):
+    shutil.rmtree(JAVA_BASE)
+    print("[v3-part1] Cleaned legacy Java directory for fresh v3.0 build")
+
+layout_dir = os.path.join(RES_BASE, "layout")
+if os.path.exists(layout_dir):
+    shutil.rmtree(layout_dir)
+    print("[v3-part1] Cleaned legacy XML layouts")
 
 if os.path.exists(APP_GRADLE_PATH):
     with open(APP_GRADLE_PATH, "r", encoding="utf-8") as f:
@@ -42,6 +43,25 @@ if os.path.exists(APP_GRADLE_PATH):
     with open(APP_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(gradle_txt)
     print("[v3-part1] Patched app/build.gradle with osmdroid & v3.0.0")
+
+STRINGS_XML = """
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VeyraVault</string>
+</resources>
+"""
+write_file(os.path.join(RES_BASE, "values", "strings.xml"), STRINGS_XML)
+write_file(os.path.join(RES_BASE, "values-fa", "strings.xml"), STRINGS_XML)
+
+STYLES_XML = """
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0F172A</item>
+    </style>
+</resources>
+"""
+write_file(os.path.join(RES_BASE, "values", "styles.xml"), STYLES_XML)
 
 DEVICE_ADMIN_XML = """
 <?xml version="1.0" encoding="utf-8"?>
@@ -73,11 +93,11 @@ ANDROID_MANIFEST = """
         android:name=".VeyraApplication"
         android:allowBackup="false"
         android:icon="@android:drawable/sym_def_app_icon"
-        android:label="VeyraVault"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.AppCompat.NoActionBar"
-        tools:replace="android:label,android:allowBackup,android:icon">
+        android:theme="@style/AppTheme"
+        tools:replace="android:label,android:allowBackup,android:icon,android:theme">
 
         <activity
             android:name=".ui.MainActivity"
@@ -85,7 +105,6 @@ ANDROID_MANIFEST = """
             android:configChanges="locale|layoutDirection|orientation|screenSize">
         </activity>
 
-        <!-- Disguise Mode 0: Default VeyraVault -->
         <activity-alias
             android:name=".LauncherDefault"
             android:targetActivity=".ui.MainActivity"
@@ -99,7 +118,6 @@ ANDROID_MANIFEST = """
             </intent-filter>
         </activity-alias>
 
-        <!-- Disguise Mode 1: Calculator -->
         <activity-alias
             android:name=".LauncherCalc"
             android:targetActivity=".ui.MainActivity"
@@ -113,7 +131,6 @@ ANDROID_MANIFEST = """
             </intent-filter>
         </activity-alias>
 
-        <!-- Disguise Mode 2: Calendar -->
         <activity-alias
             android:name=".LauncherCalendar"
             android:targetActivity=".ui.MainActivity"
@@ -127,7 +144,6 @@ ANDROID_MANIFEST = """
             </intent-filter>
         </activity-alias>
 
-        <!-- Disguise Mode 3: Notepad -->
         <activity-alias
             android:name=".LauncherNotes"
             android:targetActivity=".ui.MainActivity"
@@ -171,7 +187,49 @@ ANDROID_MANIFEST = """
 write_file(MANIFEST_PATH, ANDROID_MANIFEST)
 
 # ---------------------------------------------------------------------------
-# 1. SVG Vector Drawables for Bottom Navigation
+# 1. VeyraApplication.java
+# ---------------------------------------------------------------------------
+VEYRA_APPLICATION = """
+package com.veyravault.space;
+
+import android.app.Application;
+import android.content.Context;
+
+import com.veyravault.space.core.Engine;
+import com.veyravault.space.util.LocaleHelper;
+
+import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.app.configuration.ClientConfiguration;
+
+public class VeyraApplication extends Application {
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.applyLocale(base));
+        try {
+            BlackBoxCore.get().doAttachBaseContext(base, new ClientConfiguration() {
+                @Override
+                public String getHostPackageName() {
+                    return base.getPackageName();
+                }
+            });
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            BlackBoxCore.get().doCreate();
+        } catch (Throwable ignored) {}
+        Engine.init(this);
+    }
+}
+"""
+write_file(os.path.join(JAVA_BASE, "VeyraApplication.java"), VEYRA_APPLICATION)
+
+# ---------------------------------------------------------------------------
+# 2. SVG Vector Drawables for Bottom Navigation
 # ---------------------------------------------------------------------------
 IC_DASHBOARD = """
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -220,7 +278,7 @@ write_file(os.path.join(RES_BASE, "drawable", "ic_nav_guide.xml"), IC_GUIDE)
 write_file(os.path.join(RES_BASE, "drawable", "ic_nav_settings.xml"), IC_SETTINGS)
 
 # ---------------------------------------------------------------------------
-# 2. Jalali (Solar Hijri) & World Clock Utility + LocaleHelper + BaseActivity
+# 3. JalaliClockUtil, LocaleHelper, BaseActivity, GmsSupportManager, AppDisguiseManager, PatternLockView
 # ---------------------------------------------------------------------------
 JALALI_UTIL = """
 package com.veyravault.space.util;
@@ -629,7 +687,7 @@ public class PatternLockView extends View {
 write_file(os.path.join(JAVA_BASE, "ui", "PatternLockView.java"), PATTERN_VIEW)
 
 # ---------------------------------------------------------------------------
-# 3. CloneMetadataStore
+# 4. CloneMetadataStore
 # ---------------------------------------------------------------------------
 CLONE_METADATA_STORE = """
 package com.veyravault.space.core;
@@ -998,7 +1056,7 @@ public class CloneMetadataStore {
 write_file(os.path.join(JAVA_BASE, "core", "CloneMetadataStore.java"), CLONE_METADATA_STORE)
 
 # ---------------------------------------------------------------------------
-# 4. VirtualHookManager
+# 5. VirtualHookManager
 # ---------------------------------------------------------------------------
 VIRTUAL_HOOK_MANAGER = """
 package com.veyravault.space.core;
@@ -1212,7 +1270,7 @@ public class VirtualHookManager {
 write_file(os.path.join(JAVA_BASE, "core", "VirtualHookManager.java"), VIRTUAL_HOOK_MANAGER)
 
 # ---------------------------------------------------------------------------
-# 5. Engine.java
+# 6. Engine.java (100% reflection-safe BlackBoxCore calls + APK Vault + Native Libs + Chrome Fix)
 # ---------------------------------------------------------------------------
 ENGINE_JAVA = """
 package com.veyravault.space.core;
@@ -1273,6 +1331,26 @@ public class Engine {
         }
     }
 
+    private static boolean invokeInstallApkFile(File apkFile, int userId) {
+        try {
+            Method m = BlackBoxCore.class.getMethod("installPackageAsUser", File.class, int.class);
+            Object r = m.invoke(BlackBoxCore.get(), apkFile, userId);
+            if (r instanceof InstallResult) {
+                return ((InstallResult) r).success;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private static boolean invokeIsInstalled(String pkg, int userId) {
+        try {
+            Method m = BlackBoxCore.class.getMethod("isInstalled", String.class, int.class);
+            Object r = m.invoke(BlackBoxCore.get(), pkg, userId);
+            if (r instanceof Boolean) return (Boolean) r;
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     public static List<AppModel> getInstalledApps(Context context) {
         PackageManager pm = context.getPackageManager();
         List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
@@ -1328,11 +1406,9 @@ public class Engine {
             seen.add(pkg);
             String vaultApk = CloneMetadataStore.getVaultedApkPath(context, pkg);
             if (vaultApk != null && !vaultApk.isEmpty() && new File(vaultApk).exists()) {
-                try {
-                    if (!BlackBoxCore.get().isInstalled(pkg, userId)) {
-                        BlackBoxCore.get().installPackageAsUser(new File(vaultApk), userId);
-                    }
-                } catch (Throwable ignored) {}
+                if (!invokeIsInstalled(pkg, userId)) {
+                    invokeInstallApkFile(new File(vaultApk), userId);
+                }
             }
             AppModel model = buildClonedAppModel(context, pm, pkg, null, userId);
             if (model != null) list.add(model);
@@ -1399,16 +1475,12 @@ public class Engine {
 
             File vaultedBaseApk = backupPackageToVault(context, packageName, appInfo);
 
-            InstallResult res;
+            boolean ok = false;
             if (vaultedBaseApk != null && vaultedBaseApk.exists()) {
-                res = BlackBoxCore.get().installPackageAsUser(vaultedBaseApk, userId);
-            } else {
-                res = BlackBoxCore.get().installPackageAsUser(packageName, userId);
+                ok = invokeInstallApkFile(vaultedBaseApk, userId);
             }
-
-            boolean ok = res != null && res.success;
             if (!ok) {
-                res = BlackBoxCore.get().installPackageAsUser(packageName, userId);
+                InstallResult res = BlackBoxCore.get().installPackageAsUser(packageName, userId);
                 ok = res != null && res.success;
             }
 
@@ -1443,8 +1515,7 @@ public class Engine {
             copyFile(externalApk, vaultBase);
             CloneMetadataStore.setVaultedApkPath(context, pkg, vaultBase.getAbsolutePath());
 
-            InstallResult res = BlackBoxCore.get().installPackageAsUser(vaultBase, userId);
-            boolean ok = res != null && res.success;
+            boolean ok = invokeInstallApkFile(vaultBase, userId);
             if (ok) {
                 extractAbiFromApkZip(vaultBase, new File(vaultDir, "lib"));
                 syncLibsToBlackBoxDir(context, pkg, new File(vaultDir, "lib"));
@@ -1674,7 +1745,7 @@ public class Engine {
 write_file(os.path.join(JAVA_BASE, "core", "Engine.java"), ENGINE_JAVA)
 
 # ---------------------------------------------------------------------------
-# 6. SecurityManager & VaultDeviceAdminReceiver
+# 7. SecurityManager & VaultDeviceAdminReceiver
 # ---------------------------------------------------------------------------
 SECURITY_MANAGER = """
 package com.veyravault.space.security;
@@ -1837,7 +1908,7 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
             } catch (Throwable ignored) {}
             Toast.makeText(context, "⛔ حذف مقدور نمی‌باشد! ابتدا رمز VeyraVault را وارد کنید.", Toast.LENGTH_LONG).show();
         }
-        return "⛔ حذف مقدور نمی‌باشد! غیرفعال‌سازی فقط از داخل تنظیمات امنیتی VeyraVault با رمز عبور مجاز است.";
+        return "⛔ حذف مقدور نمی‌باشد VeyraVault با رمز عبور مجاز است.";
     }
 
     @Override
