@@ -39,7 +39,6 @@ def patch_part2_script():
     with open(part2_path, "r", encoding="utf-8") as f:
         txt = f.read()
 
-    # Strip any trailing JAVA_BASE block if present in upgrade_v3_part2.py
     for cutoff in [
         "# Auto-override SecurityLockActivity",
         'write_file(os.path.join(JAVA_BASE, "ui", "SecurityLockActivity.java")'
@@ -47,7 +46,6 @@ def patch_part2_script():
         if cutoff in txt:
             txt = txt.split(cutoff)[0].rstrip() + "\n"
 
-    # Also define JAVA_BASE at the top of upgrade_v3_part2.py so it can never be undefined
     if "JAVA_BASE =" not in txt:
         txt = 'import os\nJAVA_BASE = "app/src/main/java/com/veyravault/space"\n' + txt
 
@@ -55,6 +53,17 @@ def patch_part2_script():
         "card.setGravity(Gravity.CENTER_HORIZONTAL);",
         "card.setGravity(android.view.Gravity.CENTER_HORIZONTAL);"
     )
+
+    # Ensure BaseActivity is imported in all UI package files
+    txt = txt.replace(
+        "package com.veyravault.space.ui;\nimport com.veyravault.space.helper.BaseActivity;",
+        "package com.veyravault.space.ui;"
+    )
+    txt = txt.replace(
+        "package com.veyravault.space.ui;",
+        "package com.veyravault.space.ui;\nimport com.veyravault.space.helper.BaseActivity;"
+    )
+
     txt = re.sub(
         r"public\s+class\s+MainActivity\s+extends\s+Activity",
         "public class MainActivity extends BaseActivity",
@@ -66,10 +75,12 @@ def patch_part2_script():
     txt = re.sub(r"private\s+boolean\s+isPersian\s*\(", "public boolean isPersian(", txt)
     txt = re.sub(r"private\s+boolean\s+isFa\s*\(", "public boolean isFa(", txt)
     txt = re.sub(r"private\s+String\s+tr\s*\(", "public String tr(", txt)
+    txt = re.sub(r"private\s+void\s+triggerQuickLock\s*\(", "public void triggerQuickLock(", txt)
+    txt = re.sub(r"private\s+void\s+switchLanguageInstant\s*\(", "public void switchLanguageInstant(", txt)
 
     with open(part2_path, "w", encoding="utf-8") as f:
         f.write(txt)
-    print("[v3-part1] Cleanly patched scripts/upgrade_v3_part2.py (v3.0-final)")
+    print("[v3-part1] Cleanly patched scripts/upgrade_v3_part2.py (BaseActivity imported)")
 
 
 def patch_app_build_gradle():
@@ -461,7 +472,15 @@ public class JalaliClockUtil {
         return getTehranTimeString();
     }
 
-    public static String getTehranJalaliDate( boolean persianLang ) {
+    public static String getTehranTime(boolean persianLang) {
+        TimeZone tz = TimeZone.getTimeZone("Asia/Tehran");
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.US);
+        sdf.setTimeZone(tz);
+        String raw = sdf.format(new Date());
+        return persianLang ? toPersianDigits(raw) : raw;
+    }
+
+    public static String getTehranJalaliDate(boolean persianLang) {
         TimeZone tz = TimeZone.getTimeZone("Asia/Tehran");
         Calendar cal = Calendar.getInstance(tz);
         int gy = cal.get(Calendar.YEAR);
@@ -492,11 +511,19 @@ public class JalaliClockUtil {
         return getNewYorkTimeString();
     }
 
+    public static String getNewYorkTime(boolean persianLang) {
+        return getNewYorkTimeString();
+    }
+
     public static String getNewYorkGregorianDate() {
         TimeZone tz = TimeZone.getTimeZone("America/New_York");
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy", Locale.US);
         sdf.setTimeZone(tz);
         return sdf.format(new Date());
+    }
+
+    public static String getNewYorkGregorianDate(boolean persianLang) {
+        return getNewYorkGregorianDate();
     }
 
     public static String toPersianDigits(String input) {
@@ -584,6 +611,7 @@ package com.veyravault.space.helper;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -591,6 +619,11 @@ import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.Toast;
+
+import com.veyravault.space.security.SecurityManager;
+import com.veyravault.space.ui.SecurityLockActivity;
+import com.veyravault.space.ui.SecuritySettingsActivity;
 
 public class BaseActivity extends Activity {
 
@@ -630,6 +663,29 @@ public class BaseActivity extends Activity {
 
     public String tr(String faText, String enText) {
         return isPersian() ? faText : enText;
+    }
+
+    public void triggerQuickLock() {
+        SecurityManager.setSessionUnlocked(false);
+        if (SecurityManager.isLockEnabled(this)) {
+            Intent i = new Intent(this, SecurityLockActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(i);
+            finish();
+        } else {
+            Toast.makeText(
+                this,
+                tr("🔒 ابتدا از بخش امنیت یک رمز پین یا الگو تنظیم کنید", "🔒 Please set a PIN or Pattern in Security Settings first"),
+                Toast.LENGTH_SHORT
+            ).show();
+            Intent i = new Intent(this, SecuritySettingsActivity.class);
+            startActivity(i);
+        }
+    }
+
+    public void switchLanguageInstant() {
+        LocaleHelper.toggleLanguage(this);
+        recreate();
     }
 
     public int dp(int value) {
@@ -778,6 +834,10 @@ public class AppDisguiseManager {
             return isFa ? "یادداشت هوشمند (Smart Notes)" : "Smart Notes";
         }
         return isFa ? "پیش‌فرض (VeyraVault)" : "Default (VeyraVault)";
+    }
+
+    public static String getDisguiseTitle(Context ctx) {
+        return getDisguiseTitle(ctx, LocaleHelper.isPersian(ctx));
     }
 
     public static void applyDisguiseMode(Context ctx, String mode) {
@@ -1584,6 +1644,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.util.LruCache;
 
+import com.veyravault.space.VeyraApplication;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -1655,6 +1717,19 @@ public class Engine {
         }
     }
 
+    public static int[] getSpaces() {
+        Context ctx = VeyraApplication.getInstance();
+        if (ctx == null) {
+            return new int[]{0, 1, 2};
+        }
+        List<Integer> list = CloneMetadataStore.getSpacesList(ctx);
+        int[] arr = new int[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            arr[i] = list.get(i);
+        }
+        return arr;
+    }
+
     public static List<Integer> getSpaces(Context ctx) {
         return CloneMetadataStore.getSpacesList(ctx);
     }
@@ -1663,6 +1738,14 @@ public class Engine {
         int newSpace = CloneMetadataStore.createNewSpace(ctx);
         GmsSupportManager.ensureGmsForSpace(newSpace);
         return newSpace;
+    }
+
+    public static int createNewSpace() {
+        Context ctx = VeyraApplication.getInstance();
+        if (ctx != null) {
+            return createNewSpace(ctx);
+        }
+        return 3;
     }
 
     public static File getApkVaultDir(Context ctx, String pkg) {
