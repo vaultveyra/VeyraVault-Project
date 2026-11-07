@@ -38,6 +38,19 @@ def patch_part2_script():
         return
     with open(part2_path, "r", encoding="utf-8") as f:
         txt = f.read()
+
+    # Strip any trailing JAVA_BASE block if present in upgrade_v3_part2.py
+    for cutoff in [
+        "# Auto-override SecurityLockActivity",
+        'write_file(os.path.join(JAVA_BASE, "ui", "SecurityLockActivity.java")'
+    ]:
+        if cutoff in txt:
+            txt = txt.split(cutoff)[0].rstrip() + "\n"
+
+    # Also define JAVA_BASE at the top of upgrade_v3_part2.py so it can never be undefined
+    if "JAVA_BASE =" not in txt:
+        txt = 'import os\nJAVA_BASE = "app/src/main/java/com/veyravault/space"\n' + txt
+
     txt = txt.replace(
         "card.setGravity(Gravity.CENTER_HORIZONTAL);",
         "card.setGravity(android.view.Gravity.CENTER_HORIZONTAL);"
@@ -54,238 +67,9 @@ def patch_part2_script():
     txt = re.sub(r"private\s+boolean\s+isFa\s*\(", "public boolean isFa(", txt)
     txt = re.sub(r"private\s+String\s+tr\s*\(", "public String tr(", txt)
 
-    lock_fix = '''write_file(os.path.join(JAVA_BASE, "ui", "SecurityLockActivity.java"), r"""
-package com.veyravault.space.ui;
-
-import android.content.Intent;
-import android.graphics.Color;
-import android.os.Bundle;
-import android.text.InputType;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import com.veyravault.space.helper.BaseActivity;
-import com.veyravault.space.helper.PatternLockView;
-import com.veyravault.space.security.SecurityManager;
-
-import java.util.List;
-
-public class SecurityLockActivity extends BaseActivity {
-
-    private String activeMode = SecurityManager.MODE_PIN;
-    private LinearLayout pinContainer;
-    private LinearLayout patternContainer;
-    private EditText pinInput;
-    private TextView switchModeBtn;
-    private TextView subtitleView;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        if (!SecurityManager.isLockEnabled(this)) {
-            SecurityManager.setSessionUnlocked(true);
-            proceedToNext();
-            return;
-        }
-
-        activeMode = SecurityManager.getEffectivePrimaryLockType(this);
-        boolean antiUninstallTriggered = getIntent().getBooleanExtra("anti_uninstall_triggered", false);
-
-        ScrollView rootScroll = new ScrollView(this);
-        rootScroll.setFillViewport(true);
-        rootScroll.setBackgroundColor(Color.parseColor("#0B1021"));
-
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        int pad = dp(24);
-        root.setPadding(pad, pad, pad, pad);
-
-        if (antiUninstallTriggered) {
-            TextView alertBanner = new TextView(this);
-            alertBanner.setText(tr(
-                "⛔ حذف مقدور نمی‌باشد! عملیات حذف یا غیرفعال‌سازی این برنامه مسدود است.",
-                "⛔ Uninstallation is not permitted! Removing or deactivating this app is blocked."
-            ));
-            alertBanner.setTextColor(Color.WHITE);
-            alertBanner.setTextSize(14f);
-            alertBanner.setGravity(Gravity.CENTER);
-            alertBanner.setPadding(dp(16), dp(14), dp(16), dp(14));
-            alertBanner.setBackground(roundedBg("#B71C1C", 14));
-            LinearLayout.LayoutParams alertLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            alertLp.bottomMargin = dp(20);
-            root.addView(alertBanner, alertLp);
-        }
-
-        LinearLayout card = makeCard();
-        card.setGravity(Gravity.CENTER_HORIZONTAL);
-
-        TextView lockIcon = new TextView(this);
-        lockIcon.setText("🔒");
-        lockIcon.setTextSize(40f);
-        lockIcon.setGravity(Gravity.CENTER);
-        card.addView(lockIcon);
-
-        TextView title = new TextView(this);
-        title.setText(tr("قفل امنیتی VeyraVault", "VeyraVault Security Lock"));
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(20f);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(8), 0, dp(4));
-        card.addView(title);
-
-        subtitleView = new TextView(this);
-        subtitleView.setTextColor(Color.parseColor("#B0BEC5"));
-        subtitleView.setTextSize(13f);
-        subtitleView.setGravity(Gravity.CENTER);
-        subtitleView.setPadding(0, 0, 0, dp(16));
-        card.addView(subtitleView);
-
-        pinContainer = new LinearLayout(this);
-        pinContainer.setOrientation(LinearLayout.VERTICAL);
-        pinContainer.setGravity(Gravity.CENTER_HORIZONTAL);
-
-        pinInput = new EditText(this);
-        pinInput.setHint(tr("رمز پین (PIN) را وارد کنید", "Enter PIN code"));
-        pinInput.setHintTextColor(Color.parseColor("#78909C"));
-        pinInput.setTextColor(Color.WHITE);
-        pinInput.setGravity(Gravity.CENTER);
-        pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        pinInput.setPadding(dp(16), dp(12), dp(16), dp(12));
-        pinInput.setBackground(roundedBg("#1E2746", 12));
-        pinContainer.addView(pinInput, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        Button verifyPinBtn = new Button(this);
-        verifyPinBtn.setAllCaps(false);
-        verifyPinBtn.setText(tr("باز کردن قفل با پین ✓", "Unlock with PIN ✓"));
-        verifyPinBtn.setTextColor(Color.WHITE);
-        verifyPinBtn.setBackground(roundedBg("#2962FF", 12));
-        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        btnLp.topMargin = dp(14);
-        verifyPinBtn.setOnClickListener(v -> {
-            String entered = pinInput.getText().toString().trim();
-            if (SecurityManager.verifyPin(this, entered)) {
-                onUnlockSuccess();
-            } else {
-                Toast.makeText(this, tr("❌ رمز پین اشتباه است", "❌ Incorrect PIN"), Toast.LENGTH_SHORT).show();
-                pinInput.setText("");
-            }
-        });
-        pinContainer.addView(verifyPinBtn, btnLp);
-        card.addView(pinContainer, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        patternContainer = new LinearLayout(this);
-        patternContainer.setOrientation(LinearLayout.VERTICAL);
-        patternContainer.setGravity(Gravity.CENTER_HORIZONTAL);
-
-        PatternLockView patternView = new PatternLockView(this);
-        LinearLayout.LayoutParams patLp = new LinearLayout.LayoutParams(dp(250), dp(250));
-        patLp.gravity = Gravity.CENTER;
-        patternView.setOnPatternListener(new PatternLockView.OnPatternListener() {
-            @Override
-            public void onPatternCompleted(List<Integer> nodes, String serializedPattern) {
-                if (SecurityManager.verifyPattern(SecurityLockActivity.this, serializedPattern)) {
-                    onUnlockSuccess();
-                } else {
-                    Toast.makeText(SecurityLockActivity.this,
-                        tr("❌ الگوی وارد شده اشتباه است", "❌ Incorrect Pattern"),
-                        Toast.LENGTH_SHORT).show();
-                    patternView.clearPattern();
-                }
-            }
-        });
-        patternContainer.addView(patternView, patLp);
-        card.addView(patternContainer, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        switchModeBtn = new TextView(this);
-        switchModeBtn.setTextColor(Color.parseColor("#82B1FF"));
-        switchModeBtn.setTextSize(14f);
-        switchModeBtn.setGravity(Gravity.CENTER);
-        switchModeBtn.setPadding(dp(12), dp(18), dp(12), dp(6));
-        switchModeBtn.setOnClickListener(v -> {
-            if (SecurityManager.MODE_PIN.equals(activeMode)) {
-                activeMode = SecurityManager.MODE_PATTERN;
-            } else {
-                activeMode = SecurityManager.MODE_PIN;
-            }
-            refreshModeUi();
-        });
-        card.addView(switchModeBtn);
-
-        root.addView(card, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        rootScroll.addView(root);
-        setContentView(rootScroll);
-
-        refreshModeUi();
-    }
-
-    private void refreshModeUi() {
-        boolean isPattern = SecurityManager.MODE_PATTERN.equals(activeMode);
-        pinContainer.setVisibility(isPattern ? View.GONE : View.VISIBLE);
-        patternContainer.setVisibility(isPattern ? View.VISIBLE : View.GONE);
-
-        if (isPattern) {
-            subtitleView.setText(tr("الگوی امنیتی خود را رسم کنید", "Draw your security pattern"));
-        } else {
-            subtitleView.setText(tr("رمز پین امنیتی خود را وارد کنید", "Enter your security PIN code"));
-        }
-
-        if (SecurityManager.hasBothLocksConfigured(this)) {
-            switchModeBtn.setVisibility(View.VISIBLE);
-            if (isPattern) {
-                switchModeBtn.setText(tr("آیا از رمز پین استفاده می‌کنید؟ ورود با پین ⬅", "Using PIN instead? Switch to PIN ⬅"));
-            } else {
-                switchModeBtn.setText(tr("آیا از الگو استفاده می‌کنید؟ ورود با الگو ⬅", "Using Pattern instead? Switch to Pattern ⬅"));
-            }
-        } else {
-            switchModeBtn.setVisibility(View.GONE);
-        }
-    }
-
-    private void onUnlockSuccess() {
-        SecurityManager.setSessionUnlocked(true);
-        proceedToNext();
-    }
-
-    private void proceedToNext() {
-        Intent next = new Intent(this, MainActivity.class);
-        next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(next);
-        finish();
-    }
-
-    @Override
-    public void onBackPressed() {
-        moveTaskToBack(true);
-    }
-}
-""")'''
-
-    if "SecurityLockActivity.java" in txt:
-        txt = txt + "\n\n# Auto-override SecurityLockActivity for PatternLockView compatibility\n" + lock_fix + "\n"
-
     with open(part2_path, "w", encoding="utf-8") as f:
         f.write(txt)
-    print("[v3-part1] Verified & patched scripts/upgrade_v3_part2.py")
+    print("[v3-part1] Cleanly patched scripts/upgrade_v3_part2.py (v3.0-final)")
 
 
 def patch_app_build_gradle():
@@ -661,7 +445,7 @@ public class JalaliClockUtil {
             jd = 1 + (days % 31);
         } else {
             jm = 7 + ((days - 186) / 30);
-            jd = 1 + ((days - 186) % 30);
+            jd = 1 + ((days - 186) / 30);
         }
         return new int[]{jy, jm, jd};
     }
@@ -1675,7 +1459,7 @@ public class VirtualHookManager {
         double lon = CloneMetadataStore.getGlobalLon(ctx);
         String tz = CloneMetadataStore.getGlobalTimezone(ctx);
         String vip = CloneMetadataStore.getGlobalVirtualIp(ctx);
-        applyVirtualProperties(ctx, brand, model, device, " Falkenstein, Germany", lat, lon, tz, vip);
+        applyVirtualProperties(ctx, brand, model, device, "Falkenstein, Germany", lat, lon, tz, vip);
         installGmsAvailabilityBypass();
     }
 
