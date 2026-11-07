@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
+import shutil
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 APP_BASE = "app/src/main"
 JAVA_BASE = f"{APP_BASE}/java/com/veyravault/space"
+
+# Remove obsolete v2 files (VaultApp.java, core/CloneStore.java, core/GmsSupportManager.java)
+shutil.rmtree(os.path.join(ROOT, JAVA_BASE), ignore_errors=True)
+shutil.rmtree(os.path.join(ROOT, "build_workspace", JAVA_BASE), ignore_errors=True)
 
 
 def write_file(rel_path, content):
@@ -1589,7 +1594,7 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
 """,
 )
 
-# 11. VEYRA APPLICATION
+# 11. VEYRA APPLICATION (Fixed @Override annotations on ClientConfiguration)
 write_file(
     f"{JAVA_BASE}/VeyraApplication.java",
     """package com.veyravault.space;
@@ -1615,17 +1620,14 @@ public class VeyraApplication extends Application {
                     return base.getPackageName();
                 }
 
-                @Override
                 public boolean isHideRoot() {
                     return true;
                 }
 
-                @Override
                 public boolean isHideXposed() {
                     return true;
                 }
 
-                @Override
                 public boolean isEnableDaemonService() {
                     return true;
                 }
