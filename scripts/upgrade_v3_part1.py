@@ -24,7 +24,7 @@ Licensed under the Apache License, Version 2.0.
 """,
 )
 
-# 2. DEVICE ADMIN XML & DRAWABLE VECTORS
+# 2. DEVICE ADMIN XML & DRAWABLE VECTORS (INCLUDING APP LAUNCHER ICONS)
 write_file(
     f"{APP_BASE}/res/xml/device_admin_receiver.xml",
     """<?xml version="1.0" encoding="utf-8"?>
@@ -44,6 +44,51 @@ write_file(
     <cache-path name="picked_apks" path="picked_apks/" />
     <external-path name="external_files" path="." />
 </paths>
+""",
+)
+
+write_file(
+    f"{APP_BASE}/res/drawable/ic_launcher.xml",
+    """<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M54,16L22,30v24c0,22.2 13.6,42.9 32,50c18.4,-7.1 32,-27.8 32,-50V30L54,16z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,26L30,36.5v17.5c0,16.6 10.2,32.1 24,37.5c13.8,-5.4 24,-20.9 24,-37.5V36.5L54,26z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,44h8l4,16l4,-16h8l-8,26h-8L42,44z" />
+</vector>
+""",
+)
+
+write_file(
+    f"{APP_BASE}/res/drawable/ic_launcher_round.xml",
+    """<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M54,4A50,50 0 1,1 54,104A50,50 0 1,1 54,4z" />
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M54,18L24,31v23c0,20.8 12.8,40.2 30,46.8c17.2,-6.6 30,-26 30,-46.8V31L54,18z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,44h8l4,16l4,-16h8l-8,26h-8L42,44z" />
+</vector>
 """,
 )
 
@@ -102,7 +147,7 @@ write_file(
 """,
 )
 
-# 3. STRINGS XML
+# 3. STRINGS XML (WITH MIPMAP ALIASES FOR UNIVERSAL COMPATIBILITY)
 write_file(
     f"{APP_BASE}/res/values/strings.xml",
     """<?xml version="1.0" encoding="utf-8"?>
@@ -110,6 +155,8 @@ write_file(
     <string name="app_name">VeyraVault</string>
     <string name="device_admin_label">محافظ ضدحذف VeyraVault</string>
     <string name="device_admin_desc">محافظت امنیتی در برابر حذف غیرمجاز برنامه</string>
+    <item name="ic_launcher" type="mipmap">@drawable/ic_launcher</item>
+    <item name="ic_launcher_round" type="mipmap">@drawable/ic_launcher_round</item>
 </resources>
 """,
 )
@@ -147,14 +194,14 @@ write_file(
     <application
         android:name=".VeyraApplication"
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@drawable/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
-        tools:replace="android:label,android:allowBackup,android:supportsRtl,android:theme">
+        tools:replace="android:icon,android:roundIcon,android:label,android:allowBackup,android:supportsRtl,android:theme">
 
         <activity
             android:name=".ui.MainActivity"
@@ -700,7 +747,6 @@ public class CloneMetadataStore {
         return "sp_" + spaceId + "_" + pkg + "_";
     }
 
-    // Space Custom Naming
     public static String getSpaceCustomName(Context ctx, int spaceId) {
         return prefs(ctx).getString("space_custom_name_" + spaceId, "");
     }
@@ -718,7 +764,6 @@ public class CloneMetadataStore {
         return fa ? ("فضای " + num) : ("Space " + num);
     }
 
-    // Global Device Identity
     public static String getGlobalDeviceBrand(Context ctx) {
         return prefs(ctx).getString(KEY_GLOBAL_BRAND, "Apple");
     }
@@ -734,7 +779,6 @@ public class CloneMetadataStore {
                 .commit();
     }
 
-    // Global Region & Coordinates
     public static boolean isGlobalLocationEnabled(Context ctx) {
         return prefs(ctx).getBoolean(KEY_GLOBAL_LOC_ENABLED, true);
     }
@@ -766,7 +810,6 @@ public class CloneMetadataStore {
                 .commit();
     }
 
-    // Global Virtual IP & Proxy
     public static String getGlobalVirtualIp(Context ctx) {
         return prefs(ctx).getString(KEY_GLOBAL_VIRTUAL_IP, "88.198.24.108");
     }
@@ -790,7 +833,6 @@ public class CloneMetadataStore {
                 .commit();
     }
 
-    // Per-Clone Alias
     public static String getCustomAlias(Context ctx, String pkg, int spaceId) {
         return prefs(ctx).getString(prefix(pkg, spaceId) + "alias", "");
     }
@@ -799,7 +841,6 @@ public class CloneMetadataStore {
         prefs(ctx).edit().putString(prefix(pkg, spaceId) + "alias", alias == null ? "" : alias.trim()).commit();
     }
 
-    // Per-Clone Device Identity (Priority #1 over Global)
     public static boolean hasCustomDeviceIdentity(Context ctx, String pkg, int spaceId) {
         return prefs(ctx).getBoolean(prefix(pkg, spaceId) + "has_custom_device", false);
     }
@@ -834,7 +875,6 @@ public class CloneMetadataStore {
         return getGlobalDeviceModel(ctx);
     }
 
-    // Per-Clone Location & Region (Priority #1 over Global)
     public static boolean hasCustomLocation(Context ctx, String pkg, int spaceId) {
         return prefs(ctx).getBoolean(prefix(pkg, spaceId) + "has_custom_loc", false);
     }
@@ -876,7 +916,6 @@ public class CloneMetadataStore {
         return getGlobalCoordinates(ctx);
     }
 
-    // Device & Region Presets
     public static Map<String, String> getAvailableDevicePresets() {
         Map<String, String> map = new LinkedHashMap<>();
         map.put("iPhone 16 Pro Max", "Apple");
