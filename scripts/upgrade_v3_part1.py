@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 
- APP_BASE = "app/src/main"
+APP_BASE = "app/src/main"
 JAVA_BASE = os.path.join(APP_BASE, "java/com/veyravault/space")
 RES_BASE = os.path.join(APP_BASE, "res")
 
@@ -365,7 +365,7 @@ public class JalaliClockUtil {
     };
 
     private static final String[] PERSIAN_MONTHS_EN = {
-        "Farvardin", "Ordibehesht", "Khordاد", "Tir", "Mordad", "Shahrivar",
+        "Farvardin", "Ordibehesht", "Khordad", "Tir", "Mordad", "Shahrivar",
         "Mehr", "Aban", "Azar", "Dey", "Bahman", "Esfand"
     };
 
