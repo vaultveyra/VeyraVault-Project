@@ -10,7 +10,7 @@ def write_file(path, content):
 
 JAVA_BASE = "app/src/main/java/com/veyravault/space"
 
-MAIN_ACTIVITY = """package com.veyravault.space.ui;
+MAIN_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -1107,7 +1107,7 @@ public class MainActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/MainActivity.java"), MAIN_ACTIVITY)
 
-ADD_APP_ACTIVITY = """package com.veyravault.space.ui;
+ADD_APP_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -1389,7 +1389,7 @@ public class AddAppActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/AddAppActivity.java"), ADD_APP_ACTIVITY)
 
-GLOBAL_ENV_ACTIVITY = """package com.veyravault.space.ui;
+GLOBAL_ENV_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -1523,7 +1523,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/GlobalEnvironmentActivity.java"), GLOBAL_ENV_ACTIVITY)
 
-SET_LOCATION_ACTIVITY = """package com.veyravault.space.ui;
+SET_LOCATION_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
 import android.graphics.Color;
@@ -1696,7 +1696,7 @@ public class SetLocationActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/SetLocationActivity.java"), SET_LOCATION_ACTIVITY)
 
-SECURITY_SETTINGS_ACTIVITY = """package com.veyravault.space.ui;
+SECURITY_SETTINGS_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
@@ -1855,7 +1855,7 @@ public class SecuritySettingsActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/SecuritySettingsActivity.java"), SECURITY_SETTINGS_ACTIVITY)
 
-SECURITY_LOCK_ACTIVITY = """package com.veyravault.space.ui;
+SECURITY_LOCK_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -1863,7 +1863,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -1982,7 +1981,7 @@ public class SecurityLockActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/SecurityLockActivity.java"), SECURITY_LOCK_ACTIVITY)
 
-GUIDE_ACTIVITY = """package com.veyravault.space.ui;
+GUIDE_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -2043,7 +2042,7 @@ public class GuideActivity extends BaseActivity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/GuideActivity.java"), GUIDE_ACTIVITY)
 
-ABOUT_ACTIVITY = """package com.veyravault.space.ui;
+ABOUT_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.content.Intent;
 import android.graphics.Color;
