@@ -732,7 +732,8 @@ public class MainActivity extends BaseActivity {
 
             secCard.addView(makeText("DNS: " + store.getCustomDns(), 12, "#E2E8F0", false));
             TextView btnTestIp = makePillButton(tr("🔍 تست واقعی IP خروجی با مقصد مورد تأیید کاربر", "🔍 Real Outbound IP Test"), "#F59E0B");
-            btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(activeProfile));
+            final CloneMetadataStore.VpnAccount finalActiveProfile = activeProfile;
+btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfile));
             secCard.addView(btnTestIp);
             body.addView(secCard);
 
