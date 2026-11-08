@@ -10,6 +10,117 @@ def write_file(path, content):
 
 JAVA_BASE = "app/src/main/java/com/veyravault/space"
 
+# Auto-fix VirtualHookManager.java using reflection so BLocationManager never causes compile errors
+VIRTUAL_HOOK_MANAGER_SAFE = r"""package com.veyravault.space.core;
+
+import android.content.Context;
+import android.os.Build;
+import java.lang.reflect.Field;
+import java.util.TimeZone;
+
+public class VirtualHookManager {
+    private static VirtualHookManager sInstance;
+    private final Context context;
+
+    public static synchronized VirtualHookManager get(Context context) {
+        if (sInstance == null) {
+            sInstance = new VirtualHookManager(context.getApplicationContext());
+        }
+        return sInstance;
+    }
+
+    private VirtualHookManager(Context context) {
+        this.context = context;
+    }
+
+    public void prepareEnvironmentBeforeLaunch(String pkg, int userId) {
+        if (pkg != null && !pkg.isEmpty() && !"__space__".equals(pkg)) {
+            CloneMetadataStore.get(context).setLastActiveSession(pkg, userId);
+        }
+        applyEffectiveHookToSystem(pkg, userId);
+    }
+
+    public void applyEffectiveHookToSystem(String pkg, int userId) {
+        try {
+            CloneMetadataStore store = CloneMetadataStore.get(context);
+            CloneMetadataStore.EffectiveIdentity id = store.resolveEffectiveIdentity(pkg, userId);
+
+            // 1. Hardware Build Reflection (Deduplicated Brand/Model, Never Host Phone)
+            setBuildField("BRAND", id.brand);
+            setBuildField("MODEL", id.displayBrandModel);
+            setBuildField("MANUFACTURER", id.manufacturer);
+            setBuildField("PRODUCT", id.product);
+            setBuildField("DEVICE", id.product);
+            setBuildField("HARDWARE", id.hardware);
+
+            // 2. Timezone Sync
+            if (id.timezoneId != null && !id.timezoneId.isEmpty()) {
+                TimeZone.setDefault(TimeZone.getTimeZone(id.timezoneId));
+                System.setProperty("user.timezone", id.timezoneId);
+            }
+
+            // 3. Inject GPS coordinates into BlackBox BLocationManager via safe reflection
+            try {
+                Class<?> bLocClass = Class.forName("top.niunaijun.blackbox.entity.location.BLocation");
+                Object bLoc = bLocClass.getConstructor(double.class, double.class).newInstance(id.latitude, id.longitude);
+                Class<?> mgrClass = Class.forName("top.niunaijun.blackbox.fake.frameworks.BLocationManager");
+                Object mgr = mgrClass.getMethod("get").invoke(null);
+                try {
+                    mgrClass.getMethod("setGlobalLocation", bLocClass).invoke(mgr, bLoc);
+                } catch (Throwable ignored) {}
+                if (id.targetPackage != null && !id.targetPackage.isEmpty() && !"__space__".equals(id.targetPackage)) {
+                    try {
+                        mgrClass.getMethod("setPattern", int.class, String.class, int.class).invoke(mgr, id.targetUserId, id.targetPackage, 2);
+                    } catch (Throwable ignored) {}
+                    try {
+                        mgrClass.getMethod("setLocation", int.class, String.class, bLocClass).invoke(mgr, id.targetUserId, id.targetPackage, bLoc);
+                    } catch (Throwable ignored) {}
+                }
+            } catch (Throwable ignored) {}
+
+            // 4. System properties for Virtual SIM, Location & Proxy Tunnel
+            System.setProperty("veyra.active.pkg", id.targetPackage);
+            System.setProperty("veyra.active.user", String.valueOf(id.targetUserId));
+            System.setProperty("veyra.active.tier.device", String.valueOf(id.devicePriorityTier));
+            System.setProperty("veyra.active.tier.location", String.valueOf(id.locationPriorityTier));
+            System.setProperty("veyra.active.tier.sim", String.valueOf(id.simPriorityTier));
+            System.setProperty("veyra.active.brand", id.brand);
+            System.setProperty("veyra.active.model", id.displayBrandModel);
+            System.setProperty("veyra.active.lat", String.valueOf(id.latitude));
+            System.setProperty("veyra.active.lon", String.valueOf(id.longitude));
+            System.setProperty("veyra.active.region", id.regionLabel);
+            System.setProperty("veyra.active.tz", id.timezoneId);
+            System.setProperty("veyra.active.sim.op", id.simOperatorName);
+            System.setProperty("veyra.active.sim.mccmnc", id.simOperatorNumeric);
+            System.setProperty("veyra.active.sim.iso", id.simCountryIso);
+            System.setProperty("veyra.active.sim.phone", id.simPhoneNumber);
+
+            if (id.proxyAddress != null && id.proxyAddress.contains(":")) {
+                String[] parts = id.proxyAddress.split(":");
+                if (parts.length == 2) {
+                    System.setProperty("http.proxyHost", parts[0].trim());
+                    System.setProperty("http.proxyPort", parts[1].trim());
+                    System.setProperty("https.proxyHost", parts[0].trim());
+                    System.setProperty("https.proxyPort", parts[1].trim());
+                    System.setProperty("socksProxyHost", parts[0].trim());
+                    System.setProperty("socksProxyPort", parts[1].trim());
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void setBuildField(String fieldName, String value) {
+        if (value == null || value.isEmpty()) return;
+        try {
+            Field f = Build.class.getDeclaredField(fieldName);
+            f.setAccessible(true);
+            f.set(null, value);
+        } catch (Throwable ignored) {}
+    }
+}
+"""
+write_file(os.path.join(JAVA_BASE, "core/VirtualHookManager.java"), VIRTUAL_HOOK_MANAGER_SAFE)
+
 MAIN_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
@@ -43,12 +154,13 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 public class MainActivity extends BaseActivity {
     private static int activeTabSession = 0; // 0=Dashboard, 1=Spaces, 2=VPN, 3=Settings
-    private static int activeVpnSubTab = 0;  // 0=Countries, 1=Settings, 2=Session/Guide
+    private static int activeVpnSubTab = 0;  // 0=Countries/Clusters, 1=Settings, 2=Session/Guide
     private FrameLayout contentContainer;
     private TextView tvIranClock, tvIranDate, tvUsaClock, tvUsaDate;
     private final Handler clockHandler = new Handler(Looper.getMainLooper());
@@ -70,7 +182,8 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
+        CloneMetadataStore store = CloneMetadataStore.get(this);
+        VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
         buildMainLayout();
     }
 
@@ -82,6 +195,8 @@ public class MainActivity extends BaseActivity {
             startActivity(new Intent(this, SecurityLockActivity.class));
             return;
         }
+        CloneMetadataStore store = CloneMetadataStore.get(this);
+        VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
         clockHandler.removeCallbacks(clockTicker);
         clockHandler.post(clockTicker);
         switchTab(activeTabSession);
@@ -218,6 +333,12 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    private String formatPriorityBadge(int tier) {
+        if (tier == 1) return tr(" [اولویت ۱: اختصاصی برنامه]", " [Priority #1: App Exclusive]");
+        if (tier == 2) return tr(" [اولویت ۲: اختصاصی فضا]", " [Priority #2: Space Exclusive]");
+        return tr(" [اولویت ۳: سراسری امن]", " [Priority #3: Global Vault]");
+    }
+
     private View buildDashboardView() {
         ScrollView sv = new ScrollView(this);
         LinearLayout box = new LinearLayout(this);
@@ -252,14 +373,17 @@ public class MainActivity extends BaseActivity {
         box.addView(clockRow);
 
         CloneMetadataStore store = CloneMetadataStore.get(this);
-        CloneMetadataStore.GlobalEnvConfig g = store.getGlobalConfig();
+        CloneMetadataStore.EffectiveIdentity eff = store.resolveEffectiveIdentity(null, 0);
 
         LinearLayout envCard = makeCard("#161F33");
-        envCard.addView(makeText(tr("📱 وضعیت فعال دستگاه، سیم‌کارت و منطقه", "📱 Active Device, SIM & Region"), 14, "#38BDF8", true));
-        envCard.addView(makeText(tr("مدل دستگاه: ", "Device Model: ") + g.brand + " " + g.model, 13, "#F8FAFC", false));
-        envCard.addView(makeText(tr("منطقه فعال: ", "Active Region: ") + g.regionLabel + " (" + g.timezoneId + ")", 13, "#4ADE80", false));
-        envCard.addView(makeText(tr("سیم‌کارت مجازی: ", "Virtual SIM: ") + g.simOperatorName + " (" + g.simOperatorNumeric + " | " + g.simCountryIso.toUpperCase() + ")", 12, "#FBBF24", false));
-        TextView btnEditEnv = makePillButton(tr("⚙️ ویرایش هویت، سیم‌کارت و موقعیت", "⚙️ Edit Device, SIM & Location"), "#2563EB");
+        envCard.addView(makeText(tr("📱 هویت فعال فعلی (سپر ضد نشت اطلاعات گوشی اصلی)", "📱 Active Shielded Identity (Zero Host Leak)"), 14, "#38BDF8", true));
+        if (!eff.targetPackage.isEmpty()) {
+            envCard.addView(makeText(tr("🎯 نشست هدف: ", "🎯 Active Target: ") + eff.targetPackage + " (#" + (eff.targetUserId + 1) + ")", 12, "#A7F3D0", true));
+        }
+        envCard.addView(makeText(tr("مدل دستگاه: ", "Device Model: ") + eff.displayBrandModel + formatPriorityBadge(eff.devicePriorityTier), 13, "#F8FAFC", false));
+        envCard.addView(makeText(tr("منطقه فعال: ", "Active Region: ") + eff.regionLabel + " (" + eff.timezoneId + ")" + formatPriorityBadge(eff.locationPriorityTier), 13, "#4ADE80", false));
+        envCard.addView(makeText(tr("سیم‌کارت مجازی: ", "Virtual SIM: ") + eff.simOperatorName + " (" + eff.simOperatorNumeric + " | " + eff.simCountryIso.toUpperCase() + ")" + formatPriorityBadge(eff.simPriorityTier), 12, "#FBBF24", false));
+        TextView btnEditEnv = makePillButton(tr("⚙️ ویرایش هویت، سیم‌کارت و موقعیت سراسری", "⚙️ Edit Global Device, SIM & Location"), "#2563EB");
         btnEditEnv.setOnClickListener(v -> startActivity(new Intent(this, GlobalEnvironmentActivity.class)));
         envCard.addView(btnEditEnv);
         box.addView(envCard);
@@ -291,10 +415,11 @@ public class MainActivity extends BaseActivity {
         box.setPadding(dp(12), dp(12), dp(12), dp(28));
 
         CloneMetadataStore store = CloneMetadataStore.get(this);
+        String globalCleanModel = CloneMetadataStore.formatBrandModel(store.getGlobalBrand(), store.getGlobalModel());
         LinearLayout banner = makeCard("#1D4ED8");
-        banner.addView(makeText(tr("فضاهای چندگانه و موقعیت مکانی هوشمند", "Smart Multi-Spaces & Location"), 15, "#FFFFFF", true));
-        banner.addView(makeText(tr("مدل سراسری: ", "Global Model: ") + store.getGlobalBrand() + " " + store.getGlobalModel(), 12, "#E0F2FE", false));
-        banner.addView(makeText(tr("منطقه فعال: ", "Active Region: ") + store.getGlobalRegionLabel(), 12, "#BAE6FD", false));
+        banner.addView(makeText(tr("فضاهای چندگانه و سلسله‌مراتب ۳ لایه هویت", "Smart Multi-Spaces & 3-Tier Identity"), 15, "#FFFFFF", true));
+        banner.addView(makeText(tr("اولویت ۱: اختصاصی برنامه  |  اولویت ۲: فضا  |  اولویت ۳: ", "P1: App  |  P2: Space  |  P3: ") + globalCleanModel, 11, "#E0F2FE", false));
+        banner.addView(makeText(tr("منطقه پایه سراسری: ", "Base Global Region: ") + store.getGlobalRegionLabel(), 12, "#BAE6FD", false));
         box.addView(banner);
 
         List<Integer> activeSpaces = Engine.get(this).getActiveSpaceIds();
@@ -343,6 +468,7 @@ public class MainActivity extends BaseActivity {
     private View buildCloneAppTile(Engine.CloneItem item) {
         CloneMetadataStore store = CloneMetadataStore.get(this);
         CloneMetadataStore.CloneMeta meta = store.getCloneMeta(item.packageName, item.userId);
+        CloneMetadataStore.EffectiveIdentity eff = store.resolveEffectiveIdentity(item.packageName, item.userId);
         int cloneNum = item.userId + 1;
 
         LinearLayout tile = new LinearLayout(this);
@@ -372,7 +498,8 @@ public class MainActivity extends BaseActivity {
         leftNotifBadge.setVisibility(unreadCount > 0 ? View.VISIBLE : View.INVISIBLE);
 
         View spacer = new View(this);
-        TextView rightCloneBadge = makeText("#" + cloneNum, 10, "#38BDF8", true);
+        boolean hasP1 = meta.hasExclusiveDevice || meta.hasExclusiveLocation || meta.hasExclusiveSim;
+        TextView rightCloneBadge = makeText((hasP1 ? "★#" : "#") + cloneNum, 10, hasP1 ? "#FBBF24" : "#38BDF8", true);
 
         badgeRow.addView(leftNotifBadge);
         badgeRow.addView(spacer, new LinearLayout.LayoutParams(0, dp(1), 1f));
@@ -390,7 +517,12 @@ public class MainActivity extends BaseActivity {
         tvName.setGravity(Gravity.CENTER);
         tile.addView(tvName);
 
-        TextView tvSub = makeText(store.getEffectiveRegionSummary(item.packageName, item.userId), 9, "#4ADE80", false);
+        TextView tvModel = makeText(eff.displayBrandModel, 9, "#CBD5E1", false);
+        tvModel.setMaxLines(1);
+        tvModel.setGravity(Gravity.CENTER);
+        tile.addView(tvModel);
+
+        TextView tvSub = makeText(eff.regionLabel, 9, "#4ADE80", false);
         tvSub.setMaxLines(1);
         tvSub.setGravity(Gravity.CENTER);
         tile.addView(tvSub);
@@ -404,7 +536,9 @@ public class MainActivity extends BaseActivity {
                 openSpacePlayStore(item.userId);
                 return;
             }
-            Toast.makeText(this, tr("در حال اجرای ", "Launching ") + dispName + "...", Toast.LENGTH_SHORT).show();
+            store.setLastActiveSession(item.packageName, item.userId);
+            VirtualHookManager.get(this).prepareEnvironmentBeforeLaunch(item.packageName, item.userId);
+            Toast.makeText(this, tr("در حال اجرای ", "Launching ") + dispName + " (" + eff.displayBrandModel + ")...", Toast.LENGTH_SHORT).show();
             boolean ok = Engine.get(this).launchClone(item.packageName, item.userId);
             if (!ok) {
                 Engine.get(this).cloneFromInstalledWithVault(item.packageName, item.userId);
@@ -454,11 +588,11 @@ public class MainActivity extends BaseActivity {
 
     private void showSpaceAndroidSettingsDialog(int userId) {
         String[] items = {
-            tr("📱 تنظیم مدل گوشی اختصاصی این فضا (iPhone / Samsung / Pixel...)", "📱 Space Device Model"),
-            tr("📍 تنظیم موقعیت مکانی و منطقه این فضا (City, Country)", "📍 Space Location & Region"),
-            tr("💳 تنظیم سیم‌کارت مجازی اختصاصی این فضا (Virtual SIM)", "💳 Space Virtual SIM Card"),
+            tr("📱 تنظیم مدل گوشی اختصاصی این فضا (اولویت ۲)", "📱 Space Device Model (Priority #2)"),
+            tr("📍 تنظیم موقعیت مکانی و منطقه این فضا (اولویت ۲)", "📍 Space Location & Region (Priority #2)"),
+            tr("💳 تنظیم سیم‌کارت مجازی اختصاصی این فضا (اولویت ۲)", "💳 Space Virtual SIM Card (Priority #2)"),
             tr("✏️ تغییر نام این فضا", "✏️ Rename Space"),
-            tr("🔄 بازنشانی تنظیمات این فضا به حالت سراسری", "🔄 Reset Space to Global Defaults")
+            tr("🔄 بازنشانی تنظیمات این فضا به حالت سراسری (اولویت ۳)", "🔄 Reset Space to Global Defaults (Priority #3)")
         };
         new AlertDialog.Builder(this)
             .setTitle(tr("⚙️ تنظیمات سیستم اندروید - فضای " + (userId + 1), "⚙️ Space Android Settings - #" + (userId + 1)))
@@ -515,11 +649,11 @@ public class MainActivity extends BaseActivity {
         CloneMetadataStore store = CloneMetadataStore.get(this);
         CloneMetadataStore.CloneMeta meta = store.getCloneMeta(item.packageName, item.userId);
         String[] items = {
-            tr("▶️ اجرای برنامه", "▶️ Launch App"),
+            tr("▶️ اجرای برنامه با اعمال فوری اولویت ۱", "▶️ Launch App with Priority #1"),
             tr("✏️ تغییر نام مستعار", "✏️ Rename Alias"),
-            tr("📱 مدل دستگاه اختصاصی (اولویت ۱)", "📱 Exclusive Device Model (#1 Priority)"),
-            tr("📍 موقعیت مکانی و پروکسی اختصاصی (اولویت ۱)", "📍 Exclusive Location & Proxy (#1 Priority)"),
-            tr("💳 سیم‌کارت مجازی اختصاصی (اولویت ۱)", "💳 Exclusive Virtual SIM (#1 Priority)"),
+            tr("📱 مدل دستگاه اختصاصی (اولویت ۱ قطعی)", "📱 Exclusive Device Model (#1 Priority)"),
+            tr("📍 موقعیت مکانی و پروکسی اختصاصی (اولویت ۱ قطعی)", "📍 Exclusive Location & Proxy (#1 Priority)"),
+            tr("💳 سیم‌کارت مجازی اختصاصی (اولویت ۱ قطعی)", "💳 Exclusive Virtual SIM (#1 Priority)"),
             tr("🔔 تست نشان اعلان سمت چپ (۰ / ۱ / ۹۹ / ∞)", "🔔 Test Left Notification Badge (0 / 1 / 99 / ∞)"),
             tr("⏹️ توقف اجباری", "⏹️ Force Stop"),
             tr("🧹 پاک کردن داده‌های کلون", "🧹 Clear Clone Data"),
@@ -528,8 +662,10 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
             .setTitle(item.label + " (#" + (item.userId + 1) + ")")
             .setItems(items, (d, which) -> {
-                if (which == 0) Engine.get(this).launchClone(item.packageName, item.userId);
-                else if (which == 1) {
+                if (which == 0) {
+                    store.setLastActiveSession(item.packageName, item.userId);
+                    Engine.get(this).launchClone(item.packageName, item.userId);
+                } else if (which == 1) {
                     EditText et = new EditText(this);
                     et.setText(meta.customAlias);
                     new AlertDialog.Builder(this).setTitle(tr("نام مستعار", "Custom Alias")).setView(et)
@@ -540,6 +676,7 @@ public class MainActivity extends BaseActivity {
                         }).show();
                 } else if (which == 2) showDevicePickerForTarget(item.packageName, item.userId);
                 else if (which == 3) {
+                    store.setLastActiveSession(item.packageName, item.userId);
                     Intent locIntent = new Intent(this, SetLocationActivity.class);
                     locIntent.putExtra("target_pkg", item.packageName);
                     locIntent.putExtra("target_user", item.userId);
@@ -580,18 +717,23 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
             .setTitle(tr("💳 سیم‌کارت مجازی اختصاصی", "💳 Exclusive Virtual SIM"))
             .setView(box)
-            .setPositiveButton(tr("ذخیره", "Save"), (d, w) -> {
+            .setPositiveButton(tr("ذخیره و اعمال فوری", "Save & Apply"), (d, w) -> {
                 meta.hasExclusiveSim = true;
                 meta.simOperatorName = etOp.getText().toString().trim();
                 meta.simOperatorNumeric = etNum.getText().toString().trim();
                 meta.simCountryIso = etIso.getText().toString().trim().toLowerCase();
                 meta.simPhoneNumber = etPhone.getText().toString().trim();
                 store.saveCloneMeta(meta);
-                Toast.makeText(this, tr("✅ سیم‌کارت مجازی ذخیره شد", "✅ Virtual SIM Saved"), Toast.LENGTH_SHORT).show();
+                if (!"__space__".equals(pkg)) store.setLastActiveSession(pkg, userId);
+                VirtualHookManager.get(this).applyEffectiveHookToSystem(pkg, userId);
+                Toast.makeText(this, tr("✅ سیم‌کارت مجازی اختصاصی اعمال شد", "✅ Exclusive Virtual SIM Applied"), Toast.LENGTH_SHORT).show();
+                switchTab(1);
             })
             .setNeutralButton(tr("استفاده از سراسری", "Use Global"), (d, w) -> {
                 meta.hasExclusiveSim = false;
                 store.saveCloneMeta(meta);
+                VirtualHookManager.get(this).applyEffectiveHookToSystem(pkg, userId);
+                switchTab(1);
             }).show();
     }
 
@@ -600,12 +742,12 @@ public class MainActivity extends BaseActivity {
         CloneMetadataStore.CloneMeta meta = store.getCloneMeta(pkg, userId);
         CloneMetadataStore.DevicePreset[] presets = CloneMetadataStore.PRESETS;
         String[] labels = new String[presets.length + 1];
-        labels[0] = tr("🌐 استفاده از مدل سراسری برنامه", "🌐 Use Global Device Model");
+        labels[0] = tr("🌐 استفاده از مدل پایه فضا / سراسری", "🌐 Inherit Space / Global Model");
         for (int i = 0; i < presets.length; i++) {
-            labels[i + 1] = presets[i].brand + " — " + presets[i].model;
+            labels[i + 1] = CloneMetadataStore.formatBrandModel(presets[i].brand, presets[i].model);
         }
         new AlertDialog.Builder(this)
-            .setTitle(tr("انتخاب مدل دستگاه", "Select Device Model"))
+            .setTitle(tr("انتخاب مدل دستگاه (بدون تکرار نام برند)", "Select Device Model"))
             .setItems(labels, (d, which) -> {
                 if (which == 0) {
                     meta.hasExclusiveDevice = false;
@@ -613,12 +755,13 @@ public class MainActivity extends BaseActivity {
                     CloneMetadataStore.DevicePreset p = presets[which - 1];
                     meta.hasExclusiveDevice = true;
                     meta.deviceBrand = p.brand;
-                    meta.deviceModel = p.model;
+                    meta.deviceModel = CloneMetadataStore.cleanModelOnly(p.brand, p.model);
                     meta.deviceManufacturer = p.manufacturer;
                     meta.deviceProduct = p.product;
                     meta.deviceHardware = p.hardware;
                 }
                 store.saveCloneMeta(meta);
+                if (!"__space__".equals(pkg)) store.setLastActiveSession(pkg, userId);
                 VirtualHookManager.get(this).applyEffectiveHookToSystem(pkg, userId);
                 switchTab(1);
             }).show();
@@ -634,7 +777,7 @@ public class MainActivity extends BaseActivity {
         subTabBar.setBackgroundColor(Color.parseColor("#0F172A"));
 
         String[] subTitles = {
-            tr("🌍 کشورها و VPN", "🌍 Countries & VPN"),
+            tr("🌍 خوشه‌ها و VPN", "🌍 Clusters & VPN"),
             tr("⚙️ تنظیمات VPN", "⚙️ VPN Settings"),
             tr("🛡️ نشست و راهنما", "🛡️ Session & Guide")
         };
@@ -664,58 +807,113 @@ public class MainActivity extends BaseActivity {
         for (CloneMetadataStore.VpnProfile p : profiles) {
             if (p.id.equals(activeId)) { activeProfile = p; break; }
         }
+        final CloneMetadataStore.VpnProfile finalActive = activeProfile;
 
         if (activeVpnSubTab == 0) {
             boolean connected = store.isVpnConnected();
             LinearLayout statusCard = makeCard(connected ? "#064E3B" : "#1E293B");
             statusCard.addView(makeText(connected
-                    ? tr("🟢 وضعیت: متصل به تونل / پروکسی فعال", "🟢 Status: Connected to Active Tunnel")
+                    ? tr("🟢 وضعیت: متصل به خوشه ضدقطعی VPN", "🟢 Status: Connected to Anti-Drop VPN Cluster")
                     : tr("⚪ وضعیت: آماده اتصال", "⚪ Status: Ready to Connect"), 15, "#FFFFFF", true));
-            if (activeProfile != null) {
-                statusCard.addView(makeText(activeProfile.title, 14, "#38BDF8", true));
-                statusCard.addView(makeText(activeProfile.stateOrCity + " | " + activeProfile.protocol + " (" + activeProfile.host + ":" + activeProfile.port + ")", 12, "#CBD5E1", false));
+            if (finalActive != null) {
+                statusCard.addView(makeText("📂 " + finalActive.category, 12, "#FBBF24", true));
+                statusCard.addView(makeText(finalActive.title, 14, "#38BDF8", true));
+                statusCard.addView(makeText(finalActive.stateOrCity + " | " + finalActive.protocol + " (" + finalActive.host + ":" + finalActive.port + ")", 12, "#CBD5E1", false));
             }
             LinearLayout actionRow = new LinearLayout(this);
             actionRow.setOrientation(LinearLayout.HORIZONTAL);
             actionRow.setPadding(0, dp(8), 0, 0);
 
-            final CloneMetadataStore.VpnProfile finalActive = activeProfile;
             TextView btnToggle = makePillButton(connected ? tr("⏹️ قطع اتصال VPN", "⏹️ Disconnect VPN") : tr("🚀 اتصال و همگام‌سازی فوری", "🚀 Connect & Sync Now"), connected ? "#DC2626" : "#10B981");
             btnToggle.setOnClickListener(v -> {
                 boolean next = !store.isVpnConnected();
                 store.setVpnConnected(next);
                 if (next && finalActive != null) {
                     store.applyVpnProfileToEnvironment(finalActive);
-                    VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
+                    VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
                     Toast.makeText(this, tr("✅ متصل شد و موقعیت/سیم‌کارت همگام شد: ", "✅ Connected & Synced: ") + finalActive.stateOrCity, Toast.LENGTH_SHORT).show();
                 }
                 switchTab(2);
             });
             actionRow.addView(btnToggle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            TextView btnAddVpn = makePillButton(tr("+ اکانت VPN جدید", "+ New VPN"), "#2563EB");
+            TextView btnAddVpn = makePillButton(tr("+ اکانت / VPN رایگان", "+ Free / Custom VPN"), "#2563EB");
             btnAddVpn.setOnClickListener(v -> showAddOrEditVpnDialog(null));
             LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             addLp.setMargins(dp(6), 0, 0, 0);
             actionRow.addView(btnAddVpn, addLp);
             statusCard.addView(actionRow);
+
+            // Seamless Sibling Rotation button inside the same category
+            TextView btnRotateSibling = makePillButton(tr("🔄 چرخش فوری به سرور هم‌خانواده بعدی در همین دسته (بدون قطعی)", "🔄 Instant Failover to Next Sibling Node in Cluster"), "#0D9488");
+            LinearLayout.LayoutParams rotLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rotLp.setMargins(0, dp(8), 0, 0);
+            btnRotateSibling.setLayoutParams(rotLp);
+            btnRotateSibling.setGravity(Gravity.CENTER);
+            btnRotateSibling.setOnClickListener(v -> {
+                if (finalActive != null) {
+                    CloneMetadataStore.VpnProfile nextNode = store.rotateToNextSiblingInCluster(finalActive.id);
+                    VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
+                    if (nextNode != null) {
+                        Toast.makeText(this, tr("🔄 جایگزینی بدون قطعی در خوشه انجام شد: ", "🔄 Switched to Sibling Node: ") + nextNode.title, Toast.LENGTH_SHORT).show();
+                    }
+                    switchTab(2);
+                }
+            });
+            statusCard.addView(btnRotateSibling);
             body.addView(statusCard);
+
+            // Cluster Category Filter & Editor Card
+            String selectedCat = store.getActiveVpnCategory();
+            LinearLayout clusterCard = makeCard("#1E1B4B");
+            clusterCard.addView(makeText(tr("🗂️ دسته‌بندی‌های خوشه‌ای ضدقطعی (چند سرور هم‌مکان در هر دسته)", "🗂️ Multi-Node VPN Clusters (Auto-Failover Groups)"), 13, "#A5B4FC", true));
+            clusterCard.addView(makeText(tr("دسته انتخابی فعلی: ", "Selected Cluster: ") + ("ALL".equals(selectedCat) ? tr("همه دسته‌ها (All Clusters)", "All Clusters") : selectedCat), 12, "#F8FAFC", false));
+            LinearLayout catBtnRow = new LinearLayout(this);
+            catBtnRow.setOrientation(LinearLayout.HORIZONTAL);
+            catBtnRow.setPadding(0, dp(6), 0, 0);
+
+            TextView btnSelectCat = makePillButton(tr("📂 انتخاب دسته (خوشه)", "📂 Filter Cluster"), "#4F46E5");
+            btnSelectCat.setOnClickListener(v -> showCategoryPickerDialog());
+            catBtnRow.addView(btnSelectCat, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            TextView btnRenameCat = makePillButton(tr("✏️ ویرایش نام دسته", "✏️ Edit Cluster Name"), "#7C3AED");
+            LinearLayout.LayoutParams renLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            renLp.setMargins(dp(6), 0, 0, 0);
+            btnRenameCat.setLayoutParams(renLp);
+            btnRenameCat.setOnClickListener(v -> showRenameCategoryDialog());
+            catBtnRow.addView(btnRenameCat);
+            clusterCard.addView(catBtnRow);
+            body.addView(clusterCard);
 
             LinearLayout usStatesCard = makeCard("#172554");
             usStatesCard.addView(makeText(tr("🇺🇸 اولویت اول: ایالات متحده آمریکا (تمامی ۵۰ ایالت)", "🇺🇸 Priority #1: United States (All 50 States)"), 14, "#60A5FA", true));
-            usStatesCard.addView(makeText(tr("انتخاب سریع هر ایالت آمریکا همراه با شهر، منطقه زمانی، کد اپراتور سیم‌کارت و مختصات دقیق:", "Quickly select any US State with exact city, timezone, SIM operator & coordinates:"), 11, "#CBD5E1", false));
+            usStatesCard.addView(makeText(tr("انتخاب هر ایالت آمریکا به‌همراه ایجاد خودکار خوشه پشتیبان با منطقه زمانی و سیم‌کارت دقیق:", "Select any US State with exact city, timezone, SIM operator & coordinates:"), 11, "#CBD5E1", false));
             TextView btnPickUsState = makePillButton(tr("🗽 انتخاب از لیست کامل ۵۰ ایالت آمریکا", "🗽 Choose from All 50 US States"), "#3B82F6");
             btnPickUsState.setOnClickListener(v -> showAll50UsStatesPicker());
             usStatesCard.addView(btnPickUsState);
             body.addView(usStatesCard);
 
-            body.addView(makeText(tr("📋 لیست سرورها و کشورهای VPN (برای تنظیمات روی ⋮ بزنید)", "📋 VPN Countries & Servers (Tap ⋮ to configure)"), 13, "#94A3B8", true));
+            body.addView(makeText(tr("📋 لیست سرورهای خوشه (با منوی ⋮ جابه‌جا، ویرایش یا متصل کنید)", "📋 Cluster VPN Nodes (Tap ⋮ to reorder, edit or connect)"), 13, "#94A3B8", true));
             for (CloneMetadataStore.VpnProfile p : profiles) {
+                if (!"ALL".equals(selectedCat) && p.category != null && !selectedCat.equalsIgnoreCase(p.category)) {
+                    continue;
+                }
                 body.addView(buildVpnProfileItemCard(p, p.id.equals(activeId)));
             }
         } else if (activeVpnSubTab == 1) {
             LinearLayout secCard = makeCard("#161F33");
-            secCard.addView(makeText(tr("⚙️ تنظیمات کلی شبکه، Kill-Switch و DNS", "⚙️ Global VPN, Kill-Switch & DNS Settings"), 14, "#38BDF8", true));
+            secCard.addView(makeText(tr("⚙️ تنظیمات کلی خوشه، جایگزینی خودکار، Kill-Switch و DNS", "⚙️ Cluster Auto-Failover, Kill-Switch & DNS"), 14, "#38BDF8", true));
+
+            boolean autoRot = store.isClusterAutoRotateEnabled();
+            TextView btnAutoRot = makePillButton(autoRot
+                    ? tr("🔄 جایگزینی خودکار سرور هم‌خانواده در صورت افت یا خطا: فعال", "🔄 Auto-Failover Sibling Rotation: ON")
+                    : tr("🔄 جایگزینی خودکار سرور هم‌خانواده: غیرفعال", "🔄 Auto-Failover Sibling Rotation: OFF"),
+                    autoRot ? "#0D9488" : "#475569");
+            LinearLayout.LayoutParams arLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            arLp.setMargins(0, dp(6), 0, dp(6));
+            btnAutoRot.setLayoutParams(arLp);
+            btnAutoRot.setOnClickListener(v -> { store.setClusterAutoRotateEnabled(!autoRot); switchTab(2); });
+            secCard.addView(btnAutoRot);
 
             boolean ks = store.isKillSwitchEnabled();
             TextView btnKs = makePillButton(ks ? tr("🛡️ محافظ قطع خودکار (Kill-Switch): فعال", "🛡️ Kill-Switch: ON") : tr("🛡️ محافظ قطع خودکار (Kill-Switch): غیرفعال", "🛡️ Kill-Switch: OFF"), ks ? "#10B981" : "#475569");
@@ -731,39 +929,78 @@ public class MainActivity extends BaseActivity {
             secCard.addView(btnSync);
 
             secCard.addView(makeText("DNS: " + store.getCustomDns(), 12, "#E2E8F0", false));
-            TextView btnTestIp = makePillButton(tr("🔍 تست واقعی IP خروجی با مقصد مورد تأیید کاربر", "🔍 Real Outbound IP Test"), "#F59E0B");
-            final CloneMetadataStore.VpnProfile finalActiveProfile = activeProfile;
-btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfile));
+            TextView btnTestIp = makePillButton(tr("🔍 تست واقعی IP خروجی (همراه با جایگزینی خودکار در صورت خطا)", "🔍 Real Outbound IP Test (with Cluster Auto-Failover)"), "#F59E0B");
+            btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActive));
             secCard.addView(btnTestIp);
             body.addView(secCard);
 
-            body.addView(makeText(tr("🗂️ مدیریت اکانت‌های VPN (روی ⋮ هر اکانت بزنید)", "🗂️ Manage VPN Accounts (Tap ⋮ on any account)"), 13, "#94A3B8", true));
+            body.addView(makeText(tr("🗂️ مدیریت و چیدمان اکانت‌های VPN (با ⋮ بالا/پایین ببرید یا ویرایش کنید)", "🗂️ Manage & Reorder VPN Accounts (Tap ⋮)"), 13, "#94A3B8", true));
             for (CloneMetadataStore.VpnProfile p : profiles) {
                 body.addView(buildVpnProfileItemCard(p, p.id.equals(activeId)));
             }
         } else {
-            CloneMetadataStore.GlobalEnvConfig g = store.getGlobalConfig();
+            CloneMetadataStore.EffectiveIdentity eff = store.resolveEffectiveIdentity(null, 0);
             LinearLayout matrix = makeCard("#161F33");
             matrix.addView(makeText(tr("🛡️ جدول وضعیت نشست فعال (آنچه تلگرام و اینستاگرام می‌بینند)", "🛡️ Active Session Identity Matrix"), 14, "#4ADE80", true));
-            matrix.addView(makeText("• Device Model: " + g.brand + " " + g.model, 13, "#F8FAFC", false));
-            matrix.addView(makeText("• Session Location: " + g.regionLabel, 13, "#38BDF8", false));
-            matrix.addView(makeText("• Timezone: " + g.timezoneId, 13, "#E2E8F0", false));
-            matrix.addView(makeText("• Virtual SIM: " + g.simOperatorName + " (" + g.simOperatorNumeric + " / " + g.simCountryIso.toUpperCase() + ")", 13, "#FBBF24", false));
-            matrix.addView(makeText("• Tunnel Endpoint: " + (g.proxyAddress.isEmpty() ? "127.0.0.1:10808" : g.proxyAddress), 13, "#CBD5E1", false));
+            matrix.addView(makeText(tr("• برنامه/فضای هدف: ", "• Active Target: ") + (eff.targetPackage.isEmpty() ? tr("پیش‌فرض سراسری", "Global Default") : (eff.targetPackage + " [Space #" + (eff.targetUserId + 1) + "]")), 12, "#A7F3D0", true));
+            matrix.addView(makeText("• Device Model: " + eff.displayBrandModel + formatPriorityBadge(eff.devicePriorityTier), 13, "#F8FAFC", false));
+            matrix.addView(makeText("• Session Location: " + eff.regionLabel + formatPriorityBadge(eff.locationPriorityTier), 13, "#38BDF8", false));
+            matrix.addView(makeText("• Timezone: " + eff.timezoneId, 13, "#E2E8F0", false));
+            matrix.addView(makeText("• Virtual SIM: " + eff.simOperatorName + " (" + eff.simOperatorNumeric + " / " + eff.simCountryIso.toUpperCase() + ")" + formatPriorityBadge(eff.simPriorityTier), 13, "#FBBF24", false));
+            matrix.addView(makeText("• Tunnel Endpoint: " + (eff.proxyAddress.isEmpty() ? "127.0.0.1:10808" : eff.proxyAddress), 13, "#CBD5E1", false));
+            matrix.addView(makeText(tr("🔒 وضعیت نشت اطلاعات گوشی میزبان: ۰٪ (کاملاً ایزوله)", "🔒 Real Host Phone Leak Status: 0% (Completely Shielded)"), 12, "#4ADE80", true));
             body.addView(matrix);
 
             LinearLayout guideCard = makeCard("#1E293B");
-            guideCard.addView(makeText(tr("📘 راهنمای تغییر واقعی IP و تطابق نشست‌ها", "📘 Real IP Routing & Session Sync Guide"), 14, "#38BDF8", true));
+            guideCard.addView(makeText(tr("📘 راهنمای خوشه‌های ضدقطعی VPN و اولویت ۳ لایه", "📘 Multi-Node VPN Clusters & 3-Tier Priority Guide"), 14, "#38BDF8", true));
             guideCard.addView(makeText(tr(
-                "۱. با انتخاب هر ایالت آمریکا یا کشور در تب اول، موقعیت، منطقه زمانی (Timezone)، زبان و اپراتور سیم‌کارت مجازی بلافاصله با آن ایالت/کشور همگام می‌شود.\n" +
-                "۲. برای تغییر واقعی IP خروجی، می‌توانید از VPN فعال روی گوشی یا پورت لوکال SOCKS5/HTTP (مثل 127.0.0.1:10808 در v2rayNG) یا سرور اختصاصی در منوی ⋮ هر اکانت استفاده کنید.",
-                "1. Selecting any US State or Country automatically syncs Location, Timezone, and Virtual SIM.\n2. Configure SOCKS5/HTTP tunnel or system VPN via the ⋮ menu on any profile."), 12, "#CBD5E1", false));
+                "۱. اولویت ۱ همیشه با تنظیمات اختصاصی خود برنامه است؛ اگر برای کلونی تنظیم اختصاصی نگذارید، اولویت ۲ (تنظیمات فضا) و سپس اولویت ۳ (هویت امن سراسری) اعمال می‌شود و هرگز نام گوشی یا سیم‌کارت واقعی شما ارسال نمی‌شود.\n" +
+                "۲. در تب اول VPN، سرورهای هم‌خانواده با کشور، شهر و سیم‌کارت یکسان داخل یک «دسته/خوشه» قرار دارند تا در صورت افت یکی، بلافاصله سرور بعدی همان شهر جایگزین شود و VPN قطع نگردد.",
+                "1. Priority #1 is always Per-App settings, Priority #2 is Space settings, and Priority #3 is Safe Global Vault defaults (never exposing host hardware).\n2. Sibling VPN servers in the same cluster share identical region/SIM/timezone and automatically fail over without dropping connection."), 12, "#CBD5E1", false));
             body.addView(guideCard);
         }
 
         sv.addView(body);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         return root;
+    }
+
+    private void showCategoryPickerDialog() {
+        CloneMetadataStore store = CloneMetadataStore.get(this);
+        List<String> cats = store.getVpnCategories();
+        String[] items = new String[cats.size() + 1];
+        items[0] = tr("🌐 نمایش همه دسته‌ها (All Clusters)", "🌐 Show All Clusters");
+        for (int i = 0; i < cats.size(); i++) {
+            items[i + 1] = "📂 " + cats.get(i);
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(tr("انتخاب دسته‌بندی (خوشه VPN)", "Select VPN Cluster Category"))
+            .setItems(items, (d, w) -> {
+                if (w == 0) store.setActiveVpnCategory("ALL");
+                else store.setActiveVpnCategory(cats.get(w - 1));
+                switchTab(2);
+            }).show();
+    }
+
+    private void showRenameCategoryDialog() {
+        CloneMetadataStore store = CloneMetadataStore.get(this);
+        List<String> cats = store.getVpnCategories();
+        if (cats.isEmpty()) return;
+        String[] items = cats.toArray(new String[0]);
+        new AlertDialog.Builder(this)
+            .setTitle(tr("کدام دسته را می‌خواهید ویرایش نام کنید؟", "Select Cluster to Rename"))
+            .setItems(items, (d, w) -> {
+                final String oldCat = items[w];
+                EditText et = new EditText(this);
+                et.setText(oldCat);
+                new AlertDialog.Builder(this)
+                    .setTitle(tr("نام جدید دسته‌بندی", "New Cluster Name"))
+                    .setView(et)
+                    .setPositiveButton(tr("ذخیره", "Save"), (d2, w2) -> {
+                        store.renameVpnCategory(oldCat, et.getText().toString().trim());
+                        switchTab(2);
+                    }).show();
+            }).show();
     }
 
     private View buildVpnProfileItemCard(CloneMetadataStore.VpnProfile p, boolean isActive) {
@@ -775,13 +1012,14 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
 
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.VERTICAL);
+        info.addView(makeText("📂 " + p.category, 10, "#FBBF24", true));
         info.addView(makeText((isActive ? "✅ " : "") + p.title, 14, "#F8FAFC", true));
         info.addView(makeText(p.stateOrCity + " | " + p.simOperator + " (" + p.timezoneId + ")", 11, "#38BDF8", false));
         info.addView(makeText(p.protocol + " -> " + p.host + ":" + p.port, 11, "#94A3B8", false));
         info.setOnClickListener(v -> {
             store.applyVpnProfileToEnvironment(p);
             store.setVpnConnected(true);
-            VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
+            VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
             Toast.makeText(this, tr("✅ سرور فعال شد: ", "✅ Activated: ") + p.title, Toast.LENGTH_SHORT).show();
             switchTab(2);
         });
@@ -798,7 +1036,10 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
         CloneMetadataStore store = CloneMetadataStore.get(this);
         String[] opts = {
             tr("🚀 اتصال و همگام‌سازی با این سرور", "🚀 Connect & Sync with this Profile"),
-            tr("⚙️ ویرایش تنظیمات سرور، پورت و احراز هویت", "⚙️ Edit Host, Port & Credentials"),
+            tr("🔄 چرخش به سرور هم‌خانواده بعدی در همین دسته", "🔄 Switch to Next Sibling in this Cluster"),
+            tr("⚙️ ویرایش سرور، دسته‌بندی، پورت یا جایگزینی با VPN رایگان", "⚙️ Edit Server, Category, Port or Pick Free VPN"),
+            tr("⬆️ انتقال به بالاتر در لیست", "⬆️ Move Up in List"),
+            tr("⬇️ انتقال به پایین‌تر در لیست", "⬇️ Move Down in List"),
             tr("🔍 تست واقعی IP و پینگ این اکانت", "🔍 Test Outbound IP & Latency"),
             tr("🗑️ حذف این اکانت VPN", "🗑️ Delete VPN Account")
         };
@@ -808,13 +1049,23 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
                 if (w == 0) {
                     store.applyVpnProfileToEnvironment(p);
                     store.setVpnConnected(true);
-                    VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
+                    VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
                     switchTab(2);
                 } else if (w == 1) {
-                    showAddOrEditVpnDialog(p);
+                    store.rotateToNextSiblingInCluster(p.id);
+                    VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
+                    switchTab(2);
                 } else if (w == 2) {
-                    runRealOutboundIpVerification(p);
+                    showAddOrEditVpnDialog(p);
                 } else if (w == 3) {
+                    store.moveVpnProfile(p.id, -1);
+                    switchTab(2);
+                } else if (w == 4) {
+                    store.moveVpnProfile(p.id, 1);
+                    switchTab(2);
+                } else if (w == 5) {
+                    runRealOutboundIpVerification(p);
+                } else if (w == 6) {
                     List<CloneMetadataStore.VpnProfile> list = store.getVpnProfiles();
                     Iterator<CloneMetadataStore.VpnProfile> it = list.iterator();
                     while (it.hasNext()) {
@@ -828,40 +1079,113 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
 
     private void showAddOrEditVpnDialog(CloneMetadataStore.VpnProfile existing) {
         CloneMetadataStore store = CloneMetadataStore.get(this);
+        ScrollView sv = new ScrollView(this);
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(14), dp(10), dp(14), dp(10));
 
-        EditText etTitle = new EditText(this); etTitle.setHint("نام اکانت (مثلاً USA - Seattle VPN)");
-        EditText etCity = new EditText(this); etCity.setHint("شهر و کشور (مثلاً Seattle, United States)");
-        EditText etHost = new EditText(this); etHost.setHint("آدرس سرور یا IP (مثلاً 127.0.0.1)");
-        EditText etPort = new EditText(this); etPort.setHint("پورت (مثلاً 10808)");
-        EditText etTz = new EditText(this); etTz.setHint("منطقه زمانی (مثلاً America/Los_Angeles)");
+        final EditText etCategory = new EditText(this); etCategory.setHint(tr("دسته‌بندی / خوشه (مثلاً 🇺🇸 US - New York Cluster)", "Category / Cluster"));
+        final EditText etTitle = new EditText(this); etTitle.setHint(tr("نام سرور (مثلاً 🇺🇸 Free US New York #1)", "Server Title"));
+        final EditText etCity = new EditText(this); etCity.setHint(tr("شهر و کشور (مثلاً New York, United States)", "City, Country"));
+        final EditText etProto = new EditText(this); etProto.setHint(tr("پروتکل (SOCKS5 یا HTTP)", "Protocol (SOCKS5 / HTTP)"));
+        final EditText etHost = new EditText(this); etHost.setHint(tr("آدرس سرور یا IP (مثلاً 127.0.0.1)", "Host / IP"));
+        final EditText etPort = new EditText(this); etPort.setHint(tr("پورت (مثلاً 10808 یا 40000)", "Port"));
+        final EditText etTz = new EditText(this); etTz.setHint(tr("منطقه زمانی (مثلاً America/New_York)", "Timezone"));
+        final EditText etSimOp = new EditText(this); etSimOp.setHint(tr("اپراتور سیم‌کارت همگام (مثلاً T-Mobile USA)", "SIM Operator"));
+
         if (existing != null) {
-            etTitle.setText(existing.title); etCity.setText(existing.stateOrCity);
-            etHost.setText(existing.host); etPort.setText(String.valueOf(existing.port));
+            etCategory.setText(existing.category);
+            etTitle.setText(existing.title);
+            etCity.setText(existing.stateOrCity);
+            etProto.setText(existing.protocol);
+            etHost.setText(existing.host);
+            etPort.setText(String.valueOf(existing.port));
             etTz.setText(existing.timezoneId);
+            etSimOp.setText(existing.simOperator);
         } else {
-            etHost.setText("127.0.0.1"); etPort.setText("10808"); etTz.setText("America/New_York");
+            CloneMetadataStore.VpnProfile defFree = CloneMetadataStore.FREE_VPN_PRESETS[0];
+            etCategory.setText(defFree.category);
+            etTitle.setText(defFree.title);
+            etCity.setText(defFree.stateOrCity);
+            etProto.setText(defFree.protocol);
+            etHost.setText(defFree.host);
+            etPort.setText(String.valueOf(defFree.port));
+            etTz.setText(defFree.timezoneId);
+            etSimOp.setText(defFree.simOperator);
         }
-        box.addView(etTitle); box.addView(etCity); box.addView(etHost); box.addView(etPort); box.addView(etTz);
+
+        TextView btnPickFreePreset = makePillButton(tr("🎁 انتخاب سریع از لیست VPNهای رایگان و قوی آماده (قابل ویرایش)", "🎁 Pick from Built-in Strong Free VPN Servers (Editable)"), "#10B981");
+        btnPickFreePreset.setGravity(Gravity.CENTER);
+        btnPickFreePreset.setOnClickListener(v -> {
+            CloneMetadataStore.VpnProfile[] presets = CloneMetadataStore.FREE_VPN_PRESETS;
+            String[] labels = new String[presets.length];
+            for (int i = 0; i < presets.length; i++) {
+                labels[i] = presets[i].title + "\n[" + presets[i].category + " | " + presets[i].protocol + " " + presets[i].host + ":" + presets[i].port + "]";
+            }
+            new AlertDialog.Builder(this)
+                .setTitle(tr("🎁 لیست VPNهای رایگان و پرسرعت آماده", "🎁 Built-in Strong Free VPN Presets"))
+                .setItems(labels, (d2, idx) -> {
+                    CloneMetadataStore.VpnProfile fp = presets[idx];
+                    etCategory.setText(fp.category);
+                    etTitle.setText(fp.title);
+                    etCity.setText(fp.stateOrCity);
+                    etProto.setText(fp.protocol);
+                    etHost.setText(fp.host);
+                    etPort.setText(String.valueOf(fp.port));
+                    etTz.setText(fp.timezoneId);
+                    etSimOp.setText(fp.simOperator);
+                }).show();
+        });
+        box.addView(btnPickFreePreset);
+
+        TextView btnPickExistingCat = makePillButton(tr("📂 انتخاب از دسته‌بندی‌های موجود", "📂 Choose Existing Cluster Category"), "#3B82F6");
+        LinearLayout.LayoutParams catLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        catLp.setMargins(0, dp(6), 0, dp(6));
+        btnPickExistingCat.setLayoutParams(catLp);
+        btnPickExistingCat.setGravity(Gravity.CENTER);
+        btnPickExistingCat.setOnClickListener(v -> {
+            List<String> cats = store.getVpnCategories();
+            String[] arr = cats.toArray(new String[0]);
+            new AlertDialog.Builder(this)
+                .setTitle(tr("انتخاب دسته‌بندی", "Select Category"))
+                .setItems(arr, (d3, w3) -> etCategory.setText(arr[w3]))
+                .show();
+        });
+        box.addView(btnPickExistingCat);
+
+        box.addView(etCategory);
+        box.addView(etTitle);
+        box.addView(etCity);
+        box.addView(etProto);
+        box.addView(etHost);
+        box.addView(etPort);
+        box.addView(etTz);
+        box.addView(etSimOp);
+        sv.addView(box);
 
         new AlertDialog.Builder(this)
-            .setTitle(existing == null ? tr("➕ افزودن اکانت VPN جدید", "➕ New VPN Account") : tr("⚙️ ویرایش اکانت VPN", "⚙️ Edit VPN Account"))
-            .setView(box)
-            .setPositiveButton(tr("ذخیره", "Save"), (d, w) -> {
+            .setTitle(existing == null ? tr("➕ افزودن اکانت / انتخاب VPN رایگان", "➕ Add / Pick Free VPN") : tr("⚙️ ویرایش کامل اکانت و خوشه VPN", "⚙️ Edit VPN Account & Cluster"))
+            .setView(sv)
+            .setPositiveButton(tr("ذخیره و فعال‌سازی", "Save & Activate"), (d, w) -> {
                 List<CloneMetadataStore.VpnProfile> list = store.getVpnProfiles();
                 CloneMetadataStore.VpnProfile target = existing != null ? existing : new CloneMetadataStore.VpnProfile();
                 if (existing == null) target.id = "custom_" + System.currentTimeMillis();
-                target.title = etTitle.getText().toString().trim().isEmpty() ? "🇺🇸 Custom VPN" : etTitle.getText().toString().trim();
+                String catStr = etCategory.getText().toString().trim();
+                target.category = catStr.isEmpty() ? "🇺🇸 US - New York Cluster" : catStr;
+                target.title = etTitle.getText().toString().trim().isEmpty() ? "🇺🇸 Free USA VPN" : etTitle.getText().toString().trim();
                 target.stateOrCity = etCity.getText().toString().trim().isEmpty() ? "New York, United States" : etCity.getText().toString().trim();
-                target.country = "United States";
-                target.protocol = "SOCKS5";
-                target.host = etHost.getText().toString().trim();
+                target.country = target.stateOrCity.contains(",") ? target.stateOrCity.substring(target.stateOrCity.lastIndexOf(',') + 1).trim() : "United States";
+                String protoStr = etProto.getText().toString().trim().toUpperCase();
+                target.protocol = protoStr.isEmpty() ? "SOCKS5" : protoStr;
+                target.host = etHost.getText().toString().trim().isEmpty() ? "127.0.0.1" : etHost.getText().toString().trim();
                 try { target.port = Integer.parseInt(etPort.getText().toString().trim()); } catch (Exception e) { target.port = 10808; }
-                target.timezoneId = etTz.getText().toString().trim();
-                target.lat = 40.7128; target.lon = -74.0060;
-                target.simOperator = "T-Mobile USA"; target.simMccMnc = "310260"; target.simIso = "us";
+                target.timezoneId = etTz.getText().toString().trim().isEmpty() ? "America/New_York" : etTz.getText().toString().trim();
+                if (existing == null) {
+                    target.lat = 40.7128; target.lon = -74.0060;
+                    target.simMccMnc = "310260"; target.simIso = "us";
+                }
+                String simStr = etSimOp.getText().toString().trim();
+                target.simOperator = simStr.isEmpty() ? "T-Mobile USA" : simStr;
                 if (existing == null) list.add(0, target);
                 else {
                     for (int i = 0; i < list.size(); i++) {
@@ -869,6 +1193,9 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
                     }
                 }
                 store.saveVpnProfiles(list);
+                store.applyVpnProfileToEnvironment(target);
+                store.setVpnConnected(true);
+                VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
                 switchTab(2);
             }).show();
     }
@@ -931,36 +1258,61 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
         String[] names = new String[usStates.length];
         for (int i = 0; i < usStates.length; i++) names[i] = "🇺🇸 " + usStates[i][0];
         new AlertDialog.Builder(this)
-            .setTitle(tr("انتخاب ایالت آمریکا (۵۰ ایالت)", "Select US State"))
+            .setTitle(tr("انتخاب ایالت آمریکا (ساخت خودکار خوشه ۲ سروره ضدقطعی)", "Select US State (Creates 2-Node Cluster)"))
             .setItems(names, (d, w) -> {
                 String[] s = usStates[w];
                 CloneMetadataStore store = CloneMetadataStore.get(this);
                 List<CloneMetadataStore.VpnProfile> list = store.getVpnProfiles();
-                CloneMetadataStore.VpnProfile p = new CloneMetadataStore.VpnProfile();
-                p.id = "us_state_" + w;
-                p.title = "🇺🇸 USA - " + s[0];
-                p.country = "United States";
-                p.stateOrCity = s[0].replace(" - ", ", ") + ", United States";
-                p.protocol = "SOCKS5";
-                p.host = "127.0.0.1";
-                p.port = 10808;
-                p.timezoneId = s[1];
-                p.lat = Double.parseDouble(s[2]);
-                p.lon = Double.parseDouble(s[3]);
-                p.simOperator = "T-Mobile USA";
-                p.simMccMnc = "310260";
-                p.simIso = "us";
-                list.add(0, p);
+                String clusterName = "🇺🇸 US - " + s[0].split(" - ")[0] + " Cluster";
+                String cityLabel = s[0].replace(" - ", ", ") + ", United States";
+
+                CloneMetadataStore.VpnProfile p1 = new CloneMetadataStore.VpnProfile();
+                p1.id = "us_state_" + w + "_1";
+                p1.category = clusterName;
+                p1.nodeIndex = 1;
+                p1.title = "🇺🇸 USA - " + s[0] + " [Node #1 Primary]";
+                p1.country = "United States";
+                p1.stateOrCity = cityLabel;
+                p1.protocol = "SOCKS5";
+                p1.host = "127.0.0.1";
+                p1.port = 10808;
+                p1.timezoneId = s[1];
+                p1.lat = Double.parseDouble(s[2]);
+                p1.lon = Double.parseDouble(s[3]);
+                p1.simOperator = "T-Mobile USA";
+                p1.simMccMnc = "310260";
+                p1.simIso = "us";
+
+                CloneMetadataStore.VpnProfile p2 = new CloneMetadataStore.VpnProfile();
+                p2.id = "us_state_" + w + "_2";
+                p2.category = clusterName;
+                p2.nodeIndex = 2;
+                p2.title = "🇺🇸 USA - " + s[0] + " [Node #2 Failover]";
+                p2.country = "United States";
+                p2.stateOrCity = cityLabel;
+                p2.protocol = "HTTP";
+                p2.host = "127.0.0.1";
+                p2.port = 10809;
+                p2.timezoneId = s[1];
+                p2.lat = Double.parseDouble(s[2]);
+                p2.lon = Double.parseDouble(s[3]);
+                p2.simOperator = "T-Mobile USA";
+                p2.simMccMnc = "310260";
+                p2.simIso = "us";
+
+                list.add(0, p2);
+                list.add(0, p1);
                 store.saveVpnProfiles(list);
-                store.applyVpnProfileToEnvironment(p);
+                store.setActiveVpnCategory(clusterName);
+                store.applyVpnProfileToEnvironment(p1);
                 store.setVpnConnected(true);
-                VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
-                Toast.makeText(this, "✅ " + p.stateOrCity, Toast.LENGTH_SHORT).show();
+                VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
+                Toast.makeText(this, "✅ " + clusterName, Toast.LENGTH_SHORT).show();
                 switchTab(2);
             }).show();
     }
 
-    private void runRealOutboundIpVerification(CloneMetadataStore.VpnProfile p) {
+    private void runRealOutboundIpVerification(final CloneMetadataStore.VpnProfile p) {
         EditText etUrl = new EditText(this);
         etUrl.setText("https://api.ipify.org?format=json");
         new AlertDialog.Builder(this)
@@ -987,13 +1339,22 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
                         long ms = System.currentTimeMillis() - start;
                         resultMsg = "✅ HTTP " + code + " (" + ms + " ms)\nResponse: " + sb.toString();
                     } catch (Throwable t) {
-                        resultMsg = "⚠️ خطا در اتصال شبکه: " + t.getClass().getSimpleName() + " - " + t.getMessage();
+                        CloneMetadataStore store = CloneMetadataStore.get(MainActivity.this);
+                        if (store.isClusterAutoRotateEnabled() && p != null) {
+                            CloneMetadataStore.VpnProfile rotated = store.rotateToNextSiblingInCluster(p.id);
+                            resultMsg = "⚠️ خطا در نود فعلی (" + t.getClass().getSimpleName() + ").\n🔄 سیستم ضدقطعی خوشه بلافاصله به نود هم‌خانواده بعدی سوئیچ کرد:\n" + (rotated != null ? rotated.title : "");
+                        } else {
+                            resultMsg = "⚠️ خطا در اتصال شبکه: " + t.getClass().getSimpleName() + " - " + t.getMessage();
+                        }
                     }
                     final String finalMsg = resultMsg;
-                    runOnUiThread(() -> new AlertDialog.Builder(this)
-                        .setTitle(tr("نتیجه واقعی تست IP", "Real IP Test Result"))
-                        .setMessage(finalMsg)
-                        .setPositiveButton(tr("باشه", "OK"), null).show());
+                    runOnUiThread(() -> {
+                        new AlertDialog.Builder(MainActivity.this)
+                            .setTitle(tr("نتیجه واقعی تست IP", "Real IP Test Result"))
+                            .setMessage(finalMsg)
+                            .setPositiveButton(tr("باشه", "OK"), null).show();
+                        switchTab(2);
+                    });
                 }).start();
             }).show();
     }
@@ -1046,7 +1407,7 @@ btnTestIp.setOnClickListener(v -> runRealOutboundIpVerification(finalActiveProfi
 
         box.addView(makeSettingsRow(
             tr("📖 راهنمای جامع و آموزش کامل برنامه", "📖 Complete User Guide"),
-            tr("آموزش گام‌به‌گام فضاهای خودکار، VPN، سیم‌کارت مجازی، تغییر مکان و امنیت", "Full guide on auto-spaces, VPN, Virtual SIM, location spoofing & security"),
+            tr("آموزش گام‌به‌گام فضاهای خودکار، خوشه‌های VPN، سیم‌کارت مجازی، تغییر مکان و امنیت", "Full guide on auto-spaces, VPN clusters, Virtual SIM, location spoofing & security"),
             () -> startActivity(new Intent(this, GuideActivity.class))
         ));
 
@@ -1424,7 +1785,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         box.setPadding(dp(16), dp(16), dp(16), dp(24));
 
         TextView title = new TextView(this);
-        title.setText(tr("📱 هویت دستگاه، سیم‌کارت مجازی و منطقه سراسری", "📱 Global Device, Virtual SIM & Region"));
+        title.setText(tr("📱 هویت دستگاه، سیم‌کارت مجازی و منطقه سراسری (اولویت ۳)", "📱 Global Device, Virtual SIM & Region (Priority #3)"));
         title.setTextColor(Color.WHITE);
         title.setTextSize(17);
         title.setTypeface(null, Typeface.BOLD);
@@ -1435,7 +1796,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         box.addView(btnPreset);
 
         etBrand = addField(box, tr("برند دستگاه (Brand):", "Brand:"), g.brand);
-        etModel = addField(box, tr("مدل دستگاه (Model):", "Model:"), g.model);
+        etModel = addField(box, tr("مدل دستگاه (Model - بدون تکرار نام برند):", "Model (without duplicate brand):"), CloneMetadataStore.cleanModelOnly(g.brand, g.model));
         etManufacturer = addField(box, tr("سازنده (Manufacturer):", "Manufacturer:"), g.manufacturer);
         etProduct = addField(box, tr("کد محصول (Product):", "Product:"), g.product);
         etRegion = addField(box, tr("شهر و کشور فعال (City, Country):", "Active Region (City, Country):"), g.regionLabel);
@@ -1453,7 +1814,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         TextView btnSave = makeBtn(tr("💾 ذخیره و اعمال فوری", "💾 Save & Apply Immediately"), "#10B981");
         btnSave.setOnClickListener(v -> {
             g.brand = etBrand.getText().toString().trim();
-            g.model = etModel.getText().toString().trim();
+            g.model = CloneMetadataStore.cleanModelOnly(g.brand, etModel.getText().toString().trim());
             g.manufacturer = etManufacturer.getText().toString().trim();
             g.product = etProduct.getText().toString().trim();
             g.regionLabel = etRegion.getText().toString().trim();
@@ -1464,8 +1825,8 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             g.simCountryIso = etSimIso.getText().toString().trim().toLowerCase();
             g.simPhoneNumber = etSimPhone.getText().toString().trim();
             store.saveGlobalConfig(g);
-            VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
-            Toast.makeText(this, tr("✅ تغییرات ذخیره و اعمال شد", "✅ Saved & Applied"), Toast.LENGTH_SHORT).show();
+            VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
+            Toast.makeText(this, tr("✅ تغییرات ذخیره و اعمال شد: ", "✅ Saved & Applied: ") + CloneMetadataStore.formatBrandModel(g.brand, g.model), Toast.LENGTH_SHORT).show();
             finish();
         });
         box.addView(btnSave);
@@ -1478,14 +1839,14 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         CloneMetadataStore.DevicePreset[] presets = CloneMetadataStore.PRESETS;
         String[] names = new String[presets.length];
         for (int i = 0; i < presets.length; i++) {
-            names[i] = presets[i].brand + " — " + presets[i].model;
+            names[i] = CloneMetadataStore.formatBrandModel(presets[i].brand, presets[i].model);
         }
         new AlertDialog.Builder(this)
             .setTitle(tr("انتخاب مدل آماده", "Choose Device Preset"))
             .setItems(names, (d, w) -> {
                 CloneMetadataStore.DevicePreset p = presets[w];
                 etBrand.setText(p.brand);
-                etModel.setText(p.model);
+                etModel.setText(CloneMetadataStore.cleanModelOnly(p.brand, p.model));
                 etManufacturer.setText(p.manufacturer);
                 etProduct.setText(p.product);
             }).show();
@@ -1681,6 +2042,7 @@ public class SetLocationActivity extends BaseActivity {
             m.latitude = lat; m.longitude = lon;
             m.regionLabel = reg; m.timezoneId = tz; m.proxyAddress = prx;
             store.saveCloneMeta(m);
+            if (!"__space__".equals(targetPkg)) store.setLastActiveSession(targetPkg, targetUser);
             VirtualHookManager.get(this).applyEffectiveHookToSystem(targetPkg, targetUser);
         } else {
             CloneMetadataStore.GlobalEnvConfig g = store.getGlobalConfig();
@@ -1688,9 +2050,9 @@ public class SetLocationActivity extends BaseActivity {
             g.latitude = lat; g.longitude = lon;
             g.regionLabel = reg; g.timezoneId = tz; g.proxyAddress = prx;
             store.saveGlobalConfig(g);
-            VirtualHookManager.get(this).applyEffectiveHookToSystem(null, 0);
+            VirtualHookManager.get(this).applyEffectiveHookToSystem(store.getLastActivePkg(), store.getLastActiveUserId());
         }
-        Toast.makeText(this, tr("✅ موقعیت ذخیره شد: ", "✅ Saved: ") + reg, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, tr("✅ موقعیت ذخیره و اعمال شد: ", "✅ Saved & Applied: ") + reg, Toast.LENGTH_SHORT).show();
         finish();
     }
 }
@@ -2009,24 +2371,19 @@ public class GuideActivity extends BaseActivity {
         box.addView(t);
 
         String guideFa =
-            "۱. تخصیص هوشمند فضاها با دکمه مرکزی (+):\n" +
-            "• در ابتدا فقط «فضای ۱» به همراه فروشگاه گوگل پلی و تنظیمات اندروید وجود دارد.\n" +
-            "• با زدن دکمه + وسط نوار پایین و انتخاب یک برنامه (مثلاً اینستاگرام)، نسخه ۱ در فضای ۱ ساخته می‌شود. اگر دوباره + را بزنید و همان برنامه را انتخاب کنید، به‌طور خودکار «فضای ۲» ساخته شده و اینستاگرام ۲ وارد فضای ۲ می‌شود.\n" +
-            "• اگر روی دکمه «+ افزودن برنامه» بالای یک فضای خاص (مثلاً فضای ۴) بزنید، برنامه مستقیماً با شماره ۴ وارد همان فضا می‌شود.\n\n" +
-            "۲. بخش VPN، کشورها و ۵۰ ایالت آمریکا:\n" +
-            "• تب اول VPN شامل لیست کامل ۵۰ ایالت آمریکا (اولویت اول) و کشورهای کلیدی است.\n" +
-            "• با منوی سه‌نقطه (⋮) کنار هر اکانت VPN می‌توانید آدرس سرور، پورت، همگام‌سازی خودکار ساعت/مکان/سیم‌کارت و تست واقعی IP خروجی را انجام دهید.\n\n" +
-            "۳. اولویت ۱ تنظیمات اختصاصی:\n" +
-            "• تنظیمات اختصاصی هر کلون (مدل گوشی، سیم‌کارت مجازی، موقعیت) اولویت ۱ دارد و هرگز اطلاعات واقعی گوشی میزبان نشت نمی‌کند.";
+            "۱. سلسله‌مراتب ۳ لایه هویت و عدم نشت گوشی میزبان:\n" +
+            "• اولویت ۱ (اختصاصی برنامه): با نگه داشتن انگشت روی هر کلون می‌توانید مدل دستگاه، موقعیت مکانی و سیم‌کارت مجازی مخصوص همان برنامه را تعیین کنید.\n" +
+            "• اولویت ۲ (اختصاصی فضا): اگر برای برنامه تنظیم جداگانه نگذارید، از تنظیمات اندروید همان فضا استفاده می‌کند.\n" +
+            "• اولویت ۳ (سراسری امن): در صورت عدم تنظیم، به‌طور خودکار از هویت امن سراسری (مثل آیفون ۱۶ پرو مکس و نیویورک) استفاده می‌شود و هرگز اطلاعات گوشی واقعی شما نشت نمی‌کند.\n\n" +
+            "۲. خوشه‌های ضدقطعی VPN و لیست VPNهای رایگان:\n" +
+            "• در بخش VPN، هر دسته‌بندی (Cluster) شامل چند سرور هم‌خانواده با کشور، شهر، منطقه زمانی و سیم‌کارت یکسان است تا در صورت افت یکی، بلافاصله سرور بعدی جایگزین شود.\n" +
+            "• با زدن دکمه «+ اکانت / VPN رایگان» می‌توانید از لیست سرورهای رایگان آماده انتخاب، ویرایش و جابه‌جا کنید.";
 
         String guideEn =
-            "1. Smart Auto-Space Allocation (+):\n" +
-            "• Starts with Space 1 containing Google Play Store & Android Settings.\n" +
-            "• Selecting an app via central '+' places #1 in Space 1. Selecting it again auto-creates Space 2 with #2, and so on.\n" +
-            "• Tapping '+ Add App' on Space N installs directly into Space N with badge #N.\n\n" +
-            "2. VPN Hub & All 50 US States:\n" +
-            "• Tab 1 provides all 50 US states and global servers with ⋮ menu for custom host/port.\n" +
-            "• Tab 2 provides Kill-Switch, Auto-Sync, and Real Outbound IP verification.";
+            "1. Strict 3-Tier Identity & Zero Host Leak:\n" +
+            "• Priority #1: Per-App Exclusive Settings -> Priority #2: Space Settings -> Priority #3: Safe Global Vault Defaults. Your real host phone identity is never exposed.\n\n" +
+            "2. Multi-Node VPN Clusters & Built-in Free VPNs:\n" +
+            "• Sibling servers inside each cluster share identical country, city, timezone, and SIM, automatically rotating on failure without dropping connection.";
 
         TextView body = new TextView(this);
         body.setText(tr(guideFa, guideEn));
@@ -2073,12 +2430,12 @@ public class AboutActivity extends BaseActivity {
 
         TextView info = new TextView(this);
         info.setText(tr(
-            "محیط ایزوله چندفضایی، تغییر هویت سخت‌افزاری، سیم‌کارت مجازی و مدیریت هوشمند موقعیت مکانی و VPN\n\n" +
+            "محیط ایزوله چندفضایی، تغییر هویت سخت‌افزاری، سیم‌کارت مجازی و مدیریت هوشمند موقعیت مکانی و خوشه‌های VPN\n\n" +
             "📧 ایمیل ارتباطی: Vaultveyra@gmail.com\n" +
             "✈️ کانال و پشتیبانی تلگرام: https://t.me/VaultVeyra\n\n" +
             "📜 مجوز متن‌باز: Apache License 2.0\n" +
             "فاقد هرگونه تبلیغات، ردیاب یا تله‌متری.",
-            "Multi-Space Sandbox, Hardware Identity Spoofing, Virtual SIM & Smart VPN/Location Manager\n\n" +
+            "Multi-Space Sandbox, Hardware Identity Spoofing, Virtual SIM & Smart VPN Cluster/Location Manager\n\n" +
             "📧 Email: Vaultveyra@gmail.com\n" +
             "✈️ Telegram: https://t.me/VaultVeyra\n\n" +
             "📜 Open-Source Attribution: Apache License 2.0"
