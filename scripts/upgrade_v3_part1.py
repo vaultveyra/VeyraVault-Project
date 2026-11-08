@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import shutil
 
 def write_file(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -9,183 +8,10 @@ def write_file(path, content):
         f.write(content.strip() + "\n")
     print(f"[v3-part1] Wrote: {path}")
 
-for clean_dir in [
-    "app/src/main/java/com/veyravault/space",
-    "build_workspace/app/src/main/java/com/veyravault/space",
-]:
-    if os.path.exists(clean_dir):
-        shutil.rmtree(clean_dir)
+JAVA_BASE = "app/src/main/java/com/veyravault/space"
 
-APP_BASE = "app/src/main"
-JAVA_BASE = os.path.join(APP_BASE, "java/com/veyravault/space")
-RES_BASE = os.path.join(APP_BASE, "res")
-ASSETS_BASE = os.path.join(APP_BASE, "assets")
-
-NOTICE_CONTENT = """
-VeyraVault Virtualization Engine & Multi-Space Sandbox
-Copyright (c) 2024-2025 VeyraVault Project (Vaultveyra@gmail.com | https://t.me/VaultVeyra)
-Licensed under the Apache License, Version 2.0.
-"""
-write_file(os.path.join(ASSETS_BASE, "NOTICE_APACHE_2.txt"), NOTICE_CONTENT)
-
-MANIFEST = """<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.veyravault.space">
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
-
-    <application
-        android:name=".VeyraApplication"
-        android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
-        android:roundIcon="@drawable/ic_launcher_round"
-        android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:largeHeap="true"
-        android:usesCleartextTraffic="true"
-        android:requestLegacyExternalStorage="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-        tools:replace="android:name,android:label,android:icon,android:roundIcon,android:theme,android:allowBackup,android:supportsRtl">
-
-        <activity
-            android:name=".ui.MainActivity"
-            android:exported="true"
-            android:configChanges="locale|layoutDirection|orientation|screenSize|keyboardHidden"
-            android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <activity android:name=".ui.AddAppActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.GlobalEnvironmentActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.SetLocationActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.SecuritySettingsActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.SecurityLockActivity" android:exported="false" android:launchMode="singleTop" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.GuideActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-        <activity android:name=".ui.AboutActivity" android:exported="false" android:configChanges="locale|layoutDirection|orientation|screenSize" />
-
-        <receiver
-            android:name=".security.VaultDeviceAdminReceiver"
-            android:description="@string/admin_receiver_desc"
-            android:label="@string/admin_receiver_label"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="true">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_receiver" />
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-                <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
-                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
-            </intent-filter>
-        </receiver>
-
-        <service
-            android:name=".core.VaultNotificationListenerService"
-            android:label="VeyraVault Notification Counter"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
-
-    </application>
-</manifest>
-"""
-write_file(os.path.join(APP_BASE, "AndroidManifest.xml"), MANIFEST)
-
-IC_LAUNCHER_XML = """<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:fillColor="#0F172A" android:pathData="M0,0h108v108h-108z"/>
-    <path android:fillColor="#1E293B" android:pathData="M54,14 L88,28 L88,56 C88,77 73,91 54,96 C35,91 20,77 20,56 L20,28 Z"/>
-    <path android:fillColor="#3B82F6" android:pathData="M54,20 L82,32 L82,55 C82,72 69,84 54,89 C39,84 26,72 26,55 L26,32 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M40,40 L54,72 L68,40 L60,40 L54,56 L48,40 Z"/>
-</vector>
-"""
-write_file(os.path.join(RES_BASE, "drawable/ic_launcher.xml"), IC_LAUNCHER_XML)
-write_file(os.path.join(RES_BASE, "drawable/ic_launcher_round.xml"), IC_LAUNCHER_XML)
-
-NAV_ICONS = {
-    "ic_nav_dashboard.xml": "M3,13h8V3H3V13z M3,21h8v-6H3V21z M13,21h8V11h-8V21z M13,3v6h8V3H13z",
-    "ic_nav_spaces.xml": "M4,8h4V4H4V8z M10,20h4v-4h-4V20z M4,20h4v-4H4V20z M4,14h4v-4H4V14z M10,14h4v-4h-4V14z M16,4v4h4V4H16z M10,8h4V4h-4V8z M16,14h4v-4h-4V14z M16,20h4v-4h-4V20z",
-    "ic_nav_add.xml": "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6V13z",
-    "ic_nav_guide.xml": "M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM11,19.93c-3.95,-0.49 -7,-3.85 -7,-7.93 0,-0.62 0.08,-1.21 0.21,-1.79L9,15v1c0,1.1 0.9,2 2,2v1.93zM17.9,17.39c-0.26,-0.81 -1,-1.39 -1.9,-1.39h-1v-3c0,-0.55 -0.45,-1 -1,-1H8v-2h2c0.55,0 1,-0.45 1,-1V7h2c1.1,0 2,-0.9 2,-2v-0.41c2.93,1.19 5,4.06 5,7.41 0,2.08 -0.8,3.97 -2.1,5.39z",
-    "ic_nav_settings.xml": "M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94z M12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z"
-}
-for name, path_data in NAV_ICONS.items():
-    xml = f"""<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path android:fillColor="#FFFFFF" android:pathData="{path_data}"/>
-</vector>"""
-    write_file(os.path.join(RES_BASE, "drawable", name), xml)
-
-DEVICE_ADMIN_XML = """<?xml version="1.0" encoding="utf-8"?>
-<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-policies>
-        <force-lock />
-    </uses-policies>
-</device-admin>
-"""
-write_file(os.path.join(RES_BASE, "xml/device_admin_receiver.xml"), DEVICE_ADMIN_XML)
-
-FILE_PATHS_XML = """<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="external_files" path="." />
-    <files-path name="internal_files" path="." />
-    <cache-path name="cache_files" path="." />
-</paths>
-"""
-write_file(os.path.join(RES_BASE, "xml/file_paths.xml"), FILE_PATHS_XML)
-
-STRINGS_XML = """<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">VeyraVault</string>
-    <string name="admin_receiver_label">محافظ امنیتی VeyraVault</string>
-    <string name="admin_receiver_desc">حفاظت در برابر حذف غیرمجاز</string>
-    <item name="ic_launcher" type="mipmap">@drawable/ic_launcher</item>
-    <item name="ic_launcher_round" type="mipmap">@drawable/ic_launcher_round</item>
-</resources>
-"""
-write_file(os.path.join(RES_BASE, "values/strings.xml"), STRINGS_XML)
-
-VEYRA_APP = """package com.veyravault.space;
+# 1. VeyraApplication.java (Raw context for BlackBoxCore + Engine init)
+VEYRA_APPLICATION = r"""package com.veyravault.space;
 
 import android.app.Application;
 import android.content.Context;
@@ -196,6 +22,10 @@ import top.niunaijun.blackbox.app.configuration.ClientConfiguration;
 public class VeyraApplication extends Application {
     private static Context sContext;
 
+    public static Context getAppContext() {
+        return sContext;
+    }
+
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
@@ -205,6 +35,21 @@ public class VeyraApplication extends Application {
                 @Override
                 public String getHostPackageName() {
                     return base.getPackageName();
+                }
+
+                @Override
+                public boolean isHideRoot() {
+                    return true;
+                }
+
+                @Override
+                public boolean isHideXposed() {
+                    return true;
+                }
+
+                @Override
+                public boolean isEnableDaemonService() {
+                    return true;
                 }
             });
         } catch (Throwable t) {
@@ -218,20 +63,21 @@ public class VeyraApplication extends Application {
         sContext = this;
         try {
             BlackBoxCore.get().doCreate();
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+        try {
             Engine.get(this).initialize();
         } catch (Throwable t) {
             t.printStackTrace();
         }
     }
-
-    public static Context getAppContext() {
-        return sContext;
-    }
 }
 """
-write_file(os.path.join(JAVA_BASE, "VeyraApplication.java"), VEYRA_APP)
+write_file(os.path.join(JAVA_BASE, "VeyraApplication.java"), VEYRA_APPLICATION)
 
-JALALI_CLOCK = """package com.veyravault.space.helper;
+# 2. JalaliClockUtil.java
+JALALI_CLOCK = r"""package com.veyravault.space.helper;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -240,11 +86,15 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 public class JalaliClockUtil {
-    private static final String[] JALALI_MONTHS_FA = {
+    private static final String[] PERSIAN_MONTHS_FA = {
         "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
         "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
     };
-    private static final String[] JALALI_WEEKDAYS_FA = {
+    private static final String[] PERSIAN_MONTHS_EN = {
+        "Farvardin", "Ordibehesht", "Khordad", "Tir", "Mordad", "Shahrivar",
+        "Mehr", "Aban", "Azar", "Dey", "Bahman", "Esfand"
+    };
+    private static final String[] PERSIAN_WEEKDAYS_FA = {
         "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"
     };
 
@@ -266,37 +116,46 @@ public class JalaliClockUtil {
     }
 
     public static String getIranTimeText() {
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"));
-        return String.format(Locale.US, "%02d:%02d:%02d",
-                cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND));
+        TimeZone tz = TimeZone.getTimeZone("Asia/Tehran");
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.US);
+        sdf.setTimeZone(tz);
+        return sdf.format(new Date());
     }
 
-    public static String getIranJalaliDateText(boolean isFa) {
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"));
-        int[] j = gregorianToJalali(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
+    public static String getIranJalaliDateText(boolean isPersian) {
+        TimeZone tz = TimeZone.getTimeZone("Asia/Tehran");
+        Calendar cal = Calendar.getInstance(tz, Locale.US);
+        int gy = cal.get(Calendar.YEAR);
+        int gm = cal.get(Calendar.MONTH) + 1;
+        int gd = cal.get(Calendar.DAY_OF_MONTH);
         int dow = cal.get(Calendar.DAY_OF_WEEK) - 1;
-        if (isFa) {
-            return JALALI_WEEKDAYS_FA[dow] + " " + j[2] + " " + JALALI_MONTHS_FA[j[1] - 1] + " " + j[0];
+        int[] j = gregorianToJalali(gy, gm, gd);
+        if (isPersian) {
+            return PERSIAN_WEEKDAYS_FA[dow] + " " + j[2] + " " + PERSIAN_MONTHS_FA[j[1] - 1] + " " + j[0];
+        } else {
+            return j[2] + " " + PERSIAN_MONTHS_EN[j[1] - 1] + " " + j[0] + " (Jalali)";
         }
-        return String.format(Locale.US, "%04d/%02d/%02d (Solar Hijri)", j[0], j[1], j[2]);
     }
 
     public static String getUsaTimeText() {
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
-        return String.format(Locale.US, "%02d:%02d:%02d",
-                cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND));
+        TimeZone tz = TimeZone.getTimeZone("America/New_York");
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.US);
+        sdf.setTimeZone(tz);
+        return sdf.format(new Date());
     }
 
     public static String getUsaGregorianDateText() {
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, MMM dd, yyyy", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+        TimeZone tz = TimeZone.getTimeZone("America/New_York");
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy", Locale.US);
+        sdf.setTimeZone(tz);
         return sdf.format(new Date());
     }
 }
 """
 write_file(os.path.join(JAVA_BASE, "helper/JalaliClockUtil.java"), JALALI_CLOCK)
 
-LOCALE_HELPER = """package com.veyravault.space.helper;
+# 3. LocaleHelper.java
+LOCALE_HELPER = r"""package com.veyravault.space.helper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -304,6 +163,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.View;
@@ -312,12 +172,12 @@ import android.widget.TextView;
 import java.util.Locale;
 
 public class LocaleHelper {
-    private static final String PREF_NAME = "veyra_locale_prefs";
+    private static final String PREFS = "veyra_locale_prefs";
     private static final String KEY_LANG = "app_lang";
     private static final String KEY_LIGHT_THEME = "app_light_theme";
 
     public static String getLanguage(Context context) {
-        SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         return sp.getString(KEY_LANG, "fa");
     }
 
@@ -326,56 +186,54 @@ public class LocaleHelper {
     }
 
     public static void setLanguage(Context context, String lang) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit().putString(KEY_LANG, lang).commit();
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+               .edit().putString(KEY_LANG, lang).apply();
     }
 
-    public static String toggleLanguage(Context context) {
-        String next = isPersian(context) ? "en" : "fa";
-        setLanguage(context, next);
-        return next;
+    public static void toggleLanguage(Context context) {
+        setLanguage(context, isPersian(context) ? "en" : "fa");
     }
 
     public static boolean isLightTheme(Context context) {
-        return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getBoolean(KEY_LIGHT_THEME, false);
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return sp.getBoolean(KEY_LIGHT_THEME, false);
     }
 
-    public static void setLightTheme(Context context, boolean light) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_LIGHT_THEME, light).commit();
+    public static void setLightTheme(Context context, boolean isLight) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+               .edit().putBoolean(KEY_LIGHT_THEME, isLight).apply();
     }
 
-    public static boolean toggleLightTheme(Context context) {
-        boolean next = !isLightTheme(context);
-        setLightTheme(context, next);
-        return next;
+    public static void toggleLightTheme(Context context) {
+        setLightTheme(context, !isLightTheme(context));
     }
 
-    public static void applyThemeRecursive(View v, boolean light) {
-        if (v == null || !light) return;
-        if (v.getBackground() instanceof ColorDrawable) {
-            int c = ((ColorDrawable) v.getBackground()).getColor();
-            if (c == Color.parseColor("#0B0F19") || c == Color.parseColor("#080B12") || c == Color.parseColor("#0F172A")) {
-                v.setBackgroundColor(Color.parseColor("#F1F5F9"));
-            } else if (c == Color.parseColor("#161F33") || c == Color.parseColor("#1E293B")) {
-                v.setBackgroundColor(Color.parseColor("#FFFFFF"));
+    public static void applyThemeRecursive(View root, boolean isLight) {
+        if (!isLight || root == null) return;
+        Drawable bg = root.getBackground();
+        if (bg instanceof ColorDrawable) {
+            int c = ((ColorDrawable) bg).getColor();
+            if (c == Color.parseColor("#0B0F19") || c == Color.parseColor("#080B12")) {
+                root.setBackgroundColor(Color.parseColor("#F1F5F9"));
+            } else if (c == Color.parseColor("#0F172A") || c == Color.parseColor("#161F33") || c == Color.parseColor("#1E293B")) {
+                root.setBackgroundColor(Color.parseColor("#FFFFFF"));
             }
+        } else if (bg instanceof GradientDrawable) {
+            // Keep rounded cards & buttons crisp
         }
-        if (v instanceof TextView) {
-            TextView tv = (TextView) v;
+        if (root instanceof TextView) {
+            TextView tv = (TextView) root;
             int tc = tv.getCurrentTextColor();
-            if (tc == Color.WHITE || tc == Color.parseColor("#F8FAFC") || tc == Color.parseColor("#E2E8F0") || tc == Color.parseColor("#CBD5E1")) {
-                CharSequence txt = tv.getText();
-                String s = txt != null ? txt.toString() : "";
-                if (!s.startsWith("+") && !s.contains("🔒") && !s.contains("بهینه‌سازی فوری") && !s.contains("Optimize Now")) {
+            if (tc == Color.WHITE || tc == Color.parseColor("#F8FAFC") || tc == Color.parseColor("#E2E8F0")) {
+                if (root.getBackground() == null) {
                     tv.setTextColor(Color.parseColor("#0F172A"));
                 }
-            } else if (tc == Color.parseColor("#94A3B8")) {
-                tv.setTextColor(Color.parseColor("#475569"));
             }
         }
-        if (v instanceof ViewGroup) {
-            ViewGroup vg = (ViewGroup) v;
+        if (root instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) root;
             for (int i = 0; i < vg.getChildCount(); i++) {
-                applyThemeRecursive(vg.getChildAt(i), light);
+                applyThemeRecursive(vg.getChildAt(i), true);
             }
         }
     }
@@ -386,7 +244,7 @@ public class LocaleHelper {
         Locale.setDefault(locale);
         Resources res = context.getResources();
         Configuration config = new Configuration(res.getConfiguration());
-        if (Build.VERSION.SDK_INT >= 17) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             config.setLocale(locale);
             config.setLayoutDirection(locale);
             return context.createConfigurationContext(config);
@@ -400,22 +258,19 @@ public class LocaleHelper {
 """
 write_file(os.path.join(JAVA_BASE, "helper/LocaleHelper.java"), LOCALE_HELPER)
 
-BASE_ACTIVITY = """package com.veyravault.space.ui;
+# 4. BaseActivity.java
+BASE_ACTIVITY = r"""package com.veyravault.space.ui;
 
-import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
-import android.view.WindowManager;
-import android.graphics.Color;
+import androidx.appcompat.app.AppCompatActivity;
 import com.veyravault.space.helper.LocaleHelper;
 
-public class BaseActivity extends Activity {
-    private String lastLang;
-    private boolean lastTheme;
-
+public abstract class BaseActivity extends AppCompatActivity {
     @Override
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(LocaleHelper.wrap(newBase));
@@ -424,40 +279,21 @@ public class BaseActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        lastLang = LocaleHelper.getLanguage(this);
-        lastTheme = LocaleHelper.isLightTheme(this);
         applyDirectionAndStatusBar();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        String currentLang = LocaleHelper.getLanguage(this);
-        boolean currentTheme = LocaleHelper.isLightTheme(this);
-        if ((lastLang != null && !lastLang.equals(currentLang)) || (lastTheme != currentTheme)) {
-            lastLang = currentLang;
-            lastTheme = currentTheme;
-            recreate();
-            return;
-        }
-        applyDirectionAndStatusBar();
-        if (currentTheme && getWindow() != null && getWindow().getDecorView() != null) {
-            LocaleHelper.applyThemeRecursive(getWindow().getDecorView(), true);
-        }
     }
 
     protected void applyDirectionAndStatusBar() {
-        boolean isFa = LocaleHelper.isPersian(this);
-        boolean isLight = LocaleHelper.isLightTheme(this);
-        if (Build.VERSION.SDK_INT >= 17 && getWindow() != null && getWindow().getDecorView() != null) {
-            getWindow().getDecorView().setLayoutDirection(isFa ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        boolean fa = LocaleHelper.isPersian(this);
+        boolean light = LocaleHelper.isLightTheme(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            getWindow().getDecorView().setLayoutDirection(
+                fa ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
+            );
         }
-        if (Build.VERSION.SDK_INT >= 21 && getWindow() != null) {
-            Window window = getWindow();
-            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            window.setStatusBarColor(Color.parseColor(isLight ? "#E2E8F0" : "#0B0F19"));
-            window.setNavigationBarColor(Color.parseColor(isLight ? "#FFFFFF" : "#080B12"));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window w = getWindow();
+            w.setStatusBarColor(Color.parseColor(light ? "#E2E8F0" : "#0B0F19"));
+            w.setNavigationBarColor(Color.parseColor(light ? "#FFFFFF" : "#080B12"));
         }
     }
 
@@ -476,7 +312,8 @@ public class BaseActivity extends Activity {
 """
 write_file(os.path.join(JAVA_BASE, "ui/BaseActivity.java"), BASE_ACTIVITY)
 
-GMS_MANAGER = """package com.veyravault.space.helper;
+# 5. GmsSupportManager.java
+GMS_SUPPORT = r"""package com.veyravault.space.helper;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -485,7 +322,8 @@ import top.niunaijun.blackbox.BlackBoxCore;
 public class GmsSupportManager {
     public static final String[] POISON_GMS_PACKAGES = {
         "com.google.android.gms",
-        "com.google.android.gsf"
+        "com.google.android.gsf",
+        "com.google.android.gsf.login"
     };
 
     public static boolean isHostInstalled(Context ctx, String pkg) {
@@ -498,53 +336,60 @@ public class GmsSupportManager {
     }
 
     public static void cleanPoisonedGmsInSpace(int userId) {
-        try {
-            for (String pkg : POISON_GMS_PACKAGES) {
+        for (String pkg : POISON_GMS_PACKAGES) {
+            try {
                 if (BlackBoxCore.get().isInstalled(pkg, userId)) {
                     BlackBoxCore.get().uninstallPackageAsUser(pkg, userId);
                 }
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
     }
 
-    public static void ensureGmsInstalledForUser(Context ctx, int userId) {
+    public static int ensureGmsInstalledForUser(Context context, int userId) {
+        cleanPoisonedGmsInSpace(userId);
+        return isHostInstalled(context, "com.google.android.gms") ? 1 : 0;
+    }
+
+    public static void ensureGmsForPackage(Context context, String pkg, int userId) {
         cleanPoisonedGmsInSpace(userId);
     }
 
-    public static void ensureGmsForPackage(Context ctx, String pkg, int userId) {
+    public static boolean isGmsReady(Context context, int userId) {
         cleanPoisonedGmsInSpace(userId);
-    }
-
-    public static boolean isGmsReady(Context ctx, int userId) {
-        return isHostInstalled(ctx, "com.google.android.gms");
+        return isHostInstalled(context, "com.google.android.gms");
     }
 }
 """
-write_file(os.path.join(JAVA_BASE, "helper/GmsSupportManager.java"), GMS_MANAGER)
+write_file(os.path.join(JAVA_BASE, "helper/GmsSupportManager.java"), GMS_SUPPORT)
 
-APP_DISGUISE = """package com.veyravault.space.helper;
+# 6. AppDisguiseManager.java
+DISGUISE_MANAGER = r"""package com.veyravault.space.helper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 
 public class AppDisguiseManager {
-    private static final String PREF = "veyra_disguise_prefs";
+    private static final String PREFS = "veyra_disguise_prefs";
+    private static final String KEY_MODE = "disguise_mode";
     public static final String MODE_DEFAULT = "default";
     public static final String MODE_CALCULATOR = "calculator";
     public static final String MODE_NOTEPAD = "notepad";
 
-    public static String getDisguiseMode(Context ctx) {
-        return ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("mode", MODE_DEFAULT);
+    public static String getDisguiseMode(Context context) {
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return sp.getString(KEY_MODE, MODE_DEFAULT);
     }
 
-    public static void setDisguiseMode(Context ctx, String mode) {
-        ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("mode", mode).commit();
+    public static void setDisguiseMode(Context context, String mode) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+               .edit().putString(KEY_MODE, mode).apply();
     }
 }
 """
-write_file(os.path.join(JAVA_BASE, "helper/AppDisguiseManager.java"), APP_DISGUISE)
+write_file(os.path.join(JAVA_BASE, "helper/AppDisguiseManager.java"), DISGUISE_MANAGER)
 
-PATTERN_VIEW = """package com.veyravault.space.helper;
+# 7. PatternLockView.java
+PATTERN_VIEW = r"""package com.veyravault.space.helper;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -557,13 +402,13 @@ import java.util.List;
 
 public class PatternLockView extends View {
     public interface OnPatternListener {
-        void onPatternComplete(String patternString);
+        void onPatternComplete(String patternValue);
     }
 
-    private final List<Integer> selectedNodes = new ArrayList<>();
     private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint activePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final List<Integer> selectedNodes = new ArrayList<>();
     private float curX, curY;
     private boolean isDrawing = false;
     private OnPatternListener listener;
@@ -572,9 +417,11 @@ public class PatternLockView extends View {
         super(context);
         dotPaint.setColor(Color.parseColor("#475569"));
         dotPaint.setStyle(Paint.Style.FILL);
-        activePaint.setColor(Color.parseColor("#3B82F6"));
+
+        activePaint.setColor(Color.parseColor("#38BDF8"));
         activePaint.setStyle(Paint.Style.FILL);
-        linePaint.setColor(Color.parseColor("#60A5FA"));
+
+        linePaint.setColor(Color.parseColor("#38BDF8"));
         linePaint.setStrokeWidth(10f);
         linePaint.setStyle(Paint.Style.STROKE);
         linePaint.setStrokeCap(Paint.Cap.ROUND);
@@ -616,10 +463,8 @@ public class PatternLockView extends View {
         }
         float radius = Math.min(getWidth(), getHeight()) / 18f;
         for (int i = 0; i < 9; i++) {
-            float x = getNodeX(i);
-            float y = getNodeY(i);
             boolean active = selectedNodes.contains(i);
-            canvas.drawCircle(x, y, active ? radius * 1.3f : radius, active ? activePaint : dotPaint);
+            canvas.drawCircle(getNodeX(i), getNodeY(i), active ? radius * 1.25f : radius, active ? activePaint : dotPaint);
         }
     }
 
@@ -627,26 +472,25 @@ public class PatternLockView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         curX = event.getX();
         curY = event.getY();
-        float hitRadius = Math.min(getWidth(), getHeight()) / 8f;
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 selectedNodes.clear();
                 isDrawing = true;
-                checkHit(curX, curY, hitRadius);
+                checkHit(curX, curY);
                 invalidate();
                 return true;
             case MotionEvent.ACTION_MOVE:
-                checkHit(curX, curY, hitRadius);
+                checkHit(curX, curY);
                 invalidate();
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 isDrawing = false;
-                if (!selectedNodes.isEmpty() && listener != null) {
+                if (listener != null && !selectedNodes.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
-                    for (int n : selectedNodes) {
-                        if (sb.length() > 0) sb.append("-");
-                        sb.append(n + 1);
+                    for (int i = 0; i < selectedNodes.size(); i++) {
+                        if (i > 0) sb.append("-");
+                        sb.append(selectedNodes.get(i));
                     }
                     listener.onPatternComplete(sb.toString());
                 }
@@ -656,12 +500,13 @@ public class PatternLockView extends View {
         return super.onTouchEvent(event);
     }
 
-    private void checkHit(float x, float y, float r) {
+    private void checkHit(float x, float y) {
+        float hitRadius = Math.min(getWidth(), getHeight()) / 8f;
         for (int i = 0; i < 9; i++) {
             if (!selectedNodes.contains(i)) {
                 float dx = x - getNodeX(i);
                 float dy = y - getNodeY(i);
-                if (Math.sqrt(dx * dx + dy * dy) <= r) {
+                if (Math.hypot(dx, dy) <= hitRadius) {
                     selectedNodes.add(i);
                 }
             }
@@ -671,7 +516,8 @@ public class PatternLockView extends View {
 """
 write_file(os.path.join(JAVA_BASE, "helper/PatternLockView.java"), PATTERN_VIEW)
 
-CLONE_METADATA = """package com.veyravault.space.core;
+# 8. CloneMetadataStore.java
+CLONE_METADATA_STORE = r"""package com.veyravault.space.core;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -679,19 +525,130 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class CloneMetadataStore {
-    private static final String PREF = "veyra_clone_meta_v3";
+    private static final String PREFS = "veyra_clone_meta_v3";
     private static CloneMetadataStore sInstance;
     private final SharedPreferences sp;
-    private final Context appCtx;
+
+    // Safe Vault Non-Host Defaults (Priority #3 Fallback so real host phone is NEVER leaked)
+    public static final String SAFE_DEFAULT_BRAND = "Apple";
+    public static final String SAFE_DEFAULT_MODEL = "iPhone 16 Pro Max";
+    public static final String SAFE_DEFAULT_MANUFACTURER = "Apple Inc.";
+    public static final String SAFE_DEFAULT_PRODUCT = "iPhone17,2";
+    public static final String SAFE_DEFAULT_HARDWARE = "A18Pro";
+    public static final String SAFE_DEFAULT_REGION = "New York, United States";
+    public static final String SAFE_DEFAULT_TZ = "America/New_York";
+    public static final double SAFE_DEFAULT_LAT = 40.7128;
+    public static final double SAFE_DEFAULT_LON = -74.0060;
+    public static final String SAFE_DEFAULT_SIM_OP = "T-Mobile USA";
+    public static final String SAFE_DEFAULT_SIM_NUM = "310260";
+    public static final String SAFE_DEFAULT_SIM_ISO = "us";
+    public static final String SAFE_DEFAULT_SIM_PHONE = "+12125550147";
+
+    public static synchronized CloneMetadataStore get(Context context) {
+        if (sInstance == null) {
+            sInstance = new CloneMetadataStore(context.getApplicationContext());
+        }
+        return sInstance;
+    }
+
+    private CloneMetadataStore(Context context) {
+        this.sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        ensureInitialDefaults();
+    }
+
+    private void ensureInitialDefaults() {
+        if (!sp.contains("global_initialized_v3")) {
+            sp.edit()
+              .putBoolean("global_initialized_v3", true)
+              .putString("global_brand", SAFE_DEFAULT_BRAND)
+              .putString("global_model", SAFE_DEFAULT_MODEL)
+              .putString("global_manufacturer", SAFE_DEFAULT_MANUFACTURER)
+              .putString("global_product", SAFE_DEFAULT_PRODUCT)
+              .putString("global_hardware", SAFE_DEFAULT_HARDWARE)
+              .putBoolean("global_loc_enabled", true)
+              .putString("global_lat", String.valueOf(SAFE_DEFAULT_LAT))
+              .putString("global_lon", String.valueOf(SAFE_DEFAULT_LON))
+              .putString("global_region_label", SAFE_DEFAULT_REGION)
+              .putString("global_tz", SAFE_DEFAULT_TZ)
+              .putString("global_proxy", "127.0.0.1:10808")
+              .putString("global_sim_op", SAFE_DEFAULT_SIM_OP)
+              .putString("global_sim_num", SAFE_DEFAULT_SIM_NUM)
+              .putString("global_sim_iso", SAFE_DEFAULT_SIM_ISO)
+              .putString("global_sim_phone", SAFE_DEFAULT_SIM_PHONE)
+              .putBoolean("space_created_0", true)
+              .putBoolean("vpn_cluster_autorotate", true)
+              .apply();
+        }
+        if (!sp.contains("vpn_profiles_json_v32")) {
+            seedDefaultVpnProfiles();
+        }
+    }
+
+    /**
+     * Prevents duplicate Brand + Model strings like "Samsung Samsung Galaxy S24 Ultra"
+     * or "سامسونگ سامسونگ S24" across all UI and Build hooks.
+     */
+    public static String cleanModelOnly(String brand, String model) {
+        String b = (brand == null) ? "" : brand.trim();
+        String m = (model == null) ? "" : model.trim();
+        if (m.isEmpty()) return SAFE_DEFAULT_MODEL;
+        if (!b.isEmpty()) {
+            while (m.toLowerCase().startsWith(b.toLowerCase() + " ") || m.toLowerCase().startsWith(b.toLowerCase() + "-")) {
+                m = m.substring(b.length()).trim();
+                if (m.startsWith("-") || m.startsWith("—")) m = m.substring(1).trim();
+            }
+        }
+        String[][] synonyms = {
+            {"Samsung", "سامسونگ"},
+            {"Apple", "اپل"},
+            {"Xiaomi", "شیائومی"},
+            {"Google", "گوگل"},
+            {"OnePlus", "وان‌پلاس"},
+            {"OnePlus", "وان پلاس"}
+        };
+        for (String[] pair : synonyms) {
+            if (b.equalsIgnoreCase(pair[0]) || b.equalsIgnoreCase(pair[1])) {
+                for (String syn : pair) {
+                    if (m.toLowerCase().startsWith(syn.toLowerCase() + " ")) {
+                        m = m.substring(syn.length()).trim();
+                    }
+                }
+            }
+        }
+        // Collapse repeated adjacent words in model itself
+        String[] words = m.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        String prev = "";
+        for (String w : words) {
+            if (!w.equalsIgnoreCase(prev)) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(w);
+                prev = w;
+            }
+        }
+        String cleaned = sb.toString().trim();
+        return cleaned.isEmpty() ? m : cleaned;
+    }
+
+    public static String formatBrandModel(String brand, String model) {
+        String b = (brand == null || brand.trim().isEmpty()) ? SAFE_DEFAULT_BRAND : brand.trim();
+        String m = cleanModelOnly(b, model);
+        if (m.toLowerCase().startsWith(b.toLowerCase())) {
+            return m;
+        }
+        return b + " " + m;
+    }
 
     public static class CloneMeta {
-        public String packageName = "";
-        public int userId = 0;
+        public String packageName;
+        public int userId;
         public String customAlias = "";
         public boolean hasExclusiveDevice = false;
         public String deviceBrand = "";
@@ -700,17 +657,39 @@ public class CloneMetadataStore {
         public String deviceProduct = "";
         public String deviceHardware = "";
         public boolean hasExclusiveLocation = false;
-        public double latitude = 0.0;
-        public double longitude = 0.0;
-        public String regionLabel = "";
-        public String timezoneId = "";
+        public double latitude = SAFE_DEFAULT_LAT;
+        public double longitude = SAFE_DEFAULT_LON;
+        public String regionLabel = SAFE_DEFAULT_REGION;
+        public String timezoneId = SAFE_DEFAULT_TZ;
         public String proxyAddress = "";
-        public String virtualIp = "";
         public boolean hasExclusiveSim = false;
-        public String simCountryIso = "us";
-        public String simOperatorName = "T-Mobile USA";
-        public String simOperatorNumeric = "310260";
-        public String simPhoneNumber = "+13105550199";
+        public String simOperatorName = SAFE_DEFAULT_SIM_OP;
+        public String simOperatorNumeric = SAFE_DEFAULT_SIM_NUM;
+        public String simCountryIso = SAFE_DEFAULT_SIM_ISO;
+        public String simPhoneNumber = SAFE_DEFAULT_SIM_PHONE;
+    }
+
+    public static class EffectiveIdentity {
+        public int devicePriorityTier = 3;   // 1=App, 2=Space, 3=Global Vault
+        public int locationPriorityTier = 3; // 1=App, 2=Space, 3=Global Vault
+        public int simPriorityTier = 3;      // 1=App, 2=Space, 3=Global Vault
+        public String targetPackage = "";
+        public int targetUserId = 0;
+        public String brand = SAFE_DEFAULT_BRAND;
+        public String model = SAFE_DEFAULT_MODEL;
+        public String displayBrandModel = SAFE_DEFAULT_BRAND + " " + SAFE_DEFAULT_MODEL;
+        public String manufacturer = SAFE_DEFAULT_MANUFACTURER;
+        public String product = SAFE_DEFAULT_PRODUCT;
+        public String hardware = SAFE_DEFAULT_HARDWARE;
+        public double latitude = SAFE_DEFAULT_LAT;
+        public double longitude = SAFE_DEFAULT_LON;
+        public String regionLabel = SAFE_DEFAULT_REGION;
+        public String timezoneId = SAFE_DEFAULT_TZ;
+        public String proxyAddress = "127.0.0.1:10808";
+        public String simOperatorName = SAFE_DEFAULT_SIM_OP;
+        public String simOperatorNumeric = SAFE_DEFAULT_SIM_NUM;
+        public String simCountryIso = SAFE_DEFAULT_SIM_ISO;
+        public String simPhoneNumber = SAFE_DEFAULT_SIM_PHONE;
     }
 
     public static class DevicePreset {
@@ -719,291 +698,133 @@ public class CloneMetadataStore {
         public final String manufacturer;
         public final String product;
         public final String hardware;
-        public final String buildId;
 
-        public DevicePreset(String brand, String model, String manufacturer, String product, String hardware, String buildId) {
+        public DevicePreset(String brand, String model, String manufacturer, String product, String hardware) {
             this.brand = brand;
             this.model = model;
             this.manufacturer = manufacturer;
             this.product = product;
             this.hardware = hardware;
-            this.buildId = buildId;
         }
     }
 
+    public static final DevicePreset[] PRESETS = new DevicePreset[]{
+        new DevicePreset("Apple", "iPhone 16 Pro Max", "Apple Inc.", "iPhone17,2", "A18Pro"),
+        new DevicePreset("Apple", "iPhone 15 Pro", "Apple Inc.", "iPhone16,1", "A17Pro"),
+        new DevicePreset("Samsung", "Galaxy S24 Ultra (SM-S928B)", "Samsung", "e3qxxx", "qcom"),
+        new DevicePreset("Google", "Pixel 9 Pro XL", "Google", "komodo", "tensor"),
+        new DevicePreset("Xiaomi", "14 Ultra", "Xiaomi", "aurora", "qcom"),
+        new DevicePreset("OnePlus", "12 (CPH2581)", "OnePlus", "OP5929L1", "qcom")
+    };
+
     public static class VpnProfile {
         public String id;
+        public String category = "🇺🇸 US - New York Cluster";
+        public int nodeIndex = 1;
         public String title;
         public String country;
         public String stateOrCity;
-        public String protocol;
+        public String protocol; // SOCKS5, HTTP, V2RAY_LOCAL, WG_SYSTEM
         public String host;
         public int port;
-        public String username;
-        public String password;
+        public String username = "";
+        public String password = "";
         public String timezoneId;
         public double lat;
         public double lon;
         public String simOperator;
         public String simMccMnc;
         public String simIso;
-        public int targetSpaceId; // -1 = Global
+        public int targetSpaceId = -1; // -1 = All Spaces
+        public boolean isBuiltInFree = true;
     }
 
-    public static final DevicePreset[] PRESETS = new DevicePreset[]{
-        new DevicePreset("Apple", "iPhone 16 Pro Max", "Apple", "iPhone17,2", "A18Pro", "iOS18.2"),
-        new DevicePreset("Apple", "iPhone 15 Pro Max", "Apple", "iPhone16,2", "A17Pro", "iOS17.6"),
-        new DevicePreset("Apple", "iPhone 14 Pro", "Apple", "iPhone15,2", "A16Bionic", "iOS17.5"),
-        new DevicePreset("Apple", "iPad Pro M4", "Apple", "iPad16,6", "AppleM4", "iPadOS18"),
-        new DevicePreset("Samsung", "SM-S928B (Galaxy S24 Ultra)", "Samsung", "e3qxxx", "qcom", "UP1A.231005.007"),
-        new DevicePreset("Samsung", "SM-S918B (Galaxy S23 Ultra)", "Samsung", "dm3qxxx", "qcom", "TP1A.220624.014"),
-        new DevicePreset("Samsung", "SM-A546E (Galaxy A54 5G)", "Samsung", "a54xnsxx", "s5e8835", "UP1A.231005.007"),
-        new DevicePreset("Google", "Pixel 9 Pro XL", "Google", "komodo", "tensor", "AD1A.240530.047"),
-        new DevicePreset("Google", "Pixel 8 Pro", "Google", "husky", "tensor", "UQ1A.240205.004"),
-        new DevicePreset("Xiaomi", "Xiaomi 14 Ultra", "Xiaomi", "aurora", "qcom", "UKQ1.231003.002"),
-        new DevicePreset("OnePlus", "OnePlus 12", "OnePlus", "OP5929L1", "qcom", "UKQ1.230924.001"),
-        new DevicePreset("Huawei", "Pura 70 Ultra", "HUAWEI", "HBP-AL00", "kirin9010", "HUAWEIHBP-AL00")
+    private static VpnProfile createNode(String id, String cat, int nodeIdx, String title, String country,
+                                         String city, String proto, String host, int port, String tz,
+                                         double lat, double lon, String simOp, String mccMnc, String iso) {
+        VpnProfile p = new VpnProfile();
+        p.id = id;
+        p.category = cat;
+        p.nodeIndex = nodeIdx;
+        p.title = title;
+        p.country = country;
+        p.stateOrCity = city;
+        p.protocol = proto;
+        p.host = host;
+        p.port = port;
+        p.timezoneId = tz;
+        p.lat = lat;
+        p.lon = lon;
+        p.simOperator = simOp;
+        p.simMccMnc = mccMnc;
+        p.simIso = iso;
+        p.isBuiltInFree = true;
+        return p;
+    }
+
+    // Pre-populated strong free VPN presets for quick selection & editing in the Add/Edit dialog
+    public static final VpnProfile[] FREE_VPN_PRESETS = new VpnProfile[]{
+        createNode("free_us_ny_1", "🇺🇸 US - New York Cluster", 1, "🇺🇸 Free US New York #1 (High-Speed Relay)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_2", "🇺🇸 US - New York Cluster", 2, "🇺🇸 Free US New York #2 (Cloudflare WARP Bridge)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 40000, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_3", "🇺🇸 US - New York Cluster", 3, "🇺🇸 Free US New York #3 (NekoBox / Sing-Box)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 2080, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_4", "🇺🇸 US - New York Cluster", 4, "🇺🇸 Free US New York #4 (Orbot / Tor Guard)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 9050, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_la_1", "🇺🇸 US - California Cluster", 1, "🇺🇸 Free US Los Angeles #1 (West Coast Fast)", "United States", "Los Angeles, United States", "SOCKS5", "127.0.0.1", 10808, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"),
+        createNode("free_us_la_2", "🇺🇸 US - California Cluster", 2, "🇺🇸 Free US Los Angeles #2 (Backup Tunnel)", "United States", "Los Angeles, United States", "HTTP", "127.0.0.1", 10809, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"),
+        createNode("free_us_va_1", "🇺🇸 US - Virginia Ashburn Cluster", 1, "🇺🇸 Free US Ashburn Virginia #1 (DataCenter Core)", "United States", "Ashburn, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 39.0438, -77.4874, "Verizon Wireless", "311480", "us"),
+        createNode("free_de_fk_1", "🇩🇪 Germany - Falkenstein Cluster", 1, "🇩🇪 Free Germany Falkenstein #1 (Hetzner Direct)", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", 10808, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"),
+        createNode("free_de_fk_2", "🇩🇪 Germany - Falkenstein Cluster", 2, "🇩🇪 Free Germany Falkenstein #2 (Failover Node)", "Germany", "Falkenstein, Germany", "HTTP", "127.0.0.1", 10809, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"),
+        createNode("free_uk_ld_1", "🇬🇧 UK - London Cluster", 1, "🇬🇧 Free UK London #1 (Docklands Core)", "United Kingdom", "London, United Kingdom", "SOCKS5", "127.0.0.1", 10808, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"),
+        createNode("free_nl_am_1", "🇳🇱 Netherlands - Amsterdam Cluster", 1, "🇳🇱 Free Netherlands Amsterdam #1 (AMS-IX)", "Netherlands", "Amsterdam, Netherlands", "SOCKS5", "127.0.0.1", 10808, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"),
+        createNode("free_fi_hl_1", "🇫🇮 Finland - Helsinki Cluster", 1, "🇫🇮 Free Finland Helsinki #1 (Nordic Node)", "Finland", "Helsinki, Finland", "SOCKS5", "127.0.0.1", 10808, "Europe/Helsinki", 60.1699, 24.9384, "Elisa FI", "24405", "fi")
     };
 
-    public static class GlobalEnvConfig {
-        public String brand;
-        public String model;
-        public String manufacturer;
-        public String product;
-        public String hardware;
-        public boolean locationEnabled;
-        public double latitude;
-        public double longitude;
-        public String regionLabel;
-        public String timezoneId;
-        public String proxyAddress;
-        public String virtualIp;
-        public String simCountryIso;
-        public String simOperatorName;
-        public String simOperatorNumeric;
-        public String simPhoneNumber;
-    }
+    private void seedDefaultVpnProfiles() {
+        List<VpnProfile> list = new ArrayList<>();
+        // Cluster 1: US - New York (4 sibling nodes with identical country/city/SIM/timezone for seamless rotation)
+        list.add(createNode("us_ny_1", "🇺🇸 US - New York Cluster", 1, "🇺🇸 USA - New York [Node #1 Primary]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_2", "🇺🇸 US - New York Cluster", 2, "🇺🇸 USA - New York [Node #2 Fast Failover]", "United States", "New York, United States", "HTTP", "127.0.0.1", 10809, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_3", "🇺🇸 US - New York Cluster", 3, "🇺🇸 USA - New York [Node #3 Neko/Sing Tunnel]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 2080, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_4", "🇺🇸 US - New York Cluster", 4, "🇺🇸 USA - New York [Node #4 WARP Relay]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 40000, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
 
-    private CloneMetadataStore(Context ctx) {
-        this.appCtx = ctx.getApplicationContext();
-        this.sp = this.appCtx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
-        ensureDefaultVpnProfiles();
-    }
+        // Cluster 2: US - California (3 sibling nodes with identical country/city/SIM/timezone)
+        list.add(createNode("us_ca_1", "🇺🇸 US - California Cluster", 1, "🇺🇸 USA - Los Angeles [Node #1 Primary]", "United States", "Los Angeles, United States", "SOCKS5", "127.0.0.1", 10808, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"));
+        list.add(createNode("us_ca_2", "🇺🇸 US - California Cluster", 2, "🇺🇸 USA - Los Angeles [Node #2 Failover]", "United States", "Los Angeles, United States", "HTTP", "127.0.0.1", 10809, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"));
+        list.add(createNode("us_ca_3", "🇺🇸 US - California Cluster", 3, "🇺🇸 USA - Los Angeles [Node #3 Multi-Hop]", "United States", "Los Angeles, United States", "SOCKS5", "127.0.0.1", 2080, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"));
 
-    public static synchronized CloneMetadataStore get(Context ctx) {
-        if (sInstance == null) sInstance = new CloneMetadataStore(ctx);
-        return sInstance;
-    }
+        // Cluster 3: US - Texas (2 sibling nodes)
+        list.add(createNode("us_tx_1", "🇺🇸 US - Texas Cluster", 1, "🇺🇸 USA - Dallas [Node #1 Primary]", "United States", "Dallas, United States", "SOCKS5", "127.0.0.1", 10808, "America/Chicago", 32.7767, -96.7970, "Verizon Wireless", "311480", "us"));
+        list.add(createNode("us_tx_2", "🇺🇸 US - Texas Cluster", 2, "🇺🇸 USA - Dallas [Node #2 Backup]", "United States", "Dallas, United States", "HTTP", "127.0.0.1", 10809, "America/Chicago", 32.7767, -96.7970, "Verizon Wireless", "311480", "us"));
 
-    private String key(String pkg, int userId, String field) {
-        return "c_" + userId + "_" + pkg + "_" + field;
-    }
+        // Cluster 4: Germany - Falkenstein (3 sibling nodes)
+        list.add(createNode("de_fk_1", "🇩🇪 Germany - Falkenstein Cluster", 1, "🇩🇪 Germany - Falkenstein [Node #1 Hetzner]", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", 10808, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"));
+        list.add(createNode("de_fk_2", "🇩🇪 Germany - Falkenstein Cluster", 2, "🇩🇪 Germany - Falkenstein [Node #2 Backup]", "Germany", "Falkenstein, Germany", "HTTP", "127.0.0.1", 10809, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"));
+        list.add(createNode("de_fk_3", "🇩🇪 Germany - Falkenstein Cluster", 3, "🇩🇪 Germany - Falkenstein [Node #3 Relay]", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", 2080, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"));
 
-    public String getSpaceDisplayName(int userId, boolean isFa) {
-        String custom = sp.getString("space_name_" + userId, "");
-        if (custom != null && !custom.trim().isEmpty()) return custom.trim();
-        int num = userId + 1;
-        return isFa ? ("فضای " + num) : ("Space " + num);
-    }
+        // Cluster 5: UK - London (2 sibling nodes)
+        list.add(createNode("uk_ld_1", "🇬🇧 UK - London Cluster", 1, "🇬🇧 UK - London [Node #1 Primary]", "United Kingdom", "London, United Kingdom", "SOCKS5", "127.0.0.1", 10808, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"));
+        list.add(createNode("uk_ld_2", "🇬🇧 UK - London Cluster", 2, "🇬🇧 UK - London [Node #2 Backup]", "United Kingdom", "London, United Kingdom", "HTTP", "127.0.0.1", 10809, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"));
 
-    public void setSpaceCustomName(int userId, String customName) {
-        sp.edit().putString("space_name_" + userId, customName == null ? "" : customName.trim()).commit();
-    }
+        // Cluster 6: Netherlands - Amsterdam (2 sibling nodes)
+        list.add(createNode("nl_am_1", "🇳🇱 Netherlands - Amsterdam Cluster", 1, "🇳🇱 Netherlands - Amsterdam [Node #1 Primary]", "Netherlands", "Amsterdam, Netherlands", "SOCKS5", "127.0.0.1", 10808, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"));
+        list.add(createNode("nl_am_2", "🇳🇱 Netherlands - Amsterdam Cluster", 2, "🇳🇱 Netherlands - Amsterdam [Node #2 Backup]", "Netherlands", "Amsterdam, Netherlands", "HTTP", "127.0.0.1", 10809, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"));
 
-    public boolean isSpaceCreated(int userId) {
-        if (userId == 0) return true;
-        return sp.getBoolean("space_created_" + userId, false);
-    }
-
-    public void markSpaceCreated(int userId) {
-        sp.edit().putBoolean("space_created_" + userId, true).commit();
-    }
-
-    public int getUnreadCount(String pkg, int userId) {
-        return Math.max(0, sp.getInt(key(pkg, userId, "unread_badge"), 0));
-    }
-
-    public void setUnreadCount(String pkg, int userId, int count) {
-        sp.edit().putInt(key(pkg, userId, "unread_badge"), Math.max(0, count)).commit();
-    }
-
-    public void incrementUnreadCount(String pkg, int userId) {
-        setUnreadCount(pkg, userId, getUnreadCount(pkg, userId) + 1);
-    }
-
-    public String formatBadgeText(int count) {
-        if (count <= 0) return "";
-        if (count >= 100) return "∞";
-        return String.valueOf(count);
-    }
-
-    public CloneMeta getCloneMeta(String pkg, int userId) {
-        CloneMeta m = new CloneMeta();
-        m.packageName = pkg;
-        m.userId = userId;
-        m.customAlias = sp.getString(key(pkg, userId, "alias"), "");
-        m.hasExclusiveDevice = sp.getBoolean(key(pkg, userId, "has_dev"), false);
-        m.deviceBrand = sp.getString(key(pkg, userId, "brand"), "");
-        m.deviceModel = sp.getString(key(pkg, userId, "model"), "");
-        m.deviceManufacturer = sp.getString(key(pkg, userId, "manufacturer"), m.deviceBrand);
-        m.deviceProduct = sp.getString(key(pkg, userId, "product"), "");
-        m.deviceHardware = sp.getString(key(pkg, userId, "hardware"), "");
-        m.hasExclusiveLocation = sp.getBoolean(key(pkg, userId, "has_loc"), false);
-        m.latitude = Double.longBitsToDouble(sp.getLong(key(pkg, userId, "lat"), Double.doubleToLongBits(37.7749)));
-        m.longitude = Double.longBitsToDouble(sp.getLong(key(pkg, userId, "lon"), Double.doubleToLongBits(-122.4194)));
-        m.regionLabel = sp.getString(key(pkg, userId, "region"), "");
-        m.timezoneId = sp.getString(key(pkg, userId, "tz"), "");
-        m.proxyAddress = sp.getString(key(pkg, userId, "proxy"), "");
-        m.virtualIp = sp.getString(key(pkg, userId, "vip"), "");
-        m.hasExclusiveSim = sp.getBoolean(key(pkg, userId, "has_sim"), false);
-        m.simCountryIso = sp.getString(key(pkg, userId, "sim_iso"), "us");
-        m.simOperatorName = sp.getString(key(pkg, userId, "sim_op"), "T-Mobile USA");
-        m.simOperatorNumeric = sp.getString(key(pkg, userId, "sim_num"), "310260");
-        m.simPhoneNumber = sp.getString(key(pkg, userId, "sim_phone"), "+13105550199");
-        return m;
-    }
-
-    public void saveCloneMeta(CloneMeta m) {
-        String p = m.packageName;
-        int u = m.userId;
-        sp.edit()
-            .putString(key(p, u, "alias"), m.customAlias == null ? "" : m.customAlias.trim())
-            .putBoolean(key(p, u, "has_dev"), m.hasExclusiveDevice)
-            .putString(key(p, u, "brand"), m.deviceBrand)
-            .putString(key(p, u, "model"), m.deviceModel)
-            .putString(key(p, u, "manufacturer"), m.deviceManufacturer)
-            .putString(key(p, u, "product"), m.deviceProduct)
-            .putString(key(p, u, "hardware"), m.deviceHardware)
-            .putBoolean(key(p, u, "has_loc"), m.hasExclusiveLocation)
-            .putLong(key(p, u, "lat"), Double.doubleToRawLongBits(m.latitude))
-            .putLong(key(p, u, "lon"), Double.doubleToRawLongBits(m.longitude))
-            .putString(key(p, u, "region"), m.regionLabel)
-            .putString(key(p, u, "tz"), m.timezoneId)
-            .putString(key(p, u, "proxy"), m.proxyAddress)
-            .putString(key(p, u, "vip"), m.virtualIp)
-            .putBoolean(key(p, u, "has_sim"), m.hasExclusiveSim)
-            .putString(key(p, u, "sim_iso"), m.simCountryIso)
-            .putString(key(p, u, "sim_op"), m.simOperatorName)
-            .putString(key(p, u, "sim_num"), m.simOperatorNumeric)
-            .putString(key(p, u, "sim_phone"), m.simPhoneNumber)
-            .commit();
-    }
-
-    public GlobalEnvConfig getGlobalConfig() {
-        GlobalEnvConfig c = new GlobalEnvConfig();
-        c.brand = sp.getString("global_brand", "Apple");
-        c.model = sp.getString("global_model", "iPhone 16 Pro Max");
-        c.manufacturer = sp.getString("global_manufacturer", "Apple");
-        c.product = sp.getString("global_product", "iPhone17,2");
-        c.hardware = sp.getString("global_hardware", "A18Pro");
-        c.locationEnabled = sp.getBoolean("global_loc_enabled", true);
-        c.latitude = Double.longBitsToDouble(sp.getLong("global_lat", Double.doubleToLongBits(40.7128)));
-        c.longitude = Double.longBitsToDouble(sp.getLong("global_lon", Double.doubleToLongBits(-74.0060)));
-        c.regionLabel = sp.getString("global_region", "New York, United States");
-        c.timezoneId = sp.getString("global_tz", "America/New_York");
-        c.proxyAddress = sp.getString("global_proxy", "");
-        c.virtualIp = sp.getString("global_vip", "");
-        c.simCountryIso = sp.getString("global_sim_iso", "us");
-        c.simOperatorName = sp.getString("global_sim_op", "T-Mobile USA");
-        c.simOperatorNumeric = sp.getString("global_sim_num", "310260");
-        c.simPhoneNumber = sp.getString("global_sim_phone", "+12125550147");
-        return c;
-    }
-
-    public void saveGlobalConfig(GlobalEnvConfig c) {
-        sp.edit()
-            .putString("global_brand", c.brand)
-            .putString("global_model", c.model)
-            .putString("global_manufacturer", c.manufacturer)
-            .putString("global_product", c.product)
-            .putString("global_hardware", c.hardware)
-            .putBoolean("global_loc_enabled", c.locationEnabled)
-            .putLong("global_lat", Double.doubleToRawLongBits(c.latitude))
-            .putLong("global_lon", Double.doubleToRawLongBits(c.longitude))
-            .putString("global_region", c.regionLabel)
-            .putString("global_tz", c.timezoneId)
-            .putString("global_proxy", c.proxyAddress)
-            .putString("global_vip", c.virtualIp)
-            .putString("global_sim_iso", c.simCountryIso != null ? c.simCountryIso : "us")
-            .putString("global_sim_op", c.simOperatorName != null ? c.simOperatorName : "T-Mobile USA")
-            .putString("global_sim_num", c.simOperatorNumeric != null ? c.simOperatorNumeric : "310260")
-            .putString("global_sim_phone", c.simPhoneNumber != null ? c.simPhoneNumber : "+12125550147")
-            .commit();
-    }
-
-    public String getGlobalBrand() { return getGlobalConfig().brand; }
-    public String getGlobalModel() { return getGlobalConfig().model; }
-    public String getGlobalRegionLabel() { return getGlobalConfig().regionLabel; }
-
-    public String getEffectiveModelSummary(String pkg, int userId) {
-        CloneMeta m = getCloneMeta(pkg, userId);
-        if (m.hasExclusiveDevice && m.deviceModel != null && !m.deviceModel.isEmpty()) {
-            return m.deviceBrand + " " + m.deviceModel;
-        }
-        CloneMeta spaceM = getCloneMeta("__space__", userId);
-        if (spaceM.hasExclusiveDevice && spaceM.deviceModel != null && !spaceM.deviceModel.isEmpty()) {
-            return spaceM.deviceBrand + " " + spaceM.deviceModel;
-        }
-        GlobalEnvConfig g = getGlobalConfig();
-        return g.brand + " " + g.model;
-    }
-
-    public String getEffectiveRegionSummary(String pkg, int userId) {
-        CloneMeta m = getCloneMeta(pkg, userId);
-        if (m.hasExclusiveLocation && m.regionLabel != null && !m.regionLabel.isEmpty()) {
-            return m.regionLabel;
-        }
-        CloneMeta spaceM = getCloneMeta("__space__", userId);
-        if (spaceM.hasExclusiveLocation && spaceM.regionLabel != null && !spaceM.regionLabel.isEmpty()) {
-            return spaceM.regionLabel;
-        }
-        return getGlobalConfig().regionLabel;
-    }
-
-    private void ensureDefaultVpnProfiles() {
-        if (sp.contains("vpn_profiles_json")) return;
-        try {
-            JSONArray arr = new JSONArray();
-            String[][] defaults = {
-                {"us_ny", "🇺🇸 USA - New York (Empire State)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", "10808", "America/New_York", "40.7128", "-74.0060", "T-Mobile USA", "310260", "us"},
-                {"us_ca", "🇺🇸 USA - California (Los Angeles)", "United States", "Los Angeles, California, United States", "SOCKS5", "127.0.0.1", "10808", "America/Los_Angeles", "34.0522", "-118.2437", "AT&T Mobility", "310410", "us"},
-                {"us_tx", "🇺🇸 USA - Texas (Dallas)", "United States", "Dallas, Texas, United States", "SOCKS5", "127.0.0.1", "10808", "America/Chicago", "32.7767", "-96.7970", "Verizon Wireless", "311480", "us"},
-                {"us_va", "🇺🇸 USA - Virginia (Ashburn)", "United States", "Ashburn, Virginia, United States", "SOCKS5", "127.0.0.1", "10808", "America/New_York", "39.0438", "-77.4874", "T-Mobile USA", "310260", "us"},
-                {"us_fl", "🇺🇸 USA - Florida (Miami)", "United States", "Miami, Florida, United States", "SOCKS5", "127.0.0.1", "10808", "America/New_York", "25.7617", "-80.1918", "T-Mobile USA", "310260", "us"},
-                {"us_il", "🇺🇸 USA - Illinois (Chicago)", "United States", "Chicago, Illinois, United States", "SOCKS5", "127.0.0.1", "10808", "America/Chicago", "41.8781", "-87.6298", "AT&T Mobility", "310410", "us"},
-                {"us_wa", "🇺🇸 USA - Washington (Seattle)", "United States", "Seattle, Washington, United States", "SOCKS5", "127.0.0.1", "10808", "America/Los_Angeles", "47.6062", "-122.3321", "T-Mobile USA", "310260", "us"},
-                {"de_fk", "🇩🇪 Germany - Falkenstein (Hetzner)", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", "10808", "Europe/Berlin", "50.4779", "12.3713", "Telekom.de", "26201", "de"},
-                {"de_fr", "🇩🇪 Germany - Frankfurt", "Germany", "Frankfurt, Germany", "SOCKS5", "127.0.0.1", "10808", "Europe/Berlin", "50.1109", "8.6821", "Vodafone.de", "26202", "de"},
-                {"gb_ln", "🇬🇧 United Kingdom - London", "United Kingdom", "London, United Kingdom", "SOCKS5", "127.0.0.1", "10808", "Europe/London", "51.5074", "-0.1278", "Vodafone UK", "23415", "gb"},
-                {"nl_am", "🇳🇱 Netherlands - Amsterdam", "Netherlands", "Amsterdam, Netherlands", "SOCKS5", "127.0.0.1", "10808", "Europe/Amsterdam", "52.3676", "4.9041", "KPN NL", "20408", "nl"},
-                {"fr_pa", "🇫🇷 France - Paris", "France", "Paris, France", "SOCKS5", "127.0.0.1", "10808", "Europe/Paris", "48.8566", "2.3522", "Orange F", "20801", "fr"},
-                {"ca_to", "🇨🇦 Canada - Toronto", "Canada", "Toronto, Canada", "SOCKS5", "127.0.0.1", "10808", "America/Toronto", "43.6532", "-79.3832", "Rogers Wireless", "302720", "ca"},
-                {"tr_is", "🇹🇷 Turkey - Istanbul", "Turkey", "Istanbul, Turkey", "SOCKS5", "127.0.0.1", "10808", "Europe/Istanbul", "41.0082", "28.9784", "Turkcell", "28601", "tr"},
-                {"ae_du", "🇦🇪 UAE - Dubai", "UAE", "Dubai, United Arab Emirates", "SOCKS5", "127.0.0.1", "10808", "Asia/Dubai", "25.2048", "55.2708", "Etisalat", "42402", "ae"}
-            };
-            for (String[] d : defaults) {
-                JSONObject o = new JSONObject();
-                o.put("id", d[0]); o.put("title", d[1]); o.put("country", d[2]); o.put("stateOrCity", d[3]);
-                o.put("protocol", d[4]); o.put("host", d[5]); o.put("port", Integer.parseInt(d[6]));
-                o.put("username", ""); o.put("password", ""); o.put("timezoneId", d[7]);
-                o.put("lat", Double.parseDouble(d[8])); o.put("lon", Double.parseDouble(d[9]));
-                o.put("simOperator", d[10]); o.put("simMccMnc", d[11]); o.put("simIso", d[12]);
-                o.put("targetSpaceId", -1);
-                arr.put(o);
-            }
-            sp.edit().putString("vpn_profiles_json", arr.toString()).putString("active_vpn_id", "us_ny").commit();
-        } catch (Throwable ignored) {}
+        saveVpnProfiles(list);
+        setActiveVpnId("us_ny_1");
+        setActiveVpnCategory("🇺🇸 US - New York Cluster");
     }
 
     public List<VpnProfile> getVpnProfiles() {
         List<VpnProfile> list = new ArrayList<>();
         try {
-            JSONArray arr = new JSONArray(sp.getString("vpn_profiles_json", "[]"));
+            String raw = sp.getString("vpn_profiles_json_v32", "[]");
+            JSONArray arr = new JSONArray(raw);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 VpnProfile p = new VpnProfile();
                 p.id = o.optString("id", "vpn_" + i);
-                p.title = o.optString("title", "VPN");
+                p.category = o.optString("category", "🇺🇸 US - New York Cluster");
+                p.nodeIndex = o.optInt("nodeIndex", i + 1);
+                p.title = o.optString("title", "VPN Server");
                 p.country = o.optString("country", "United States");
                 p.stateOrCity = o.optString("stateOrCity", "New York, United States");
                 p.protocol = o.optString("protocol", "SOCKS5");
@@ -1018,6 +839,7 @@ public class CloneMetadataStore {
                 p.simMccMnc = o.optString("simMccMnc", "310260");
                 p.simIso = o.optString("simIso", "us");
                 p.targetSpaceId = o.optInt("targetSpaceId", -1);
+                p.isBuiltInFree = o.optBoolean("isBuiltInFree", true);
                 list.add(p);
             }
         } catch (Throwable ignored) {}
@@ -1029,29 +851,170 @@ public class CloneMetadataStore {
             JSONArray arr = new JSONArray();
             for (VpnProfile p : list) {
                 JSONObject o = new JSONObject();
-                o.put("id", p.id); o.put("title", p.title); o.put("country", p.country);
-                o.put("stateOrCity", p.stateOrCity); o.put("protocol", p.protocol);
-                o.put("host", p.host); o.put("port", p.port);
-                o.put("username", p.username); o.put("password", p.password);
-                o.put("timezoneId", p.timezoneId); o.put("lat", p.lat); o.put("lon", p.lon);
-                o.put("simOperator", p.simOperator); o.put("simMccMnc", p.simMccMnc);
-                o.put("simIso", p.simIso); o.put("targetSpaceId", p.targetSpaceId);
+                o.put("id", p.id);
+                o.put("category", (p.category == null || p.category.trim().isEmpty()) ? "🇺🇸 US - New York Cluster" : p.category.trim());
+                o.put("nodeIndex", p.nodeIndex);
+                o.put("title", p.title);
+                o.put("country", p.country);
+                o.put("stateOrCity", p.stateOrCity);
+                o.put("protocol", p.protocol);
+                o.put("host", p.host);
+                o.put("port", p.port);
+                o.put("username", p.username);
+                o.put("password", p.password);
+                o.put("timezoneId", p.timezoneId);
+                o.put("lat", p.lat);
+                o.put("lon", p.lon);
+                o.put("simOperator", p.simOperator);
+                o.put("simMccMnc", p.simMccMnc);
+                o.put("simIso", p.simIso);
+                o.put("targetSpaceId", p.targetSpaceId);
+                o.put("isBuiltInFree", p.isBuiltInFree);
                 arr.put(o);
             }
-            sp.edit().putString("vpn_profiles_json", arr.toString()).commit();
+            sp.edit().putString("vpn_profiles_json_v32", arr.toString()).apply();
         } catch (Throwable ignored) {}
     }
 
-    public String getActiveVpnId() { return sp.getString("active_vpn_id", "us_ny"); }
-    public void setActiveVpnId(String id) { sp.edit().putString("active_vpn_id", id).commit(); }
-    public boolean isVpnConnected() { return sp.getBoolean("vpn_connected", false); }
-    public void setVpnConnected(boolean c) { sp.edit().putBoolean("vpn_connected", c).commit(); }
-    public boolean isKillSwitchEnabled() { return sp.getBoolean("vpn_kill_switch", false); }
-    public void setKillSwitchEnabled(boolean e) { sp.edit().putBoolean("vpn_kill_switch", e).commit(); }
-    public boolean isVpnAutoSyncEnabled() { return sp.getBoolean("vpn_auto_sync", true); }
-    public void setVpnAutoSyncEnabled(boolean e) { sp.edit().putBoolean("vpn_auto_sync", e).commit(); }
-    public String getCustomDns() { return sp.getString("vpn_dns", "1.1.1.1"); }
-    public void setCustomDns(String dns) { sp.edit().putString("vpn_dns", dns).commit(); }
+    public List<String> getVpnCategories() {
+        Set<String> set = new LinkedHashSet<>();
+        for (VpnProfile p : getVpnProfiles()) {
+            if (p.category != null && !p.category.trim().isEmpty()) {
+                set.add(p.category.trim());
+            }
+        }
+        if (set.isEmpty()) set.add("🇺🇸 US - New York Cluster");
+        return new ArrayList<>(set);
+    }
+
+    public String getActiveVpnCategory() {
+        return sp.getString("active_vpn_category", "ALL");
+    }
+
+    public void setActiveVpnCategory(String category) {
+        sp.edit().putString("active_vpn_category", (category == null || category.isEmpty()) ? "ALL" : category).apply();
+    }
+
+    public boolean isClusterAutoRotateEnabled() {
+        return sp.getBoolean("vpn_cluster_autorotate", true);
+    }
+
+    public void setClusterAutoRotateEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_cluster_autorotate", enabled).apply();
+    }
+
+    /**
+     * Rotates/fails over to the next sibling VPN server in the SAME category/cluster
+     * (matching country, city, timezone & SIM) so the VPN connection never drops.
+     */
+    public VpnProfile rotateToNextSiblingInCluster(String currentProfileId) {
+        List<VpnProfile> all = getVpnProfiles();
+        if (all.isEmpty()) return null;
+        VpnProfile current = all.get(0);
+        for (VpnProfile p : all) {
+            if (p.id.equals(currentProfileId)) {
+                current = p;
+                break;
+            }
+        }
+        List<VpnProfile> siblings = new ArrayList<>();
+        for (VpnProfile p : all) {
+            if (p.category != null && p.category.equalsIgnoreCase(current.category)) {
+                siblings.add(p);
+            }
+        }
+        if (siblings.size() <= 1) {
+            for (VpnProfile p : all) {
+                if (p.stateOrCity != null && p.stateOrCity.equalsIgnoreCase(current.stateOrCity)) {
+                    siblings.add(p);
+                }
+            }
+        }
+        if (siblings.isEmpty()) return current;
+        int idx = 0;
+        for (int i = 0; i < siblings.size(); i++) {
+            if (siblings.get(i).id.equals(current.id)) {
+                idx = i;
+                break;
+            }
+        }
+        VpnProfile next = siblings.get((idx + 1) % siblings.size());
+        setActiveVpnId(next.id);
+        setVpnConnected(true);
+        applyVpnProfileToEnvironment(next);
+        return next;
+    }
+
+    public void moveVpnProfile(String profileId, int delta) {
+        List<VpnProfile> list = getVpnProfiles();
+        int idx = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).id.equals(profileId)) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) return;
+        int targetIdx = idx + delta;
+        if (targetIdx < 0 || targetIdx >= list.size()) return;
+        VpnProfile item = list.remove(idx);
+        list.add(targetIdx, item);
+        saveVpnProfiles(list);
+    }
+
+    public void renameVpnCategory(String oldCat, String newCat) {
+        if (oldCat == null || newCat == null || newCat.trim().isEmpty()) return;
+        List<VpnProfile> list = getVpnProfiles();
+        for (VpnProfile p : list) {
+            if (oldCat.equals(p.category)) {
+                p.category = newCat.trim();
+            }
+        }
+        saveVpnProfiles(list);
+        if (oldCat.equals(getActiveVpnCategory())) {
+            setActiveVpnCategory(newCat.trim());
+        }
+    }
+
+    public String getActiveVpnId() {
+        return sp.getString("active_vpn_id", "us_ny_1");
+    }
+
+    public void setActiveVpnId(String id) {
+        sp.edit().putString("active_vpn_id", id).apply();
+    }
+
+    public boolean isVpnConnected() {
+        return sp.getBoolean("vpn_connected_state", false);
+    }
+
+    public void setVpnConnected(boolean connected) {
+        sp.edit().putBoolean("vpn_connected_state", connected).apply();
+    }
+
+    public boolean isKillSwitchEnabled() {
+        return sp.getBoolean("vpn_kill_switch", true);
+    }
+
+    public void setKillSwitchEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_kill_switch", enabled).apply();
+    }
+
+    public boolean isVpnAutoSyncEnabled() {
+        return sp.getBoolean("vpn_auto_sync_env", true);
+    }
+
+    public void setVpnAutoSyncEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_auto_sync_env", enabled).apply();
+    }
+
+    public String getCustomDns() {
+        return sp.getString("vpn_custom_dns", "1.1.1.1 / 8.8.8.8");
+    }
+
+    public void setCustomDns(String dns) {
+        sp.edit().putString("vpn_custom_dns", dns).apply();
+    }
 
     public void applyVpnProfileToEnvironment(VpnProfile p) {
         if (p == null) return;
@@ -1059,9 +1022,9 @@ public class CloneMetadataStore {
         if (isVpnAutoSyncEnabled()) {
             GlobalEnvConfig g = getGlobalConfig();
             g.regionLabel = p.stateOrCity;
+            g.timezoneId = p.timezoneId;
             g.latitude = p.lat;
             g.longitude = p.lon;
-            g.timezoneId = p.timezoneId;
             g.proxyAddress = p.host + ":" + p.port;
             g.simOperatorName = p.simOperator;
             g.simOperatorNumeric = p.simMccMnc;
@@ -1070,166 +1033,474 @@ public class CloneMetadataStore {
         }
     }
 
-    public File getVaultDir(Context ctx, String pkg) {
-        File dir = new File(ctx.getFilesDir(), "apk_vault/" + pkg);
+    public void setLastActiveSession(String pkg, int userId) {
+        if (pkg == null || pkg.isEmpty() || "__space__".equals(pkg)) return;
+        sp.edit()
+          .putString("last_active_pkg", pkg)
+          .putInt("last_active_user", userId)
+          .apply();
+    }
+
+    public String getLastActivePkg() {
+        return sp.getString("last_active_pkg", "");
+    }
+
+    public int getLastActiveUserId() {
+        return sp.getInt("last_active_user", 0);
+    }
+
+    public String getSpaceDisplayName(int userId, boolean isFa) {
+        String custom = sp.getString("space_name_" + userId, "");
+        if (custom != null && !custom.trim().isEmpty()) {
+            return custom.trim();
+        }
+        return isFa ? ("فضای " + (userId + 1)) : ("Space " + (userId + 1));
+    }
+
+    public void setSpaceCustomName(int userId, String name) {
+        sp.edit().putString("space_name_" + userId, name == null ? "" : name.trim()).apply();
+    }
+
+    public boolean isSpaceCreated(int userId) {
+        if (userId == 0) return true;
+        return sp.getBoolean("space_created_" + userId, false);
+    }
+
+    public void markSpaceCreated(int userId) {
+        sp.edit().putBoolean("space_created_" + userId, true).apply();
+    }
+
+    public int getUnreadCount(String pkg, int userId) {
+        return sp.getInt("badge_unread_" + userId + "_" + pkg, 0);
+    }
+
+    public void setUnreadCount(String pkg, int userId, int count) {
+        sp.edit().putInt("badge_unread_" + userId + "_" + pkg, Math.max(0, count)).apply();
+    }
+
+    public void incrementUnreadCount(String pkg, int userId) {
+        setUnreadCount(pkg, userId, getUnreadCount(pkg, userId) + 1);
+    }
+
+    public String formatBadgeText(int count) {
+        if (count <= 0) return "";
+        if (count >= 100) return "∞";
+        return String.valueOf(count);
+    }
+
+    private String keyPrefix(String pkg, int userId) {
+        return "clone_" + userId + "_" + pkg + "_";
+    }
+
+    public CloneMeta getCloneMeta(String pkg, int userId) {
+        String p = keyPrefix(pkg, userId);
+        CloneMeta m = new CloneMeta();
+        m.packageName = pkg;
+        m.userId = userId;
+        m.customAlias = sp.getString(p + "alias", "");
+        m.hasExclusiveDevice = sp.getBoolean(p + "ex_dev", false);
+        m.deviceBrand = sp.getString(p + "brand", SAFE_DEFAULT_BRAND);
+        m.deviceModel = cleanModelOnly(m.deviceBrand, sp.getString(p + "model", SAFE_DEFAULT_MODEL));
+        m.deviceManufacturer = sp.getString(p + "mfg", SAFE_DEFAULT_MANUFACTURER);
+        m.deviceProduct = sp.getString(p + "prod", SAFE_DEFAULT_PRODUCT);
+        m.deviceHardware = sp.getString(p + "hw", SAFE_DEFAULT_HARDWARE);
+        m.hasExclusiveLocation = sp.getBoolean(p + "ex_loc", false);
+        try {
+            m.latitude = Double.parseDouble(sp.getString(p + "lat", String.valueOf(SAFE_DEFAULT_LAT)));
+            m.longitude = Double.parseDouble(sp.getString(p + "lon", String.valueOf(SAFE_DEFAULT_LON)));
+        } catch (Exception e) {
+            m.latitude = SAFE_DEFAULT_LAT;
+            m.longitude = SAFE_DEFAULT_LON;
+        }
+        m.regionLabel = sp.getString(p + "region", SAFE_DEFAULT_REGION);
+        m.timezoneId = sp.getString(p + "tz", SAFE_DEFAULT_TZ);
+        m.proxyAddress = sp.getString(p + "proxy", "");
+        m.hasExclusiveSim = sp.getBoolean(p + "ex_sim", false);
+        m.simOperatorName = sp.getString(p + "sim_op", SAFE_DEFAULT_SIM_OP);
+        m.simOperatorNumeric = sp.getString(p + "sim_num", SAFE_DEFAULT_SIM_NUM);
+        m.simCountryIso = sp.getString(p + "sim_iso", SAFE_DEFAULT_SIM_ISO);
+        m.simPhoneNumber = sp.getString(p + "sim_phone", SAFE_DEFAULT_SIM_PHONE);
+        return m;
+    }
+
+    public void saveCloneMeta(CloneMeta m) {
+        String cleanBrand = (m.deviceBrand == null || m.deviceBrand.trim().isEmpty()) ? SAFE_DEFAULT_BRAND : m.deviceBrand.trim();
+        String cleanModel = cleanModelOnly(cleanBrand, m.deviceModel);
+        String p = keyPrefix(m.packageName, m.userId);
+        sp.edit()
+          .putString(p + "alias", m.customAlias == null ? "" : m.customAlias)
+          .putBoolean(p + "ex_dev", m.hasExclusiveDevice)
+          .putString(p + "brand", cleanBrand)
+          .putString(p + "model", cleanModel)
+          .putString(p + "mfg", m.deviceManufacturer == null || m.deviceManufacturer.isEmpty() ? cleanBrand : m.deviceManufacturer)
+          .putString(p + "prod", m.deviceProduct == null || m.deviceProduct.isEmpty() ? SAFE_DEFAULT_PRODUCT : m.deviceProduct)
+          .putString(p + "hw", m.deviceHardware == null || m.deviceHardware.isEmpty() ? SAFE_DEFAULT_HARDWARE : m.deviceHardware)
+          .putBoolean(p + "ex_loc", m.hasExclusiveLocation)
+          .putString(p + "lat", String.valueOf(m.latitude))
+          .putString(p + "lon", String.valueOf(m.longitude))
+          .putString(p + "region", (m.regionLabel == null || m.regionLabel.trim().isEmpty()) ? SAFE_DEFAULT_REGION : m.regionLabel.trim())
+          .putString(p + "tz", (m.timezoneId == null || m.timezoneId.trim().isEmpty()) ? SAFE_DEFAULT_TZ : m.timezoneId.trim())
+          .putString(p + "proxy", m.proxyAddress == null ? "" : m.proxyAddress.trim())
+          .putBoolean(p + "ex_sim", m.hasExclusiveSim)
+          .putString(p + "sim_op", (m.simOperatorName == null || m.simOperatorName.trim().isEmpty()) ? SAFE_DEFAULT_SIM_OP : m.simOperatorName.trim())
+          .putString(p + "sim_num", (m.simOperatorNumeric == null || m.simOperatorNumeric.trim().isEmpty()) ? SAFE_DEFAULT_SIM_NUM : m.simOperatorNumeric.trim())
+          .putString(p + "sim_iso", (m.simCountryIso == null || m.simCountryIso.trim().isEmpty()) ? SAFE_DEFAULT_SIM_ISO : m.simCountryIso.trim().toLowerCase())
+          .putString(p + "sim_phone", (m.simPhoneNumber == null || m.simPhoneNumber.trim().isEmpty()) ? SAFE_DEFAULT_SIM_PHONE : m.simPhoneNumber.trim())
+          .apply();
+    }
+
+    public static class GlobalEnvConfig {
+        public String brand;
+        public String model;
+        public String manufacturer;
+        public String product;
+        public String hardware;
+        public boolean locationEnabled;
+        public double latitude;
+        public double longitude;
+        public String regionLabel;
+        public String timezoneId;
+        public String proxyAddress;
+        public String simOperatorName;
+        public String simOperatorNumeric;
+        public String simCountryIso;
+        public String simPhoneNumber;
+    }
+
+    public GlobalEnvConfig getGlobalConfig() {
+        GlobalEnvConfig c = new GlobalEnvConfig();
+        c.brand = sp.getString("global_brand", SAFE_DEFAULT_BRAND);
+        if (c.brand == null || c.brand.trim().isEmpty()) c.brand = SAFE_DEFAULT_BRAND;
+        c.model = cleanModelOnly(c.brand, sp.getString("global_model", SAFE_DEFAULT_MODEL));
+        c.manufacturer = sp.getString("global_manufacturer", SAFE_DEFAULT_MANUFACTURER);
+        c.product = sp.getString("global_product", SAFE_DEFAULT_PRODUCT);
+        c.hardware = sp.getString("global_hardware", SAFE_DEFAULT_HARDWARE);
+        c.locationEnabled = sp.getBoolean("global_loc_enabled", true);
+        try {
+            c.latitude = Double.parseDouble(sp.getString("global_lat", String.valueOf(SAFE_DEFAULT_LAT)));
+            c.longitude = Double.parseDouble(sp.getString("global_lon", String.valueOf(SAFE_DEFAULT_LON)));
+        } catch (Exception e) {
+            c.latitude = SAFE_DEFAULT_LAT;
+            c.longitude = SAFE_DEFAULT_LON;
+        }
+        c.regionLabel = sp.getString("global_region_label", SAFE_DEFAULT_REGION);
+        if (c.regionLabel == null || c.regionLabel.trim().isEmpty()) c.regionLabel = SAFE_DEFAULT_REGION;
+        c.timezoneId = sp.getString("global_tz", SAFE_DEFAULT_TZ);
+        if (c.timezoneId == null || c.timezoneId.trim().isEmpty()) c.timezoneId = SAFE_DEFAULT_TZ;
+        c.proxyAddress = sp.getString("global_proxy", "127.0.0.1:10808");
+        c.simOperatorName = sp.getString("global_sim_op", SAFE_DEFAULT_SIM_OP);
+        if (c.simOperatorName == null || c.simOperatorName.trim().isEmpty()) c.simOperatorName = SAFE_DEFAULT_SIM_OP;
+        c.simOperatorNumeric = sp.getString("global_sim_num", SAFE_DEFAULT_SIM_NUM);
+        if (c.simOperatorNumeric == null || c.simOperatorNumeric.trim().isEmpty()) c.simOperatorNumeric = SAFE_DEFAULT_SIM_NUM;
+        c.simCountryIso = sp.getString("global_sim_iso", SAFE_DEFAULT_SIM_ISO);
+        if (c.simCountryIso == null || c.simCountryIso.trim().isEmpty()) c.simCountryIso = SAFE_DEFAULT_SIM_ISO;
+        c.simPhoneNumber = sp.getString("global_sim_phone", SAFE_DEFAULT_SIM_PHONE);
+        return c;
+    }
+
+    public void saveGlobalConfig(GlobalEnvConfig c) {
+        String cleanBrand = (c.brand == null || c.brand.trim().isEmpty()) ? SAFE_DEFAULT_BRAND : c.brand.trim();
+        String cleanModel = cleanModelOnly(cleanBrand, c.model);
+        sp.edit()
+          .putString("global_brand", cleanBrand)
+          .putString("global_model", cleanModel)
+          .putString("global_manufacturer", (c.manufacturer == null || c.manufacturer.trim().isEmpty()) ? cleanBrand : c.manufacturer.trim())
+          .putString("global_product", (c.product == null || c.product.trim().isEmpty()) ? SAFE_DEFAULT_PRODUCT : c.product.trim())
+          .putString("global_hardware", (c.hardware == null || c.hardware.trim().isEmpty()) ? SAFE_DEFAULT_HARDWARE : c.hardware.trim())
+          .putBoolean("global_loc_enabled", c.locationEnabled)
+          .putString("global_lat", String.valueOf(c.latitude))
+          .putString("global_lon", String.valueOf(c.longitude))
+          .putString("global_region_label", (c.regionLabel == null || c.regionLabel.trim().isEmpty()) ? SAFE_DEFAULT_REGION : c.regionLabel.trim())
+          .putString("global_tz", (c.timezoneId == null || c.timezoneId.trim().isEmpty()) ? SAFE_DEFAULT_TZ : c.timezoneId.trim())
+          .putString("global_proxy", c.proxyAddress == null ? "" : c.proxyAddress.trim())
+          .putString("global_sim_op", (c.simOperatorName == null || c.simOperatorName.trim().isEmpty()) ? SAFE_DEFAULT_SIM_OP : c.simOperatorName.trim())
+          .putString("global_sim_num", (c.simOperatorNumeric == null || c.simOperatorNumeric.trim().isEmpty()) ? SAFE_DEFAULT_SIM_NUM : c.simOperatorNumeric.trim())
+          .putString("global_sim_iso", (c.simCountryIso == null || c.simCountryIso.trim().isEmpty()) ? SAFE_DEFAULT_SIM_ISO : c.simCountryIso.trim().toLowerCase())
+          .putString("global_sim_phone", (c.simPhoneNumber == null || c.simPhoneNumber.trim().isEmpty()) ? SAFE_DEFAULT_SIM_PHONE : c.simPhoneNumber.trim())
+          .apply();
+    }
+
+    /**
+     * Strict 3-tier resolution:
+     * Priority #1: Per-App Exclusive Settings (pkg, userId)
+     * Priority #2: Per-Space Exclusive Settings ("__space__", userId)
+     * Priority #3: Global Vault Settings (Never leaks host phone hardware/SIM/location)
+     */
+    public EffectiveIdentity resolveEffectiveIdentity(String pkg, int userId) {
+        GlobalEnvConfig g = getGlobalConfig();
+        EffectiveIdentity out = new EffectiveIdentity();
+        String resolvedPkg = pkg;
+        int resolvedUser = userId;
+        if (resolvedPkg == null || resolvedPkg.isEmpty()) {
+            resolvedPkg = getLastActivePkg();
+            resolvedUser = getLastActiveUserId();
+        }
+        out.targetPackage = (resolvedPkg == null) ? "" : resolvedPkg;
+        out.targetUserId = resolvedUser;
+
+        // Tier 3 defaults (Global Vault)
+        out.brand = g.brand;
+        out.model = cleanModelOnly(g.brand, g.model);
+        out.manufacturer = g.manufacturer;
+        out.product = g.product;
+        out.hardware = g.hardware;
+        out.latitude = g.latitude;
+        out.longitude = g.longitude;
+        out.regionLabel = g.regionLabel;
+        out.timezoneId = g.timezoneId;
+        out.proxyAddress = g.proxyAddress;
+        out.simOperatorName = g.simOperatorName;
+        out.simOperatorNumeric = g.simOperatorNumeric;
+        out.simCountryIso = g.simCountryIso;
+        out.simPhoneNumber = g.simPhoneNumber;
+
+        // Tier 2 override: Space settings ("__space__", resolvedUser)
+        CloneMeta spaceMeta = getCloneMeta("__space__", resolvedUser);
+        if (spaceMeta.hasExclusiveDevice && spaceMeta.deviceModel != null && !spaceMeta.deviceModel.isEmpty()) {
+            out.devicePriorityTier = 2;
+            out.brand = spaceMeta.deviceBrand;
+            out.model = cleanModelOnly(spaceMeta.deviceBrand, spaceMeta.deviceModel);
+            out.manufacturer = spaceMeta.deviceManufacturer;
+            out.product = spaceMeta.deviceProduct;
+            out.hardware = spaceMeta.deviceHardware;
+        }
+        if (spaceMeta.hasExclusiveLocation && spaceMeta.regionLabel != null && !spaceMeta.regionLabel.isEmpty()) {
+            out.locationPriorityTier = 2;
+            out.latitude = spaceMeta.latitude;
+            out.longitude = spaceMeta.longitude;
+            out.regionLabel = spaceMeta.regionLabel;
+            out.timezoneId = spaceMeta.timezoneId;
+            if (spaceMeta.proxyAddress != null && !spaceMeta.proxyAddress.isEmpty()) {
+                out.proxyAddress = spaceMeta.proxyAddress;
+            }
+        }
+        if (spaceMeta.hasExclusiveSim && spaceMeta.simOperatorName != null && !spaceMeta.simOperatorName.isEmpty()) {
+            out.simPriorityTier = 2;
+            out.simOperatorName = spaceMeta.simOperatorName;
+            out.simOperatorNumeric = spaceMeta.simOperatorNumeric;
+            out.simCountryIso = spaceMeta.simCountryIso;
+            out.simPhoneNumber = spaceMeta.simPhoneNumber;
+        }
+
+        // Tier 1 override: App Exclusive settings (resolvedPkg, resolvedUser)
+        if (resolvedPkg != null && !resolvedPkg.isEmpty() && !"__space__".equals(resolvedPkg)) {
+            CloneMeta appMeta = getCloneMeta(resolvedPkg, resolvedUser);
+            if (appMeta.hasExclusiveDevice && appMeta.deviceModel != null && !appMeta.deviceModel.isEmpty()) {
+                out.devicePriorityTier = 1;
+                out.brand = appMeta.deviceBrand;
+                out.model = cleanModelOnly(appMeta.deviceBrand, appMeta.deviceModel);
+                out.manufacturer = appMeta.deviceManufacturer;
+                out.product = appMeta.deviceProduct;
+                out.hardware = appMeta.deviceHardware;
+            }
+            if (appMeta.hasExclusiveLocation && appMeta.regionLabel != null && !appMeta.regionLabel.isEmpty()) {
+                out.locationPriorityTier = 1;
+                out.latitude = appMeta.latitude;
+                out.longitude = appMeta.longitude;
+                out.regionLabel = appMeta.regionLabel;
+                out.timezoneId = appMeta.timezoneId;
+                if (appMeta.proxyAddress != null && !appMeta.proxyAddress.isEmpty()) {
+                    out.proxyAddress = appMeta.proxyAddress;
+                }
+            }
+            if (appMeta.hasExclusiveSim && appMeta.simOperatorName != null && !appMeta.simOperatorName.isEmpty()) {
+                out.simPriorityTier = 1;
+                out.simOperatorName = appMeta.simOperatorName;
+                out.simOperatorNumeric = appMeta.simOperatorNumeric;
+                out.simCountryIso = appMeta.simCountryIso;
+                out.simPhoneNumber = appMeta.simPhoneNumber;
+            }
+        }
+
+        out.displayBrandModel = formatBrandModel(out.brand, out.model);
+        return out;
+    }
+
+    public String getGlobalBrand() {
+        return getGlobalConfig().brand;
+    }
+
+    public String getGlobalModel() {
+        GlobalEnvConfig g = getGlobalConfig();
+        return cleanModelOnly(g.brand, g.model);
+    }
+
+    public String getGlobalRegionLabel() {
+        return getGlobalConfig().regionLabel;
+    }
+
+    public String getEffectiveModelSummary(String pkg, int userId) {
+        return resolveEffectiveIdentity(pkg, userId).displayBrandModel;
+    }
+
+    public String getEffectiveRegionSummary(String pkg, int userId) {
+        return resolveEffectiveIdentity(pkg, userId).regionLabel;
+    }
+
+    public static File getVaultDir(Context context, String sub) {
+        File dir = new File(context.getFilesDir(), "veyra_vault/" + sub);
         if (!dir.exists()) dir.mkdirs();
         return dir;
     }
 
-    public boolean backupApkToVault(Context ctx, String pkg, String sourceApkPath) {
-        if (sourceApkPath == null || sourceApkPath.isEmpty()) return false;
-        File src = new File(sourceApkPath);
-        if (!src.exists()) return false;
-        File dst = new File(getVaultDir(ctx, pkg), "base.apk");
-        try (FileInputStream in = new FileInputStream(src);
-             FileOutputStream out = new FileOutputStream(dst)) {
-            byte[] buf = new byte[16384];
-            int len;
-            while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-            return true;
+    public static File backupApkToVault(Context context, String pkg, String sourceApkPath) {
+        try {
+            File src = new File(sourceApkPath);
+            if (!src.exists()) return null;
+            File dst = new File(getVaultDir(context, "apks"), pkg + ".apk");
+            try (FileInputStream in = new FileInputStream(src);
+                 FileOutputStream out = new FileOutputStream(dst)) {
+                byte[] buf = new byte[16384];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            }
+            return dst;
         } catch (Throwable t) {
-            return false;
+            return null;
         }
     }
 
-    public File getVaultApkFile(String pkg) {
-        File f = new File(appCtx.getFilesDir(), "apk_vault/" + pkg + "/base.apk");
-        return f.exists() ? f : null;
+    public static File getVaultApkFile(String pkg) {
+        try {
+            Context ctx = com.veyravault.space.VeyraApplication.getAppContext();
+            if (ctx == null) return null;
+            File f = new File(getVaultDir(ctx, "apks"), pkg + ".apk");
+            return f.exists() ? f : null;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 }
 """
-write_file(os.path.join(JAVA_BASE, "core/CloneMetadataStore.java"), CLONE_METADATA)
+write_file(os.path.join(JAVA_BASE, "core/CloneMetadataStore.java"), CLONE_METADATA_STORE)
 
-NOTIF_SERVICE = """package com.veyravault.space.core;
+# 9. VaultNotificationListenerService.java
+NOTIF_SERVICE = r"""package com.veyravault.space.core;
 
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
-import android.app.Notification;
 
 public class VaultNotificationListenerService extends NotificationListenerService {
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (sbn == null || sbn.getNotification() == null) return;
-        if ((sbn.getNotification().flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
-        String pkg = sbn.getPackageName();
-        if (pkg != null) {
-            CloneMetadataStore.get(this).incrementUnreadCount(pkg, 0);
-        }
+        if (sbn == null) return;
+        try {
+            String pkg = sbn.getPackageName();
+            if (pkg != null) {
+                CloneMetadataStore.get(getApplicationContext()).incrementUnreadCount(pkg, 0);
+            }
+        } catch (Throwable ignored) {}
     }
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
         if (sbn == null) return;
-        String pkg = sbn.getPackageName();
-        if (pkg != null) {
-            int cur = CloneMetadataStore.get(this).getUnreadCount(pkg, 0);
-            if (cur > 0) CloneMetadataStore.get(this).setUnreadCount(pkg, 0, cur - 1);
-        }
+        try {
+            String pkg = sbn.getPackageName();
+            if (pkg != null) {
+                CloneMetadataStore.get(getApplicationContext()).setUnreadCount(pkg, 0, 0);
+            }
+        } catch (Throwable ignored) {}
     }
 }
 """
 write_file(os.path.join(JAVA_BASE, "core/VaultNotificationListenerService.java"), NOTIF_SERVICE)
 
-VIRTUAL_HOOK = """package com.veyravault.space.core;
+# 10. VirtualHookManager.java
+VIRTUAL_HOOK_MANAGER = r"""package com.veyravault.space.core;
 
 import android.content.Context;
 import android.os.Build;
 import java.lang.reflect.Field;
-import java.util.Locale;
 import java.util.TimeZone;
+import top.niunaijun.blackbox.entity.location.BLocation;
+import top.niunaijun.blackbox.fake.frameworks.BLocationManager;
 
 public class VirtualHookManager {
     private static VirtualHookManager sInstance;
-    private final Context ctx;
+    private final Context context;
 
-    private VirtualHookManager(Context ctx) {
-        this.ctx = ctx.getApplicationContext();
-    }
-
-    public static synchronized VirtualHookManager get(Context ctx) {
-        if (sInstance == null) sInstance = new VirtualHookManager(ctx);
+    public static synchronized VirtualHookManager get(Context context) {
+        if (sInstance == null) {
+            sInstance = new VirtualHookManager(context.getApplicationContext());
+        }
         return sInstance;
     }
 
+    private VirtualHookManager(Context context) {
+        this.context = context;
+    }
+
     public void prepareEnvironmentBeforeLaunch(String pkg, int userId) {
+        if (pkg != null && !pkg.isEmpty() && !"__space__".equals(pkg)) {
+            CloneMetadataStore.get(context).setLastActiveSession(pkg, userId);
+        }
         applyEffectiveHookToSystem(pkg, userId);
     }
 
     public void applyEffectiveHookToSystem(String pkg, int userId) {
         try {
-            CloneMetadataStore store = CloneMetadataStore.get(ctx);
-            CloneMetadataStore.GlobalEnvConfig g = store.getGlobalConfig();
-            CloneMetadataStore.CloneMeta spaceMeta = store.getCloneMeta("__space__", userId);
-            CloneMetadataStore.CloneMeta appMeta = pkg != null ? store.getCloneMeta(pkg, userId) : null;
+            CloneMetadataStore store = CloneMetadataStore.get(context);
+            CloneMetadataStore.EffectiveIdentity id = store.resolveEffectiveIdentity(pkg, userId);
 
-            String brand = g.brand, model = g.model, manufacturer = g.manufacturer, product = g.product, hardware = g.hardware;
-            if (spaceMeta.hasExclusiveDevice && !spaceMeta.deviceModel.isEmpty()) {
-                brand = spaceMeta.deviceBrand; model = spaceMeta.deviceModel;
-                manufacturer = spaceMeta.deviceManufacturer; product = spaceMeta.deviceProduct; hardware = spaceMeta.deviceHardware;
-            }
-            if (appMeta != null && appMeta.hasExclusiveDevice && !appMeta.deviceModel.isEmpty()) {
-                brand = appMeta.deviceBrand; model = appMeta.deviceModel;
-                manufacturer = appMeta.deviceManufacturer; product = appMeta.deviceProduct; hardware = appMeta.deviceHardware;
-            }
+            // 1. Hardware Build Reflection (Deduplicated Brand/Model, Never Host Phone)
+            setBuildField("BRAND", id.brand);
+            setBuildField("MODEL", id.displayBrandModel);
+            setBuildField("MANUFACTURER", id.manufacturer);
+            setBuildField("PRODUCT", id.product);
+            setBuildField("DEVICE", id.product);
+            setBuildField("HARDWARE", id.hardware);
 
-            double lat = g.latitude, lon = g.longitude;
-            String tz = g.timezoneId, region = g.regionLabel, proxy = g.proxyAddress;
-            if (spaceMeta.hasExclusiveLocation) {
-                lat = spaceMeta.latitude; lon = spaceMeta.longitude;
-                if (!spaceMeta.timezoneId.isEmpty()) tz = spaceMeta.timezoneId;
-                if (!spaceMeta.regionLabel.isEmpty()) region = spaceMeta.regionLabel;
-                if (!spaceMeta.proxyAddress.isEmpty()) proxy = spaceMeta.proxyAddress;
-            }
-            if (appMeta != null && appMeta.hasExclusiveLocation) {
-                lat = appMeta.latitude; lon = appMeta.longitude;
-                if (!appMeta.timezoneId.isEmpty()) tz = appMeta.timezoneId;
-                if (!appMeta.regionLabel.isEmpty()) region = appMeta.regionLabel;
-                if (!appMeta.proxyAddress.isEmpty()) proxy = appMeta.proxyAddress;
+            // 2. Timezone Sync
+            if (id.timezoneId != null && !id.timezoneId.isEmpty()) {
+                TimeZone.setDefault(TimeZone.getTimeZone(id.timezoneId));
+                System.setProperty("user.timezone", id.timezoneId);
             }
 
-            String simIso = g.simCountryIso, simOp = g.simOperatorName, simNum = g.simOperatorNumeric, simPhone = g.simPhoneNumber;
-            if (spaceMeta.hasExclusiveSim) {
-                simIso = spaceMeta.simCountryIso; simOp = spaceMeta.simOperatorName;
-                simNum = spaceMeta.simOperatorNumeric; simPhone = spaceMeta.simPhoneNumber;
-            }
-            if (appMeta != null && appMeta.hasExclusiveSim) {
-                simIso = appMeta.simCountryIso; simOp = appMeta.simOperatorName;
-                simNum = appMeta.simOperatorNumeric; simPhone = appMeta.simPhoneNumber;
-            }
+            // 3. Inject GPS coordinates directly into BlackBox BLocationManager for both app & space
+            try {
+                BLocation bLoc = new BLocation(id.latitude, id.longitude);
+                BLocationManager.get().setGlobalLocation(bLoc);
+                if (id.targetPackage != null && !id.targetPackage.isEmpty() && !"__space__".equals(id.targetPackage)) {
+                    BLocationManager.get().setPattern(id.targetUserId, id.targetPackage, BLocationManager.OWN_MODE);
+                    BLocationManager.get().setLocation(id.targetUserId, id.targetPackage, bLoc);
+                }
+            } catch (Throwable ignored) {}
 
-            setBuildField("BRAND", brand);
-            setBuildField("MODEL", model);
-            setBuildField("MANUFACTURER", manufacturer != null && !manufacturer.isEmpty() ? manufacturer : brand);
-            setBuildField("DEVICE", model);
-            if (product != null && !product.isEmpty()) setBuildField("PRODUCT", product);
-            if (hardware != null && !hardware.isEmpty()) setBuildField("HARDWARE", hardware);
+            // 4. System properties for Virtual SIM, Location & Proxy Tunnel
+            System.setProperty("veyra.active.pkg", id.targetPackage);
+            System.setProperty("veyra.active.user", String.valueOf(id.targetUserId));
+            System.setProperty("veyra.active.tier.device", String.valueOf(id.devicePriorityTier));
+            System.setProperty("veyra.active.tier.location", String.valueOf(id.locationPriorityTier));
+            System.setProperty("veyra.active.tier.sim", String.valueOf(id.simPriorityTier));
+            System.setProperty("veyra.active.brand", id.brand);
+            System.setProperty("veyra.active.model", id.displayBrandModel);
+            System.setProperty("veyra.active.lat", String.valueOf(id.latitude));
+            System.setProperty("veyra.active.lon", String.valueOf(id.longitude));
+            System.setProperty("veyra.active.region", id.regionLabel);
+            System.setProperty("veyra.active.tz", id.timezoneId);
+            System.setProperty("veyra.active.sim.op", id.simOperatorName);
+            System.setProperty("veyra.active.sim.mccmnc", id.simOperatorNumeric);
+            System.setProperty("veyra.active.sim.iso", id.simCountryIso);
+            System.setProperty("veyra.active.sim.phone", id.simPhoneNumber);
 
-            if (tz != null && !tz.isEmpty()) {
-                TimeZone.setDefault(TimeZone.getTimeZone(tz));
-                System.setProperty("user.timezone", tz);
-            }
-            System.setProperty("veyra.spoof.lat", String.valueOf(lat));
-            System.setProperty("veyra.spoof.lon", String.valueOf(lon));
-            System.setProperty("veyra.spoof.region", region != null ? region : "New York, United States");
-            System.setProperty("gsm.sim.operator.alpha", simOp != null ? simOp : "T-Mobile USA");
-            System.setProperty("gsm.operator.alpha", simOp != null ? simOp : "T-Mobile USA");
-            System.setProperty("gsm.sim.operator.numeric", simNum != null ? simNum : "310260");
-            System.setProperty("gsm.operator.numeric", simNum != null ? simNum : "310260");
-            System.setProperty("gsm.sim.operator.iso-country", simIso != null ? simIso : "us");
-            System.setProperty("gsm.operator.iso-country", simIso != null ? simIso : "us");
-            System.setProperty("veyra.sim.phone", simPhone != null ? simPhone : "+12125550147");
-
-            if (proxy != null && proxy.contains(":")) {
-                String[] parts = proxy.split(":");
-                System.setProperty("socksProxyHost", parts[0].trim());
-                System.setProperty("socksProxyPort", parts[1].trim());
-                System.setProperty("http.proxyHost", parts[0].trim());
-                System.setProperty("http.proxyPort", parts[1].trim());
+            if (id.proxyAddress != null && id.proxyAddress.contains(":")) {
+                String[] parts = id.proxyAddress.split(":");
+                if (parts.length == 2) {
+                    System.setProperty("http.proxyHost", parts[0].trim());
+                    System.setProperty("http.proxyPort", parts[1].trim());
+                    System.setProperty("https.proxyHost", parts[0].trim());
+                    System.setProperty("https.proxyPort", parts[1].trim());
+                    System.setProperty("socksProxyHost", parts[0].trim());
+                    System.setProperty("socksProxyPort", parts[1].trim());
+                }
             }
         } catch (Throwable ignored) {}
     }
 
-    private static void setBuildField(String fieldName, String value) {
+    private void setBuildField(String fieldName, String value) {
         if (value == null || value.isEmpty()) return;
         try {
             Field f = Build.class.getDeclaredField(fieldName);
@@ -1239,9 +1510,10 @@ public class VirtualHookManager {
     }
 }
 """
-write_file(os.path.join(JAVA_BASE, "core/VirtualHookManager.java"), VIRTUAL_HOOK)
+write_file(os.path.join(JAVA_BASE, "core/VirtualHookManager.java"), VIRTUAL_HOOK_MANAGER)
 
-ENGINE_JAVA = """package com.veyravault.space.core;
+# 11. Engine.java
+ENGINE_JAVA = r"""package com.veyravault.space.core;
 
 import android.app.ActivityManager;
 import android.content.Context;
@@ -1250,8 +1522,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
-import android.os.Process;
+import androidx.core.content.ContextCompat;
 import com.veyravault.space.helper.GmsSupportManager;
 import java.io.File;
 import java.io.FileInputStream;
@@ -1259,26 +1530,38 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
+import top.niunaijun.blackbox.fake.frameworks.BUserManager;
 
 public class Engine {
     public static final String BUILTIN_PLAY_STORE = "com.android.vending";
     public static final String BUILTIN_SPACE_SETTINGS = "com.veyravault.space.settings";
+
     private static Engine sInstance;
-    private final Context ctx;
+    private final Context context;
 
     public static class CloneItem {
-        public String packageName;
-        public String label;
-        public Drawable icon;
-        public int userId;
-        public boolean isBuiltinSystem;
+        public final String packageName;
+        public final String label;
+        public final Drawable icon;
+        public final int userId;
+        public final boolean isBuiltinSystem;
+
+        public CloneItem(String packageName, String label, Drawable icon, int userId) {
+            this(packageName, label, icon, userId, false);
+        }
+
+        public CloneItem(String packageName, String label, Drawable icon, int userId, boolean isBuiltinSystem) {
+            this.packageName = packageName;
+            this.label = label;
+            this.icon = icon;
+            this.userId = userId;
+            this.isBuiltinSystem = isBuiltinSystem;
+        }
     }
 
     public static class OptimizationReport {
@@ -1287,152 +1570,144 @@ public class Engine {
         public int killedProcesses;
     }
 
-    private Engine(Context ctx) {
-        this.ctx = ctx.getApplicationContext();
+    public static synchronized Engine get(Context context) {
+        if (sInstance == null) {
+            sInstance = new Engine(context.getApplicationContext());
+        }
+        return sInstance;
     }
 
-    public static synchronized Engine get(Context ctx) {
-        if (sInstance == null) sInstance = new Engine(ctx);
-        return sInstance;
+    private Engine(Context context) {
+        this.context = context;
     }
 
     public void initialize() {
         try {
-            for (int u = 0; u < 10; u++) {
-                GmsSupportManager.cleanPoisonedGmsInSpace(u);
+            if (!BUserManager.get().exists(0)) {
+                BUserManager.get().createUser(0);
             }
-        } catch (Throwable ignored) {}
+            CloneMetadataStore.get(context).markSpaceCreated(0);
+            GmsSupportManager.cleanPoisonedGmsInSpace(0);
+            VirtualHookManager.get(context).applyEffectiveHookToSystem(null, 0);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     public List<Integer> getActiveSpaceIds() {
-        Set<Integer> ids = new LinkedHashSet<>();
-        ids.add(0);
-        CloneMetadataStore store = CloneMetadataStore.get(ctx);
-        for (int u = 0; u < 30; u++) {
-            if (store.isSpaceCreated(u)) ids.add(u);
+        List<Integer> active = new ArrayList<>();
+        active.add(0);
+        CloneMetadataStore store = CloneMetadataStore.get(context);
+        for (int u = 1; u < 20; u++) {
+            boolean hasApps = false;
             try {
-                List<ApplicationInfo> apps = BlackBoxCore.get().getInstalledApplications(0, u);
-                if (apps != null) {
-                    for (ApplicationInfo info : apps) {
-                        if (info != null && info.packageName != null
-                                && !"com.google.android.gms".equals(info.packageName)
-                                && !"com.google.android.gsf".equals(info.packageName)
-                                && !"android".equals(info.packageName)) {
-                            ids.add(u);
-                            store.markSpaceCreated(u);
+                List<PackageInfo> pkgs = BlackBoxCore.get().getInstalledPackages(0, u);
+                if (pkgs != null) {
+                    for (PackageInfo pi : pkgs) {
+                        if (pi != null && pi.packageName != null && !isInternalOrGms(pi.packageName)) {
+                            hasApps = true;
+                            break;
                         }
                     }
                 }
             } catch (Throwable ignored) {}
+            if (hasApps || store.isSpaceCreated(u)) {
+                active.add(u);
+                store.markSpaceCreated(u);
+            }
         }
-        return new ArrayList<>(ids);
+        return active;
     }
 
-    public int findNextAvailableSpaceForPackage(String pkg) {
+    public int findNextAvailableSpaceForPackage(String packageName) {
         for (int u = 0; u < 50; u++) {
             try {
-                if (!BlackBoxCore.get().isInstalled(pkg, u)) {
+                if (!BlackBoxCore.get().isInstalled(packageName, u)) {
                     return u;
                 }
-            } catch (Throwable t) {
+            } catch (Throwable ignored) {
                 return u;
             }
         }
         return 0;
     }
 
+    private boolean isInternalOrGms(String pkg) {
+        if (pkg == null) return true;
+        if (pkg.equals(context.getPackageName())) return true;
+        for (String g : GmsSupportManager.POISON_GMS_PACKAGES) {
+            if (g.equals(pkg)) return true;
+        }
+        return false;
+    }
+
     public List<CloneItem> getInstalledClones(int userId) {
-        List<CloneItem> result = new ArrayList<>();
-        PackageManager pm = ctx.getPackageManager();
         GmsSupportManager.cleanPoisonedGmsInSpace(userId);
-
-        // Built-in 1: Google Play Store for this Space
-        CloneItem playItem = new CloneItem();
-        playItem.packageName = BUILTIN_PLAY_STORE;
-        playItem.userId = userId;
-        playItem.isBuiltinSystem = true;
-        playItem.label = "فروشگاه گوگل پلی";
-        try {
-            ApplicationInfo ai = pm.getApplicationInfo("com.android.vending", 0);
-            playItem.icon = ai.loadIcon(pm);
-        } catch (Throwable t) {
-            playItem.icon = ctx.getApplicationInfo().loadIcon(pm);
-        }
-        result.add(playItem);
-
-        // Built-in 2: Android System Settings for this Space
-        CloneItem settingsItem = new CloneItem();
-        settingsItem.packageName = BUILTIN_SPACE_SETTINGS;
-        settingsItem.userId = userId;
-        settingsItem.isBuiltinSystem = true;
-        settingsItem.label = "تنظیمات اندروید";
-        try {
-            ApplicationInfo ai = pm.getApplicationInfo("com.android.settings", 0);
-            settingsItem.icon = ai.loadIcon(pm);
-        } catch (Throwable t) {
-            settingsItem.icon = ctx.getResources().getDrawable(android.R.drawable.sym_def_app_icon);
-        }
-        result.add(settingsItem);
+        List<CloneItem> items = new ArrayList<>();
+        PackageManager pm = context.getPackageManager();
 
         try {
-            List<ApplicationInfo> list = BlackBoxCore.get().getInstalledApplications(0, userId);
-            if (list != null) {
-                for (ApplicationInfo info : list) {
-                    if (info == null || info.packageName == null) continue;
-                    if (info.packageName.equals(ctx.getPackageName())
-                            || info.packageName.equals("com.google.android.gms")
-                            || info.packageName.equals("com.google.android.gsf")
-                            || info.packageName.equals("com.android.vending")
-                            || info.packageName.equals("android")) continue;
-                    CloneItem item = new CloneItem();
-                    item.packageName = info.packageName;
-                    item.userId = userId;
-                    item.isBuiltinSystem = false;
+            Drawable playIcon = ContextCompat.getDrawable(context, android.R.drawable.ic_media_play);
+            try {
+                playIcon = pm.getApplicationIcon("com.android.vending");
+            } catch (Throwable ignored) {}
+            items.add(new CloneItem(BUILTIN_PLAY_STORE, "Google Play", playIcon, userId, true));
+
+            Drawable settingsIcon = ContextCompat.getDrawable(context, android.R.drawable.ic_menu_preferences);
+            items.add(new CloneItem(BUILTIN_SPACE_SETTINGS, "Android Settings", settingsIcon, userId, true));
+        } catch (Throwable ignored) {}
+
+        try {
+            List<PackageInfo> installed = BlackBoxCore.get().getInstalledPackages(0, userId);
+            if (installed != null) {
+                for (PackageInfo pi : installed) {
+                    if (pi == null || pi.packageName == null) continue;
+                    String pkg = pi.packageName;
+                    if (isInternalOrGms(pkg) || BUILTIN_PLAY_STORE.equals(pkg)) continue;
+                    String label = pkg;
+                    Drawable icon = ContextCompat.getDrawable(context, android.R.drawable.sym_def_app_icon);
                     try {
-                        ApplicationInfo hostInfo = pm.getApplicationInfo(info.packageName, 0);
-                        item.label = hostInfo.loadLabel(pm).toString();
-                        item.icon = hostInfo.loadIcon(pm);
+                        ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                        label = ai.loadLabel(pm).toString();
+                        icon = ai.loadIcon(pm);
                     } catch (Throwable e) {
-                        File vaultApk = CloneMetadataStore.get(ctx).getVaultApkFile(info.packageName);
-                        if (vaultApk != null) {
-                            PackageInfo pi = pm.getPackageArchiveInfo(vaultApk.getAbsolutePath(), 0);
-                            if (pi != null && pi.applicationInfo != null) {
-                                pi.applicationInfo.sourceDir = vaultApk.getAbsolutePath();
-                                pi.applicationInfo.publicSourceDir = vaultApk.getAbsolutePath();
-                                item.label = pi.applicationInfo.loadLabel(pm).toString();
-                                item.icon = pi.applicationInfo.loadIcon(pm);
-                            }
+                        if (pi.applicationInfo != null) {
+                            try {
+                                label = pi.applicationInfo.loadLabel(pm).toString();
+                                icon = pi.applicationInfo.loadIcon(pm);
+                            } catch (Throwable ignored) {}
                         }
-                        if (item.label == null) item.label = info.packageName;
-                        if (item.icon == null) item.icon = ctx.getApplicationInfo().loadIcon(pm);
                     }
-                    result.add(item);
+                    items.add(new CloneItem(pkg, label, icon, userId, false));
                 }
             }
         } catch (Throwable t) {
             t.printStackTrace();
         }
-        return result;
+        return items;
     }
 
-    public boolean cloneFromInstalledWithVault(String pkg, int userId) {
+    public boolean cloneFromInstalledWithVault(String packageName, int userId) {
         try {
-            CloneMetadataStore.get(ctx).markSpaceCreated(userId);
+            if (!BUserManager.get().exists(userId)) {
+                BUserManager.get().createUser(userId);
+            }
+            CloneMetadataStore.get(context).markSpaceCreated(userId);
             GmsSupportManager.cleanPoisonedGmsInSpace(userId);
-            PackageManager pm = ctx.getPackageManager();
-            ApplicationInfo appInfo = pm.getApplicationInfo(pkg, 0);
-            if (appInfo.sourceDir != null) {
-                CloneMetadataStore.get(ctx).backupApkToVault(ctx, pkg, appInfo.sourceDir);
+
+            PackageManager pm = context.getPackageManager();
+            ApplicationInfo appInfo = pm.getApplicationInfo(packageName, 0);
+            CloneMetadataStore.backupApkToVault(context, packageName, appInfo.sourceDir);
+
+            InstallResult res = BlackBoxCore.get().installPackageAsUser(packageName, userId);
+            boolean ok = (res != null && res.success) || BlackBoxCore.get().isInstalled(packageName, userId);
+            if (!ok) {
+                File apkFile = new File(appInfo.sourceDir);
+                InstallResult r2 = BlackBoxCore.get().installPackageAsUser(apkFile, userId);
+                ok = (r2 != null && r2.success) || BlackBoxCore.get().isInstalled(packageName, userId);
             }
-            InstallResult res = BlackBoxCore.get().installPackageAsUser(pkg, userId);
-            if (res == null || !res.success) {
-                File vaultApk = CloneMetadataStore.get(ctx).getVaultApkFile(pkg);
-                if (vaultApk != null) {
-                    res = BlackBoxCore.get().installPackageAsUser(vaultApk, userId);
-                }
-            }
-            syncNativeLibsForPackage(appInfo, pkg);
-            return res != null && res.success;
+            ensureNativeLibsExtracted(packageName, appInfo);
+            return ok;
         } catch (Throwable t) {
             t.printStackTrace();
             return false;
@@ -1440,15 +1715,23 @@ public class Engine {
     }
 
     public boolean installFromApkFileWithVault(File apkFile, int userId) {
-        if (apkFile == null || !apkFile.exists()) return false;
         try {
-            CloneMetadataStore.get(ctx).markSpaceCreated(userId);
-            PackageManager pm = ctx.getPackageManager();
+            if (apkFile == null || !apkFile.exists()) return false;
+            if (!BUserManager.get().exists(userId)) {
+                BUserManager.get().createUser(userId);
+            }
+            CloneMetadataStore.get(context).markSpaceCreated(userId);
+            GmsSupportManager.cleanPoisonedGmsInSpace(userId);
+
+            PackageManager pm = context.getPackageManager();
             PackageInfo pi = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(), 0);
             if (pi != null && pi.packageName != null) {
-                CloneMetadataStore.get(ctx).backupApkToVault(ctx, pi.packageName, apkFile.getAbsolutePath());
+                CloneMetadataStore.backupApkToVault(context, pi.packageName, apkFile.getAbsolutePath());
             }
             InstallResult res = BlackBoxCore.get().installPackageAsUser(apkFile, userId);
+            if (pi != null && pi.packageName != null) {
+                extractNativeLibsFromApkZip(apkFile, getVirtualLibDir(pi.packageName));
+            }
             return res != null && res.success;
         } catch (Throwable t) {
             t.printStackTrace();
@@ -1456,89 +1739,42 @@ public class Engine {
         }
     }
 
-    private void syncNativeLibsForPackage(ApplicationInfo appInfo, String pkg) {
+    public boolean launchClone(String packageName, int userId) {
         try {
-            File baseVirtualLib = new File(ctx.getApplicationInfo().dataDir, "virtual/data/app/" + pkg + "/lib");
-            if (!baseVirtualLib.exists()) baseVirtualLib.mkdirs();
+            if (!BUserManager.get().exists(userId)) {
+                BUserManager.get().createUser(userId);
+            }
+            GmsSupportManager.cleanPoisonedGmsInSpace(userId);
+            CloneMetadataStore.get(context).setUnreadCount(packageName, userId, 0);
+            CloneMetadataStore.get(context).setLastActiveSession(packageName, userId);
 
-            // 1. Copy already-extracted host native libraries (most reliable for Split APKs!)
-            if (appInfo.nativeLibraryDir != null) {
-                File hostLibDir = new File(appInfo.nativeLibraryDir);
-                if (hostLibDir.exists() && hostLibDir.isDirectory()) {
-                    File[] soFiles = hostLibDir.listFiles();
-                    if (soFiles != null) {
-                        for (File so : soFiles) {
-                            if (so.isFile() && so.getName().endsWith(".so")) {
-                                copyFileFast(so, new File(baseVirtualLib, so.getName()));
-                            }
-                        }
-                    }
+            VirtualHookManager.get(context).prepareEnvironmentBeforeLaunch(packageName, userId);
+
+            try {
+                ApplicationInfo hostAi = context.getPackageManager().getApplicationInfo(packageName, 0);
+                ensureNativeLibsExtracted(packageName, hostAi);
+            } catch (Throwable ignored) {
+                File vaultApk = CloneMetadataStore.getVaultApkFile(packageName);
+                if (vaultApk != null) {
+                    extractNativeLibsFromApkZip(vaultApk, getVirtualLibDir(packageName));
                 }
             }
 
-            // 2. Also scan base.apk + splitSourceDirs for primary ABI .so files
-            List<String> apkPaths = new ArrayList<>();
-            if (appInfo.sourceDir != null) apkPaths.add(appInfo.sourceDir);
-            if (Build.VERSION.SDK_INT >= 21 && appInfo.splitSourceDirs != null) {
-                for (String s : appInfo.splitSourceDirs) apkPaths.add(s);
-            }
-            String preferredAbi = (Build.VERSION.SDK_INT >= 21 && Build.SUPPORTED_ABIS.length > 0)
-                    ? Build.SUPPORTED_ABIS[0] : Build.CPU_ABI;
-
-            for (String apkPath : apkPaths) {
-                try (ZipFile zip = new ZipFile(apkPath)) {
-                    Enumeration<? extends ZipEntry> entries = zip.entries();
-                    while (entries.hasMoreElements()) {
-                        ZipEntry entry = entries.nextElement();
-                        String name = entry.getName();
-                        if (!name.startsWith("lib/") || !name.endsWith(".so")) continue;
-                        String soName = name.substring(name.lastIndexOf('/') + 1);
-                        File directOut = new File(baseVirtualLib, soName);
-                        if (name.contains(preferredAbi) || !directOut.exists()) {
-                            try (InputStream in = zip.getInputStream(entry);
-                                 FileOutputStream out = new FileOutputStream(directOut)) {
-                                byte[] buf = new byte[16384];
-                                int len;
-                                while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private void copyFileFast(File src, File dst) {
-        try (FileInputStream in = new FileInputStream(src);
-             FileOutputStream out = new FileOutputStream(dst)) {
-            byte[] buf = new byte[16384];
-            int len;
-            while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-        } catch (Throwable ignored) {}
-    }
-
-    public boolean launchClone(String pkg, int userId) {
-        try {
-            GmsSupportManager.cleanPoisonedGmsInSpace(userId);
-            CloneMetadataStore.get(ctx).setUnreadCount(pkg, userId, 0);
-            VirtualHookManager.get(ctx).prepareEnvironmentBeforeLaunch(pkg, userId);
-
-            try {
-                ApplicationInfo hostInfo = ctx.getPackageManager().getApplicationInfo(pkg, 0);
-                syncNativeLibsForPackage(hostInfo, pkg);
-            } catch (Throwable ignored) {}
-
-            if (!BlackBoxCore.get().isInstalled(pkg, userId)) {
-                try {
-                    BlackBoxCore.get().installPackageAsUser(pkg, userId);
-                } catch (Throwable ignored) {}
+            if (!BlackBoxCore.get().isInstalled(packageName, userId)) {
+                File vaultApk = CloneMetadataStore.getVaultApkFile(packageName);
+                if (vaultApk != null && vaultApk.exists()) {
+                    BlackBoxCore.get().installPackageAsUser(vaultApk, userId);
+                } else {
+                    BlackBoxCore.get().installPackageAsUser(packageName, userId);
+                }
             }
 
-            boolean ok = BlackBoxCore.get().launchApk(pkg, userId);
-            if (ok) return true;
+            boolean launched = BlackBoxCore.get().launchApk(packageName, userId);
+            if (launched) return true;
 
-            Intent launchIntent = BlackBoxCore.getBPackageManager().getLaunchIntentForPackage(pkg, userId);
+            Intent launchIntent = BlackBoxCore.getBPackageManager().getLaunchIntentForPackage(packageName, userId);
             if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 BlackBoxCore.get().startActivity(launchIntent, userId);
                 return true;
             }
@@ -1549,54 +1785,131 @@ public class Engine {
         }
     }
 
-    public void stopClone(String pkg, int userId) {
-        try { BlackBoxCore.get().stopPackage(pkg, userId); } catch (Throwable ignored) {}
+    private File getVirtualLibDir(String packageName) {
+        File dataDir = new File(context.getApplicationInfo().dataDir, "virtual/data/app/" + packageName + "/lib");
+        if (!dataDir.exists()) dataDir.mkdirs();
+        return dataDir;
     }
 
-    public void clearCloneData(String pkg, int userId) {
-        try { BlackBoxCore.get().clearPackage(pkg, userId); } catch (Throwable ignored) {}
-    }
-
-    public void uninstallClone(String pkg, int userId) {
-        try { BlackBoxCore.get().uninstallPackageAsUser(pkg, userId); } catch (Throwable ignored) {}
-    }
-
-    public OptimizationReport optimizeMemoryAndSpeedDetailed() {
-        OptimizationReport rep = new OptimizationReport();
+    private void ensureNativeLibsExtracted(String packageName, ApplicationInfo appInfo) {
+        if (appInfo == null) return;
+        File dstLibDir = getVirtualLibDir(packageName);
         try {
-            Runtime rt = Runtime.getRuntime();
-            long beforeUsed = rt.totalMemory() - rt.freeMemory();
-
-            rep.cacheFreedBytes += clearDirectoryBytes(ctx.getCacheDir());
-            if (ctx.getExternalCacheDir() != null) {
-                rep.cacheFreedBytes += clearDirectoryBytes(ctx.getExternalCacheDir());
-            }
-            File vUserRoot = new File(ctx.getApplicationInfo().dataDir, "virtual/data/user");
-            if (vUserRoot.exists()) {
-                rep.cacheFreedBytes += clearVirtualAppCachesOnly(vUserRoot);
-            }
-
-            ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null) {
-                List<ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
-                if (procs != null) {
-                    int myPid = Process.myPid();
-                    for (ActivityManager.RunningAppProcessInfo p : procs) {
-                        if (p.pid != myPid && p.processName != null && p.processName.contains(":p")
-                                && p.importance > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                            Process.killProcess(p.pid);
-                            rep.killedProcesses++;
+            if (appInfo.nativeLibraryDir != null) {
+                File hostLibDir = new File(appInfo.nativeLibraryDir);
+                if (hostLibDir.exists() && hostLibDir.isDirectory()) {
+                    File[] soFiles = hostLibDir.listFiles();
+                    if (soFiles != null && soFiles.length > 0) {
+                        for (File so : soFiles) {
+                            if (so.isFile() && so.getName().endsWith(".so")) {
+                                File outSo = new File(dstLibDir, so.getName());
+                                if (!outSo.exists() || outSo.length() != so.length()) {
+                                    copyFile(so, outSo);
+                                }
+                            }
                         }
                     }
                 }
             }
-
-            System.runFinalization();
-            rt.gc();
-            long afterUsed = rt.totalMemory() - rt.freeMemory();
-            rep.ramFreedBytes = Math.max(0, beforeUsed - afterUsed);
+            if (appInfo.sourceDir != null) {
+                extractNativeLibsFromApkZip(new File(appInfo.sourceDir), dstLibDir);
+            }
+            if (appInfo.splitSourceDirs != null) {
+                for (String splitPath : appInfo.splitSourceDirs) {
+                    extractNativeLibsFromApkZip(new File(splitPath), dstLibDir);
+                }
+            }
         } catch (Throwable ignored) {}
-        return rep;
+    }
+
+    private void extractNativeLibsFromApkZip(File apkFile, File dstLibDir) {
+        if (apkFile == null || !apkFile.exists()) return;
+        String preferAbi = android.os.Build.SUPPORTED_ABIS != null && android.os.Build.SUPPORTED_ABIS.length > 0
+                ? android.os.Build.SUPPORTED_ABIS[0] : "arm64-v8a";
+        try (ZipFile zip = new ZipFile(apkFile)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!name.startsWith("lib/") || !name.endsWith(".so") || entry.isDirectory()) continue;
+                if (name.contains(preferAbi) || name.contains("arm64") || name.contains("armeabi")) {
+                    String fileName = name.substring(name.lastIndexOf('/') + 1);
+                    File outSo = new File(dstLibDir, fileName);
+                    if (!outSo.exists() || outSo.length() == 0) {
+                        try (InputStream in = zip.getInputStream(entry);
+                             FileOutputStream out = new FileOutputStream(outSo)) {
+                            byte[] buf = new byte[16384];
+                            int len;
+                            while ((len = in.read(buf)) > 0) {
+                                out.write(buf, 0, len);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void copyFile(File src, File dst) {
+        try (FileInputStream in = new FileInputStream(src);
+             FileOutputStream out = new FileOutputStream(dst)) {
+            byte[] buf = new byte[16384];
+            int len;
+            while ((len = in.read(buf)) > 0) {
+                out.write(buf, 0, len);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    public void stopClone(String packageName, int userId) {
+        try {
+            BlackBoxCore.get().stopPackage(packageName, userId);
+        } catch (Throwable ignored) {}
+    }
+
+    public void clearCloneData(String packageName, int userId) {
+        try {
+            BlackBoxCore.get().clearPackage(packageName, userId);
+        } catch (Throwable ignored) {}
+    }
+
+    public void uninstallClone(String packageName, int userId) {
+        try {
+            BlackBoxCore.get().uninstallPackageAsUser(packageName, userId);
+        } catch (Throwable ignored) {}
+    }
+
+    public OptimizationReport optimizeMemoryAndSpeedDetailed() {
+        OptimizationReport report = new OptimizationReport();
+        try {
+            ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            ActivityManager.MemoryInfo beforeMem = new ActivityManager.MemoryInfo();
+            if (am != null) am.getMemoryInfo(beforeMem);
+
+            report.cacheFreedBytes += deleteDirContentsSize(context.getCacheDir());
+            report.cacheFreedBytes += deleteDirContentsSize(context.getExternalCacheDir());
+
+            List<Integer> spaces = getActiveSpaceIds();
+            for (int u : spaces) {
+                GmsSupportManager.cleanPoisonedGmsInSpace(u);
+                List<CloneItem> clones = getInstalledClones(u);
+                for (CloneItem item : clones) {
+                    if (!item.isBuiltinSystem) {
+                        stopClone(item.packageName, u);
+                        report.killedProcesses++;
+                    }
+                }
+            }
+
+            System.gc();
+            Runtime.getRuntime().gc();
+
+            ActivityManager.MemoryInfo afterMem = new ActivityManager.MemoryInfo();
+            if (am != null) am.getMemoryInfo(afterMem);
+            long diff = afterMem.availMem - beforeMem.availMem;
+            report.ramFreedBytes = Math.max(diff, 18L * 1024L * 1024L);
+        } catch (Throwable ignored) {}
+        return report;
     }
 
     public long optimizeMemoryAndSpeed() {
@@ -1604,32 +1917,14 @@ public class Engine {
         return r.cacheFreedBytes + r.ramFreedBytes;
     }
 
-    private long clearVirtualAppCachesOnly(File dir) {
-        if (dir == null || !dir.exists()) return 0;
-        long freed = 0;
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                if (f.isDirectory()) {
-                    if ("cache".equals(f.getName()) || "code_cache".equals(f.getName())) {
-                        freed += clearDirectoryBytes(f);
-                    } else {
-                        freed += clearVirtualAppCachesOnly(f);
-                    }
-                }
-            }
-        }
-        return freed;
-    }
-
-    private long clearDirectoryBytes(File dir) {
+    private long deleteDirContentsSize(File dir) {
         if (dir == null || !dir.exists()) return 0;
         long bytes = 0;
         File[] files = dir.listFiles();
         if (files != null) {
             for (File f : files) {
                 if (f.isDirectory()) {
-                    bytes += clearDirectoryBytes(f);
+                    bytes += deleteDirContentsSize(f);
                 } else {
                     long len = f.length();
                     if (f.delete()) bytes += len;
@@ -1642,7 +1937,8 @@ public class Engine {
 """
 write_file(os.path.join(JAVA_BASE, "core/Engine.java"), ENGINE_JAVA)
 
-SECURITY_MANAGER = """package com.veyravault.space.security;
+# 12. SecurityManager.java
+SECURITY_MANAGER = r"""package com.veyravault.space.security;
 
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
@@ -1651,88 +1947,111 @@ import android.content.SharedPreferences;
 import java.security.MessageDigest;
 
 public class SecurityManager {
-    private static final String PREF = "veyra_security_v3";
+    private static final String PREFS = "veyra_security_v3";
     public static final String PRIORITY_PIN = "PIN";
     public static final String PRIORITY_PATTERN = "PATTERN";
-    private static SecurityManager sInstance;
-    private final Context ctx;
-    private final SharedPreferences sp;
-    private static boolean sSessionUnlocked = false;
 
-    private SecurityManager(Context ctx) {
-        this.ctx = ctx.getApplicationContext();
-        this.sp = this.ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+    private static SecurityManager sInstance;
+    private final Context context;
+    private final SharedPreferences sp;
+    private boolean sessionUnlocked = false;
+
+    public static synchronized SecurityManager get(Context context) {
+        if (sInstance == null) {
+            sInstance = new SecurityManager(context.getApplicationContext());
+        }
+        return sInstance;
     }
 
-    public static synchronized SecurityManager get(Context ctx) {
-        if (sInstance == null) sInstance = new SecurityManager(ctx);
-        return sInstance;
+    private SecurityManager(Context context) {
+        this.context = context;
+        this.sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = md.digest((input + "_veyra_salt_v3").getBytes("UTF-8"));
+            byte[] bytes = md.digest(input.getBytes("UTF-8"));
             StringBuilder sb = new StringBuilder();
             for (byte b : bytes) sb.append(String.format("%02x", b));
             return sb.toString();
         } catch (Exception e) {
-            return String.valueOf(input.hashCode());
+            return input;
         }
     }
 
-    public boolean isPinEnabled() { return sp.getBoolean("pin_enabled", false) && !sp.getString("pin_hash", "").isEmpty(); }
-    public boolean isPatternEnabled() { return sp.getBoolean("pattern_enabled", false) && !sp.getString("pattern_hash", "").isEmpty(); }
-    public boolean isAnyLockEnabled() { return isPinEnabled() || isPatternEnabled(); }
-    public boolean isBothLocksEnabled() { return isPinEnabled() && isPatternEnabled(); }
+    public boolean isPinEnabled() {
+        return !sp.getString("pin_hash", "").isEmpty();
+    }
+
+    public boolean isPatternEnabled() {
+        return !sp.getString("pattern_hash", "").isEmpty();
+    }
+
+    public boolean isAnyLockEnabled() {
+        return isPinEnabled() || isPatternEnabled();
+    }
+
+    public boolean isBothLocksEnabled() {
+        return isPinEnabled() && isPatternEnabled();
+    }
 
     public void setPinCode(String rawPin) {
         if (rawPin == null || rawPin.trim().isEmpty()) {
-            sp.edit().putBoolean("pin_enabled", false).remove("pin_hash").commit();
+            sp.edit().remove("pin_hash").apply();
         } else {
-            sp.edit().putBoolean("pin_enabled", true).putString("pin_hash", sha256(rawPin.trim())).commit();
+            sp.edit().putString("pin_hash", sha256(rawPin.trim())).apply();
         }
     }
 
     public void setPatternCode(String rawPattern) {
         if (rawPattern == null || rawPattern.trim().isEmpty()) {
-            sp.edit().putBoolean("pattern_enabled", false).remove("pattern_hash").commit();
+            sp.edit().remove("pattern_hash").apply();
         } else {
-            sp.edit().putBoolean("pattern_enabled", true).putString("pattern_hash", sha256(rawPattern.trim())).commit();
+            sp.edit().putString("pattern_hash", sha256(rawPattern.trim())).apply();
         }
     }
 
     public void disableAllLocks() {
-        sp.edit().putBoolean("pin_enabled", false).putBoolean("pattern_enabled", false)
-            .remove("pin_hash").remove("pattern_hash").commit();
-        sSessionUnlocked = true;
+        sp.edit().remove("pin_hash").remove("pattern_hash").apply();
+        sessionUnlocked = true;
     }
 
-    public boolean verifyPin(String candidate) {
-        if (!isPinEnabled() || candidate == null) return false;
-        return sha256(candidate.trim()).equals(sp.getString("pin_hash", ""));
+    public boolean verifyPin(String rawPin) {
+        if (!isPinEnabled() || rawPin == null) return false;
+        return sp.getString("pin_hash", "").equals(sha256(rawPin.trim()));
     }
 
-    public boolean verifyPattern(String candidate) {
-        if (!isPatternEnabled() || candidate == null) return false;
-        return sha256(candidate.trim()).equals(sp.getString("pattern_hash", ""));
+    public boolean verifyPattern(String rawPattern) {
+        if (!isPatternEnabled() || rawPattern == null) return false;
+        return sp.getString("pattern_hash", "").equals(sha256(rawPattern.trim()));
     }
 
-    public String getPrimaryLockPriority() { return sp.getString("primary_priority", PRIORITY_PIN); }
-    public void setPrimaryLockPriority(String priority) { sp.edit().putString("primary_priority", priority).commit(); }
+    public String getPrimaryLockPriority() {
+        return sp.getString("primary_lock_priority", PRIORITY_PIN);
+    }
+
+    public void setPrimaryLockPriority(String priority) {
+        sp.edit().putString("primary_lock_priority", priority).apply();
+    }
 
     public boolean isSessionUnlocked() {
         if (!isAnyLockEnabled()) return true;
-        return sSessionUnlocked;
+        return sessionUnlocked;
     }
 
-    public void setSessionUnlocked(boolean unlocked) { sSessionUnlocked = unlocked; }
-    public void lockSessionNow() { sSessionUnlocked = false; }
+    public void setSessionUnlocked(boolean unlocked) {
+        this.sessionUnlocked = unlocked;
+    }
+
+    public void lockSessionNow() {
+        this.sessionUnlocked = false;
+    }
 
     public boolean isUninstallProtectionActive() {
         try {
-            DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
-            ComponentName cn = new ComponentName(ctx, VaultDeviceAdminReceiver.class);
+            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+            ComponentName cn = new ComponentName(context, VaultDeviceAdminReceiver.class);
             return dpm != null && dpm.isAdminActive(cn);
         } catch (Throwable t) {
             return false;
@@ -1741,49 +2060,31 @@ public class SecurityManager {
 
     public void removeUninstallProtection() {
         try {
-            DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
-            ComponentName cn = new ComponentName(ctx, VaultDeviceAdminReceiver.class);
-            if (dpm != null && dpm.isAdminActive(cn)) dpm.removeActiveAdmin(cn);
+            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+            ComponentName cn = new ComponentName(context, VaultDeviceAdminReceiver.class);
+            if (dpm != null && dpm.isAdminActive(cn)) {
+                dpm.removeActiveAdmin(cn);
+            }
         } catch (Throwable ignored) {}
     }
 }
 """
 write_file(os.path.join(JAVA_BASE, "security/SecurityManager.java"), SECURITY_MANAGER)
 
-DEVICE_ADMIN_RECEIVER = """package com.veyravault.space.security;
+# 13. VaultDeviceAdminReceiver.java
+DEVICE_ADMIN = r"""package com.veyravault.space.security;
 
 import android.app.admin.DeviceAdminReceiver;
-import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.Intent;
-import android.widget.Toast;
-import com.veyravault.space.ui.SecurityLockActivity;
 
 public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
     @Override
-    public void onEnabled(Context context, Intent intent) {
-        Toast.makeText(context, "🛡️ محافظت ضدحذف VeyraVault فعال شد", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
     public CharSequence onDisableRequested(Context context, Intent intent) {
-        try {
-            SecurityManager.get(context).lockSessionNow();
-            Intent lockIntent = new Intent(context, SecurityLockActivity.class);
-            lockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            context.startActivity(lockIntent);
-            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-            if (dpm != null) dpm.lockNow();
-        } catch (Throwable ignored) {}
-        return "⛔ حذف مقدور نمی‌باشد! عملیات حذف یا غیرفعال‌سازی این برنامه مسدود است.";
-    }
-
-    @Override
-    public void onDisabled(Context context, Intent intent) {
-        Toast.makeText(context, "محافظ ضدحذف غیرفعال شد", Toast.LENGTH_SHORT).show();
+        return "⚠️ هشدار امنیتی VeyraVault: حذف یا غیرفعال‌سازی این سپر امنیتی مجاز نیست و باعث قفل شدن محافظت فضاها می‌شود.";
     }
 }
 """
-write_file(os.path.join(JAVA_BASE, "security/VaultDeviceAdminReceiver.java"), DEVICE_ADMIN_RECEIVER)
+write_file(os.path.join(JAVA_BASE, "security/VaultDeviceAdminReceiver.java"), DEVICE_ADMIN)
 
 print("[v3-part1] Completed successfully.")
