@@ -121,6 +121,806 @@ public class VirtualHookManager {
 """
 write_file(os.path.join(JAVA_BASE, "core/VirtualHookManager.java"), VIRTUAL_HOOK_MANAGER_SAFE)
 
+# 8. CloneMetadataStore.java (3-tier identity, brand dedupe, VPN clusters, free VPN presets)
+CLONE_METADATA_STORE = r"""package com.veyravault.space.core;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+public class CloneMetadataStore {
+    private static final String PREFS = "veyra_clone_meta_v3";
+    private static CloneMetadataStore sInstance;
+    private final SharedPreferences sp;
+
+    public static final String SAFE_DEFAULT_BRAND = "Apple";
+    public static final String SAFE_DEFAULT_MODEL = "iPhone 16 Pro Max";
+    public static final String SAFE_DEFAULT_MANUFACTURER = "Apple Inc.";
+    public static final String SAFE_DEFAULT_PRODUCT = "iPhone17,2";
+    public static final String SAFE_DEFAULT_HARDWARE = "A18Pro";
+    public static final String SAFE_DEFAULT_REGION = "New York, United States";
+    public static final String SAFE_DEFAULT_TZ = "America/New_York";
+    public static final double SAFE_DEFAULT_LAT = 40.7128;
+    public static final double SAFE_DEFAULT_LON = -74.0060;
+    public static final String SAFE_DEFAULT_SIM_OP = "T-Mobile USA";
+    public static final String SAFE_DEFAULT_SIM_NUM = "310260";
+    public static final String SAFE_DEFAULT_SIM_ISO = "us";
+    public static final String SAFE_DEFAULT_SIM_PHONE = "+12125550147";
+
+    public static synchronized CloneMetadataStore get(Context context) {
+        if (sInstance == null) {
+            sInstance = new CloneMetadataStore(context.getApplicationContext());
+        }
+        return sInstance;
+    }
+
+    private CloneMetadataStore(Context context) {
+        this.sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        ensureInitialDefaults();
+    }
+
+    private void ensureInitialDefaults() {
+        if (!sp.contains("global_initialized_v3")) {
+            sp.edit()
+              .putBoolean("global_initialized_v3", true)
+              .putString("global_brand", SAFE_DEFAULT_BRAND)
+              .putString("global_model", SAFE_DEFAULT_MODEL)
+              .putString("global_manufacturer", SAFE_DEFAULT_MANUFACTURER)
+              .putString("global_product", SAFE_DEFAULT_PRODUCT)
+              .putString("global_hardware", SAFE_DEFAULT_HARDWARE)
+              .putBoolean("global_loc_enabled", true)
+              .putString("global_lat", String.valueOf(SAFE_DEFAULT_LAT))
+              .putString("global_lon", String.valueOf(SAFE_DEFAULT_LON))
+              .putString("global_region_label", SAFE_DEFAULT_REGION)
+              .putString("global_tz", SAFE_DEFAULT_TZ)
+              .putString("global_proxy", "127.0.0.1:10808")
+              .putString("global_sim_op", SAFE_DEFAULT_SIM_OP)
+              .putString("global_sim_num", SAFE_DEFAULT_SIM_NUM)
+              .putString("global_sim_iso", SAFE_DEFAULT_SIM_ISO)
+              .putString("global_sim_phone", SAFE_DEFAULT_SIM_PHONE)
+              .putBoolean("space_created_0", true)
+              .putBoolean("vpn_cluster_autorotate", true)
+              .apply();
+        }
+        if (!sp.contains("vpn_profiles_json_v32")) {
+            seedDefaultVpnProfiles();
+        }
+    }
+
+    public static String cleanModelOnly(String brand, String model) {
+        String b = (brand == null) ? "" : brand.trim();
+        String m = (model == null) ? "" : model.trim();
+        if (m.isEmpty()) return SAFE_DEFAULT_MODEL;
+        if (!b.isEmpty()) {
+            while (m.toLowerCase().startsWith(b.toLowerCase() + " ") || m.toLowerCase().startsWith(b.toLowerCase() + "-")) {
+                m = m.substring(b.length()).trim();
+                if (m.startsWith("-") || m.startsWith("—")) m = m.substring(1).trim();
+            }
+        }
+        String[][] synonyms = {
+            {"Samsung", "سامسونگ"},
+            {"Apple", "اپل"},
+            {"Xiaomi", "شیائومی"},
+            {"Google", "گوگل"},
+            {"OnePlus", "وان‌پلاس"},
+            {"OnePlus", "وان پلاس"}
+        };
+        for (String[] pair : synonyms) {
+            if (b.equalsIgnoreCase(pair[0]) || b.equalsIgnoreCase(pair[1])) {
+                for (String syn : pair) {
+                    if (m.toLowerCase().startsWith(syn.toLowerCase() + " ")) {
+                        m = m.substring(syn.length()).trim();
+                    }
+                }
+            }
+        }
+        String[] words = m.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        String prev = "";
+        for (String w : words) {
+            if (!w.equalsIgnoreCase(prev)) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(w);
+                prev = w;
+            }
+        }
+        String cleaned = sb.toString().trim();
+        return cleaned.isEmpty() ? m : cleaned;
+    }
+
+    public static String formatBrandModel(String brand, String model) {
+        String b = (brand == null || brand.trim().isEmpty()) ? SAFE_DEFAULT_BRAND : brand.trim();
+        String m = cleanModelOnly(b, model);
+        if (m.toLowerCase().startsWith(b.toLowerCase())) {
+            return m;
+        }
+        return b + " " + m;
+    }
+
+    public static class CloneMeta {
+        public String packageName;
+        public int userId;
+        public String customAlias = "";
+        public boolean hasExclusiveDevice = false;
+        public String deviceBrand = "";
+        public String deviceModel = "";
+        public String deviceManufacturer = "";
+        public String deviceProduct = "";
+        public String deviceHardware = "";
+        public boolean hasExclusiveLocation = false;
+        public double latitude = SAFE_DEFAULT_LAT;
+        public double longitude = SAFE_DEFAULT_LON;
+        public String regionLabel = SAFE_DEFAULT_REGION;
+        public String timezoneId = SAFE_DEFAULT_TZ;
+        public String proxyAddress = "";
+        public boolean hasExclusiveSim = false;
+        public String simOperatorName = SAFE_DEFAULT_SIM_OP;
+        public String simOperatorNumeric = SAFE_DEFAULT_SIM_NUM;
+        public String simCountryIso = SAFE_DEFAULT_SIM_ISO;
+        public String simPhoneNumber = SAFE_DEFAULT_SIM_PHONE;
+    }
+
+    public static class EffectiveIdentity {
+        public int devicePriorityTier = 3;
+        public int locationPriorityTier = 3;
+        public int simPriorityTier = 3;
+        public String targetPackage = "";
+        public int targetUserId = 0;
+        public String brand = SAFE_DEFAULT_BRAND;
+        public String model = SAFE_DEFAULT_MODEL;
+        public String displayBrandModel = SAFE_DEFAULT_BRAND + " " + SAFE_DEFAULT_MODEL;
+        public String manufacturer = SAFE_DEFAULT_MANUFACTURER;
+        public String product = SAFE_DEFAULT_PRODUCT;
+        public String hardware = SAFE_DEFAULT_HARDWARE;
+        public double latitude = SAFE_DEFAULT_LAT;
+        public double longitude = SAFE_DEFAULT_LON;
+        public String regionLabel = SAFE_DEFAULT_REGION;
+        public String timezoneId = SAFE_DEFAULT_TZ;
+        public String proxyAddress = "127.0.0.1:10808";
+        public String simOperatorName = SAFE_DEFAULT_SIM_OP;
+        public String simOperatorNumeric = SAFE_DEFAULT_SIM_NUM;
+        public String simCountryIso = SAFE_DEFAULT_SIM_ISO;
+        public String simPhoneNumber = SAFE_DEFAULT_SIM_PHONE;
+    }
+
+    public static class DevicePreset {
+        public final String brand;
+        public final String model;
+        public final String manufacturer;
+        public final String product;
+        public final String hardware;
+
+        public DevicePreset(String brand, String model, String manufacturer, String product, String hardware) {
+            this.brand = brand;
+            this.model = model;
+            this.manufacturer = manufacturer;
+            this.product = product;
+            this.hardware = hardware;
+        }
+    }
+
+    public static final DevicePreset[] PRESETS = new DevicePreset[]{
+        new DevicePreset("Apple", "iPhone 16 Pro Max", "Apple Inc.", "iPhone17,2", "A18Pro"),
+        new DevicePreset("Apple", "iPhone 15 Pro", "Apple Inc.", "iPhone16,1", "A17Pro"),
+        new DevicePreset("Samsung", "Galaxy S24 Ultra (SM-S928B)", "Samsung", "e3qxxx", "qcom"),
+        new DevicePreset("Google", "Pixel 9 Pro XL", "Google", "komodo", "tensor"),
+        new DevicePreset("Xiaomi", "14 Ultra", "Xiaomi", "aurora", "qcom"),
+        new DevicePreset("OnePlus", "12 (CPH2581)", "OnePlus", "OP5929L1", "qcom")
+    };
+
+    public static class VpnProfile {
+        public String id;
+        public String category = "🇺🇸 US - New York Cluster";
+        public int nodeIndex = 1;
+        public String title;
+        public String country;
+        public String stateOrCity;
+        public String protocol;
+        public String host;
+        public int port;
+        public String username = "";
+        public String password = "";
+        public String timezoneId;
+        public double lat;
+        public double lon;
+        public String simOperator;
+        public String simMccMnc;
+        public String simIso;
+        public int targetSpaceId = -1;
+        public boolean isBuiltInFree = true;
+    }
+
+    private static VpnProfile createNode(String id, String cat, int nodeIdx, String title, String country,
+                                         String city, String proto, String host, int port, String tz,
+                                         double lat, double lon, String simOp, String mccMnc, String iso) {
+        VpnProfile p = new VpnProfile();
+        p.id = id;
+        p.category = cat;
+        p.nodeIndex = nodeIdx;
+        p.title = title;
+        p.country = country;
+        p.stateOrCity = city;
+        p.protocol = proto;
+        p.host = host;
+        p.port = port;
+        p.timezoneId = tz;
+        p.lat = lat;
+        p.lon = lon;
+        p.simOperator = simOp;
+        p.simMccMnc = mccMnc;
+        p.simIso = iso;
+        p.isBuiltInFree = true;
+        return p;
+    }
+
+    public static final VpnProfile[] FREE_VPN_PRESETS = new VpnProfile[]{
+        createNode("free_us_ny_1", "🇺🇸 US - New York Cluster", 1, "🇺🇸 Free US New York #1 (v2rayNG Local)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_2", "🇺🇸 US - New York Cluster", 2, "🇺🇸 Free US New York #2 (Cloudflare WARP Local)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 40000, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_3", "🇺🇸 US - New York Cluster", 3, "🇺🇸 Free US New York #3 (NekoBox / Sing-Box)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 2080, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_ny_4", "🇺🇸 US - New York Cluster", 4, "🇺🇸 Free US New York #4 (Orbot / Tor)", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 9050, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"),
+        createNode("free_us_la_1", "🇺🇸 US - California Cluster", 1, "🇺🇸 Free US Los Angeles #1", "United States", "Los Angeles, United States", "SOCKS5", "127.0.0.1", 10808, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"),
+        createNode("free_us_la_2", "🇺🇸 US - California Cluster", 2, "🇺🇸 Free US Los Angeles #2 (HTTP)", "United States", "Los Angeles, United States", "HTTP", "127.0.0.1", 10809, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"),
+        createNode("free_us_va_1", "🇺🇸 US - Virginia Ashburn Cluster", 1, "🇺🇸 Free US Ashburn Virginia #1", "United States", "Ashburn, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 39.0438, -77.4874, "Verizon Wireless", "311480", "us"),
+        createNode("free_de_fk_1", "🇩🇪 Germany - Falkenstein Cluster", 1, "🇩🇪 Free Germany Falkenstein #1", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", 10808, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"),
+        createNode("free_de_fk_2", "🇩🇪 Germany - Falkenstein Cluster", 2, "🇩🇪 Free Germany Falkenstein #2 (HTTP)", "Germany", "Falkenstein, Germany", "HTTP", "127.0.0.1", 10809, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"),
+        createNode("free_uk_ld_1", "🇬🇧 UK - London Cluster", 1, "🇬🇧 Free UK London #1", "United Kingdom", "London, United Kingdom", "SOCKS5", "127.0.0.1", 10808, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"),
+        createNode("free_nl_am_1", "🇳🇱 Netherlands - Amsterdam Cluster", 1, "🇳🇱 Free Netherlands Amsterdam #1", "Netherlands", "Amsterdam, Netherlands", "SOCKS5", "127.0.0.1", 10808, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"),
+        createNode("free_fi_hl_1", "🇫🇮 Finland - Helsinki Cluster", 1, "🇫🇮 Free Finland Helsinki #1", "Finland", "Helsinki, Finland", "SOCKS5", "127.0.0.1", 10808, "Europe/Helsinki", 60.1699, 24.9384, "Elisa FI", "24405", "fi")
+    };
+
+    private void seedDefaultVpnProfiles() {
+        List<VpnProfile> list = new ArrayList<>();
+        list.add(createNode("us_ny_1", "🇺🇸 US - New York Cluster", 1, "🇺🇸 USA - New York [Node #1 Primary]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 10808, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_2", "🇺🇸 US - New York Cluster", 2, "🇺🇸 USA - New York [Node #2 Failover]", "United States", "New York, United States", "HTTP", "127.0.0.1", 10809, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_3", "🇺🇸 US - New York Cluster", 3, "🇺🇸 USA - New York [Node #3 Neko/Sing]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 2080, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ny_4", "🇺🇸 US - New York Cluster", 4, "🇺🇸 USA - New York [Node #4 WARP]", "United States", "New York, United States", "SOCKS5", "127.0.0.1", 40000, "America/New_York", 40.7128, -74.0060, "T-Mobile USA", "310260", "us"));
+        list.add(createNode("us_ca_1", "🇺🇸 US - California Cluster", 1, "🇺🇸 USA - Los Angeles [Node #1 Primary]", "United States", "Los Angeles, United States", "SOCKS5", "127.0.0.1", 10808, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"));
+        list.add(createNode("us_ca_2", "🇺🇸 US - California Cluster", 2, "🇺🇸 USA - Los Angeles [Node #2 Failover]", "United States", "Los Angeles, United States", "HTTP", "127.0.0.1", 10809, "America/Los_Angeles", 34.0522, -118.2437, "AT&T Mobility", "310410", "us"));
+        list.add(createNode("us_tx_1", "🇺🇸 US - Texas Cluster", 1, "🇺🇸 USA - Dallas [Node #1 Primary]", "United States", "Dallas, United States", "SOCKS5", "127.0.0.1", 10808, "America/Chicago", 32.7767, -96.7970, "Verizon Wireless", "311480", "us"));
+        list.add(createNode("us_tx_2", "🇺🇸 US - Texas Cluster", 2, "🇺🇸 USA - Dallas [Node #2 Backup]", "United States", "Dallas, United States", "HTTP", "127.0.0.1", 10809, "America/Chicago", 32.7767, -96.7970, "Verizon Wireless", "311480", "us"));
+        list.add(createNode("de_fk_1", "🇩🇪 Germany - Falkenstein Cluster", 1, "🇩🇪 Germany - Falkenstein [Node #1]", "Germany", "Falkenstein, Germany", "SOCKS5", "127.0.0.1", 10808, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"));
+        list.add(createNode("de_fk_2", "🇩🇪 Germany - Falkenstein Cluster", 2, "🇩🇪 Germany - Falkenstein [Node #2]", "Germany", "Falkenstein, Germany", "HTTP", "127.0.0.1", 10809, "Europe/Berlin", 50.4779, 12.3713, "Telekom DE", "26201", "de"));
+        list.add(createNode("uk_ld_1", "🇬🇧 UK - London Cluster", 1, "🇬🇧 UK - London [Node #1]", "United Kingdom", "London, United Kingdom", "SOCKS5", "127.0.0.1", 10808, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"));
+        list.add(createNode("uk_ld_2", "🇬🇧 UK - London Cluster", 2, "🇬🇧 UK - London [Node #2]", "United Kingdom", "London, United Kingdom", "HTTP", "127.0.0.1", 10809, "Europe/London", 51.5074, -0.1278, "Vodafone UK", "23415", "gb"));
+        list.add(createNode("nl_am_1", "🇳🇱 Netherlands - Amsterdam Cluster", 1, "🇳🇱 Netherlands - Amsterdam [Node #1]", "Netherlands", "Amsterdam, Netherlands", "SOCKS5", "127.0.0.1", 10808, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"));
+        list.add(createNode("nl_am_2", "🇳🇱 Netherlands - Amsterdam Cluster", 2, "🇳🇱 Netherlands - Amsterdam [Node #2]", "Netherlands", "Amsterdam, Netherlands", "HTTP", "127.0.0.1", 10809, "Europe/Amsterdam", 52.3676, 4.9041, "KPN NL", "20408", "nl"));
+        saveVpnProfiles(list);
+        setActiveVpnId("us_ny_1");
+        setActiveVpnCategory("🇺🇸 US - New York Cluster");
+    }
+
+    public List<VpnProfile> getVpnProfiles() {
+        List<VpnProfile> list = new ArrayList<>();
+        try {
+            JSONArray arr = new JSONArray(sp.getString("vpn_profiles_json_v32", "[]"));
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                VpnProfile p = new VpnProfile();
+                p.id = o.optString("id", "vpn_" + i);
+                p.category = o.optString("category", "🇺🇸 US - New York Cluster");
+                p.nodeIndex = o.optInt("nodeIndex", i + 1);
+                p.title = o.optString("title", "VPN Server");
+                p.country = o.optString("country", "United States");
+                p.stateOrCity = o.optString("stateOrCity", "New York, United States");
+                p.protocol = o.optString("protocol", "SOCKS5");
+                p.host = o.optString("host", "127.0.0.1");
+                p.port = o.optInt("port", 10808);
+                p.username = o.optString("username", "");
+                p.password = o.optString("password", "");
+                p.timezoneId = o.optString("timezoneId", "America/New_York");
+                p.lat = o.optDouble("lat", 40.7128);
+                p.lon = o.optDouble("lon", -74.0060);
+                p.simOperator = o.optString("simOperator", "T-Mobile USA");
+                p.simMccMnc = o.optString("simMccMnc", "310260");
+                p.simIso = o.optString("simIso", "us");
+                p.targetSpaceId = o.optInt("targetSpaceId", -1);
+                p.isBuiltInFree = o.optBoolean("isBuiltInFree", true);
+                list.add(p);
+            }
+        } catch (Throwable ignored) {}
+        return list;
+    }
+
+    public void saveVpnProfiles(List<VpnProfile> list) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (VpnProfile p : list) {
+                JSONObject o = new JSONObject();
+                o.put("id", p.id);
+                o.put("category", (p.category == null || p.category.trim().isEmpty()) ? "🇺🇸 US - New York Cluster" : p.category.trim());
+                o.put("nodeIndex", p.nodeIndex);
+                o.put("title", p.title);
+                o.put("country", p.country);
+                o.put("stateOrCity", p.stateOrCity);
+                o.put("protocol", p.protocol);
+                o.put("host", p.host);
+                o.put("port", p.port);
+                o.put("username", p.username);
+                o.put("password", p.password);
+                o.put("timezoneId", p.timezoneId);
+                o.put("lat", p.lat);
+                o.put("lon", p.lon);
+                o.put("simOperator", p.simOperator);
+                o.put("simMccMnc", p.simMccMnc);
+                o.put("simIso", p.simIso);
+                o.put("targetSpaceId", p.targetSpaceId);
+                o.put("isBuiltInFree", p.isBuiltInFree);
+                arr.put(o);
+            }
+            sp.edit().putString("vpn_profiles_json_v32", arr.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    public List<String> getVpnCategories() {
+        Set<String> set = new LinkedHashSet<>();
+        for (VpnProfile p : getVpnProfiles()) {
+            if (p.category != null && !p.category.trim().isEmpty()) set.add(p.category.trim());
+        }
+        if (set.isEmpty()) set.add("🇺🇸 US - New York Cluster");
+        return new ArrayList<>(set);
+    }
+
+    public String getActiveVpnCategory() {
+        return sp.getString("active_vpn_category", "ALL");
+    }
+
+    public void setActiveVpnCategory(String category) {
+        sp.edit().putString("active_vpn_category", (category == null || category.isEmpty()) ? "ALL" : category).apply();
+    }
+
+    public boolean isClusterAutoRotateEnabled() {
+        return sp.getBoolean("vpn_cluster_autorotate", true);
+    }
+
+    public void setClusterAutoRotateEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_cluster_autorotate", enabled).apply();
+    }
+
+    public VpnProfile rotateToNextSiblingInCluster(String currentProfileId) {
+        List<VpnProfile> all = getVpnProfiles();
+        if (all.isEmpty()) return null;
+        VpnProfile current = all.get(0);
+        for (VpnProfile p : all) {
+            if (p.id.equals(currentProfileId)) { current = p; break; }
+        }
+        List<VpnProfile> siblings = new ArrayList<>();
+        for (VpnProfile p : all) {
+            if (p.category != null && p.category.equalsIgnoreCase(current.category)) siblings.add(p);
+        }
+        if (siblings.size() <= 1) {
+            siblings.clear();
+            for (VpnProfile p : all) {
+                if (p.stateOrCity != null && p.stateOrCity.equalsIgnoreCase(current.stateOrCity)) siblings.add(p);
+            }
+        }
+        if (siblings.isEmpty()) return current;
+        int idx = 0;
+        for (int i = 0; i < siblings.size(); i++) {
+            if (siblings.get(i).id.equals(current.id)) { idx = i; break; }
+        }
+        VpnProfile next = siblings.get((idx + 1) % siblings.size());
+        setActiveVpnId(next.id);
+        setVpnConnected(true);
+        applyVpnProfileToEnvironment(next);
+        return next;
+    }
+
+    public void moveVpnProfile(String profileId, int delta) {
+        List<VpnProfile> list = getVpnProfiles();
+        int idx = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).id.equals(profileId)) { idx = i; break; }
+        }
+        if (idx < 0) return;
+        int targetIdx = idx + delta;
+        if (targetIdx < 0 || targetIdx >= list.size()) return;
+        VpnProfile item = list.remove(idx);
+        list.add(targetIdx, item);
+        saveVpnProfiles(list);
+    }
+
+    public void renameVpnCategory(String oldCat, String newCat) {
+        if (oldCat == null || newCat == null || newCat.trim().isEmpty()) return;
+        List<VpnProfile> list = getVpnProfiles();
+        for (VpnProfile p : list) {
+            if (oldCat.equals(p.category)) p.category = newCat.trim();
+        }
+        saveVpnProfiles(list);
+        if (oldCat.equals(getActiveVpnCategory())) setActiveVpnCategory(newCat.trim());
+    }
+
+    public String getActiveVpnId() {
+        return sp.getString("active_vpn_id", "us_ny_1");
+    }
+
+    public void setActiveVpnId(String id) {
+        sp.edit().putString("active_vpn_id", id).apply();
+    }
+
+    public boolean isVpnConnected() {
+        return sp.getBoolean("vpn_connected_state", false);
+    }
+
+    public void setVpnConnected(boolean connected) {
+        sp.edit().putBoolean("vpn_connected_state", connected).apply();
+    }
+
+    public boolean isKillSwitchEnabled() {
+        return sp.getBoolean("vpn_kill_switch", true);
+    }
+
+    public void setKillSwitchEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_kill_switch", enabled).apply();
+    }
+
+    public boolean isVpnAutoSyncEnabled() {
+        return sp.getBoolean("vpn_auto_sync_env", true);
+    }
+
+    public void setVpnAutoSyncEnabled(boolean enabled) {
+        sp.edit().putBoolean("vpn_auto_sync_env", enabled).apply();
+    }
+
+    public String getCustomDns() {
+        return sp.getString("vpn_custom_dns", "1.1.1.1 / 8.8.8.8");
+    }
+
+    public void setCustomDns(String dns) {
+        sp.edit().putString("vpn_custom_dns", dns).apply();
+    }
+
+    public void applyVpnProfileToEnvironment(VpnProfile p) {
+        if (p == null) return;
+        setActiveVpnId(p.id);
+        if (isVpnAutoSyncEnabled()) {
+            GlobalEnvConfig g = getGlobalConfig();
+            g.regionLabel = p.stateOrCity;
+            g.timezoneId = p.timezoneId;
+            g.latitude = p.lat;
+            g.longitude = p.lon;
+            g.proxyAddress = p.host + ":" + p.port;
+            g.simOperatorName = p.simOperator;
+            g.simOperatorNumeric = p.simMccMnc;
+            g.simCountryIso = p.simIso;
+            saveGlobalConfig(g);
+        }
+    }
+
+    public void setLastActiveSession(String pkg, int userId) {
+        if (pkg == null || pkg.isEmpty() || "__space__".equals(pkg)) return;
+        sp.edit().putString("last_active_pkg", pkg).putInt("last_active_user", userId).apply();
+    }
+
+    public String getLastActivePkg() {
+        return sp.getString("last_active_pkg", "");
+    }
+
+    public int getLastActiveUserId() {
+        return sp.getInt("last_active_user", 0);
+    }
+
+    public String getSpaceDisplayName(int userId, boolean isFa) {
+        String custom = sp.getString("space_name_" + userId, "");
+        if (custom != null && !custom.trim().isEmpty()) return custom.trim();
+        return isFa ? ("فضای " + (userId + 1)) : ("Space " + (userId + 1));
+    }
+
+    public void setSpaceCustomName(int userId, String name) {
+        sp.edit().putString("space_name_" + userId, name == null ? "" : name.trim()).apply();
+    }
+
+    public boolean isSpaceCreated(int userId) {
+        if (userId == 0) return true;
+        return sp.getBoolean("space_created_" + userId, false);
+    }
+
+    public void markSpaceCreated(int userId) {
+        sp.edit().putBoolean("space_created_" + userId, true).apply();
+    }
+
+    public int getUnreadCount(String pkg, int userId) {
+        return sp.getInt("badge_unread_" + userId + "_" + pkg, 0);
+    }
+
+    public void setUnreadCount(String pkg, int userId, int count) {
+        sp.edit().putInt("badge_unread_" + userId + "_" + pkg, Math.max(0, count)).apply();
+    }
+
+    public void incrementUnreadCount(String pkg, int userId) {
+        setUnreadCount(pkg, userId, getUnreadCount(pkg, userId) + 1);
+    }
+
+    public String formatBadgeText(int count) {
+        if (count <= 0) return "";
+        if (count >= 100) return "∞";
+        return String.valueOf(count);
+    }
+
+    private String keyPrefix(String pkg, int userId) {
+        return "clone_" + userId + "_" + pkg + "_";
+    }
+
+    public CloneMeta getCloneMeta(String pkg, int userId) {
+        String p = keyPrefix(pkg, userId);
+        CloneMeta m = new CloneMeta();
+        m.packageName = pkg;
+        m.userId = userId;
+        m.customAlias = sp.getString(p + "alias", "");
+        m.hasExclusiveDevice = sp.getBoolean(p + "ex_dev", false);
+        m.deviceBrand = sp.getString(p + "brand", SAFE_DEFAULT_BRAND);
+        m.deviceModel = cleanModelOnly(m.deviceBrand, sp.getString(p + "model", SAFE_DEFAULT_MODEL));
+        m.deviceManufacturer = sp.getString(p + "mfg", SAFE_DEFAULT_MANUFACTURER);
+        m.deviceProduct = sp.getString(p + "prod", SAFE_DEFAULT_PRODUCT);
+        m.deviceHardware = sp.getString(p + "hw", SAFE_DEFAULT_HARDWARE);
+        m.hasExclusiveLocation = sp.getBoolean(p + "ex_loc", false);
+        try {
+            m.latitude = Double.parseDouble(sp.getString(p + "lat", String.valueOf(SAFE_DEFAULT_LAT)));
+            m.longitude = Double.parseDouble(sp.getString(p + "lon", String.valueOf(SAFE_DEFAULT_LON)));
+        } catch (Exception e) {
+            m.latitude = SAFE_DEFAULT_LAT;
+            m.longitude = SAFE_DEFAULT_LON;
+        }
+        m.regionLabel = sp.getString(p + "region", SAFE_DEFAULT_REGION);
+        m.timezoneId = sp.getString(p + "tz", SAFE_DEFAULT_TZ);
+        m.proxyAddress = sp.getString(p + "proxy", "");
+        m.hasExclusiveSim = sp.getBoolean(p + "ex_sim", false);
+        m.simOperatorName = sp.getString(p + "sim_op", SAFE_DEFAULT_SIM_OP);
+        m.simOperatorNumeric = sp.getString(p + "sim_num", SAFE_DEFAULT_SIM_NUM);
+        m.simCountryIso = sp.getString(p + "sim_iso", SAFE_DEFAULT_SIM_ISO);
+        m.simPhoneNumber = sp.getString(p + "sim_phone", SAFE_DEFAULT_SIM_PHONE);
+        return m;
+    }
+
+    private static String orDefault(String v, String def) {
+        return (v == null || v.trim().isEmpty()) ? def : v.trim();
+    }
+
+    public void saveCloneMeta(CloneMeta m) {
+        String cleanBrand = orDefault(m.deviceBrand, SAFE_DEFAULT_BRAND);
+        String p = keyPrefix(m.packageName, m.userId);
+        sp.edit()
+          .putString(p + "alias", m.customAlias == null ? "" : m.customAlias)
+          .putBoolean(p + "ex_dev", m.hasExclusiveDevice)
+          .putString(p + "brand", cleanBrand)
+          .putString(p + "model", cleanModelOnly(cleanBrand, m.deviceModel))
+          .putString(p + "mfg", orDefault(m.deviceManufacturer, cleanBrand))
+          .putString(p + "prod", orDefault(m.deviceProduct, SAFE_DEFAULT_PRODUCT))
+          .putString(p + "hw", orDefault(m.deviceHardware, SAFE_DEFAULT_HARDWARE))
+          .putBoolean(p + "ex_loc", m.hasExclusiveLocation)
+          .putString(p + "lat", String.valueOf(m.latitude))
+          .putString(p + "lon", String.valueOf(m.longitude))
+          .putString(p + "region", orDefault(m.regionLabel, SAFE_DEFAULT_REGION))
+          .putString(p + "tz", orDefault(m.timezoneId, SAFE_DEFAULT_TZ))
+          .putString(p + "proxy", m.proxyAddress == null ? "" : m.proxyAddress.trim())
+          .putBoolean(p + "ex_sim", m.hasExclusiveSim)
+          .putString(p + "sim_op", orDefault(m.simOperatorName, SAFE_DEFAULT_SIM_OP))
+          .putString(p + "sim_num", orDefault(m.simOperatorNumeric, SAFE_DEFAULT_SIM_NUM))
+          .putString(p + "sim_iso", orDefault(m.simCountryIso, SAFE_DEFAULT_SIM_ISO).toLowerCase())
+          .putString(p + "sim_phone", orDefault(m.simPhoneNumber, SAFE_DEFAULT_SIM_PHONE))
+          .apply();
+    }
+
+    public static class GlobalEnvConfig {
+        public String brand;
+        public String model;
+        public String manufacturer;
+        public String product;
+        public String hardware;
+        public boolean locationEnabled;
+        public double latitude;
+        public double longitude;
+        public String regionLabel;
+        public String timezoneId;
+        public String proxyAddress;
+        public String simOperatorName;
+        public String simOperatorNumeric;
+        public String simCountryIso;
+        public String simPhoneNumber;
+    }
+
+    public GlobalEnvConfig getGlobalConfig() {
+        GlobalEnvConfig c = new GlobalEnvConfig();
+        c.brand = orDefault(sp.getString("global_brand", SAFE_DEFAULT_BRAND), SAFE_DEFAULT_BRAND);
+        c.model = cleanModelOnly(c.brand, sp.getString("global_model", SAFE_DEFAULT_MODEL));
+        c.manufacturer = sp.getString("global_manufacturer", SAFE_DEFAULT_MANUFACTURER);
+        c.product = sp.getString("global_product", SAFE_DEFAULT_PRODUCT);
+        c.hardware = sp.getString("global_hardware", SAFE_DEFAULT_HARDWARE);
+        c.locationEnabled = sp.getBoolean("global_loc_enabled", true);
+        try {
+            c.latitude = Double.parseDouble(sp.getString("global_lat", String.valueOf(SAFE_DEFAULT_LAT)));
+            c.longitude = Double.parseDouble(sp.getString("global_lon", String.valueOf(SAFE_DEFAULT_LON)));
+        } catch (Exception e) {
+            c.latitude = SAFE_DEFAULT_LAT;
+            c.longitude = SAFE_DEFAULT_LON;
+        }
+        c.regionLabel = orDefault(sp.getString("global_region_label", SAFE_DEFAULT_REGION), SAFE_DEFAULT_REGION);
+        c.timezoneId = orDefault(sp.getString("global_tz", SAFE_DEFAULT_TZ), SAFE_DEFAULT_TZ);
+        c.proxyAddress = sp.getString("global_proxy", "127.0.0.1:10808");
+        c.simOperatorName = orDefault(sp.getString("global_sim_op", SAFE_DEFAULT_SIM_OP), SAFE_DEFAULT_SIM_OP);
+        c.simOperatorNumeric = orDefault(sp.getString("global_sim_num", SAFE_DEFAULT_SIM_NUM), SAFE_DEFAULT_SIM_NUM);
+        c.simCountryIso = orDefault(sp.getString("global_sim_iso", SAFE_DEFAULT_SIM_ISO), SAFE_DEFAULT_SIM_ISO);
+        c.simPhoneNumber = sp.getString("global_sim_phone", SAFE_DEFAULT_SIM_PHONE);
+        return c;
+    }
+
+    public void saveGlobalConfig(GlobalEnvConfig c) {
+        String cleanBrand = orDefault(c.brand, SAFE_DEFAULT_BRAND);
+        sp.edit()
+          .putString("global_brand", cleanBrand)
+          .putString("global_model", cleanModelOnly(cleanBrand, c.model))
+          .putString("global_manufacturer", orDefault(c.manufacturer, cleanBrand))
+          .putString("global_product", orDefault(c.product, SAFE_DEFAULT_PRODUCT))
+          .putString("global_hardware", orDefault(c.hardware, SAFE_DEFAULT_HARDWARE))
+          .putBoolean("global_loc_enabled", c.locationEnabled)
+          .putString("global_lat", String.valueOf(c.latitude))
+          .putString("global_lon", String.valueOf(c.longitude))
+          .putString("global_region_label", orDefault(c.regionLabel, SAFE_DEFAULT_REGION))
+          .putString("global_tz", orDefault(c.timezoneId, SAFE_DEFAULT_TZ))
+          .putString("global_proxy", c.proxyAddress == null ? "" : c.proxyAddress.trim())
+          .putString("global_sim_op", orDefault(c.simOperatorName, SAFE_DEFAULT_SIM_OP))
+          .putString("global_sim_num", orDefault(c.simOperatorNumeric, SAFE_DEFAULT_SIM_NUM))
+          .putString("global_sim_iso", orDefault(c.simCountryIso, SAFE_DEFAULT_SIM_ISO).toLowerCase())
+          .putString("global_sim_phone", orDefault(c.simPhoneNumber, SAFE_DEFAULT_SIM_PHONE))
+          .apply();
+    }
+
+    public EffectiveIdentity resolveEffectiveIdentity(String pkg, int userId) {
+        GlobalEnvConfig g = getGlobalConfig();
+        EffectiveIdentity out = new EffectiveIdentity();
+        String resolvedPkg = pkg;
+        int resolvedUser = userId;
+        if (resolvedPkg == null || resolvedPkg.isEmpty()) {
+            resolvedPkg = getLastActivePkg();
+            resolvedUser = getLastActiveUserId();
+        }
+        out.targetPackage = (resolvedPkg == null) ? "" : resolvedPkg;
+        out.targetUserId = resolvedUser;
+
+        out.brand = g.brand;
+        out.model = cleanModelOnly(g.brand, g.model);
+        out.manufacturer = g.manufacturer;
+        out.product = g.product;
+        out.hardware = g.hardware;
+        out.latitude = g.latitude;
+        out.longitude = g.longitude;
+        out.regionLabel = g.regionLabel;
+        out.timezoneId = g.timezoneId;
+        out.proxyAddress = g.proxyAddress;
+        out.simOperatorName = g.simOperatorName;
+        out.simOperatorNumeric = g.simOperatorNumeric;
+        out.simCountryIso = g.simCountryIso;
+        out.simPhoneNumber = g.simPhoneNumber;
+
+        CloneMeta s = getCloneMeta("__space__", resolvedUser);
+        if (s.hasExclusiveDevice) {
+            out.devicePriorityTier = 2;
+            out.brand = s.deviceBrand;
+            out.model = cleanModelOnly(s.deviceBrand, s.deviceModel);
+            out.manufacturer = s.deviceManufacturer;
+            out.product = s.deviceProduct;
+            out.hardware = s.deviceHardware;
+        }
+        if (s.hasExclusiveLocation) {
+            out.locationPriorityTier = 2;
+            out.latitude = s.latitude;
+            out.longitude = s.longitude;
+            out.regionLabel = s.regionLabel;
+            out.timezoneId = s.timezoneId;
+            if (s.proxyAddress != null && !s.proxyAddress.isEmpty()) out.proxyAddress = s.proxyAddress;
+        }
+        if (s.hasExclusiveSim) {
+            out.simPriorityTier = 2;
+            out.simOperatorName = s.simOperatorName;
+            out.simOperatorNumeric = s.simOperatorNumeric;
+            out.simCountryIso = s.simCountryIso;
+            out.simPhoneNumber = s.simPhoneNumber;
+        }
+
+        if (resolvedPkg != null && !resolvedPkg.isEmpty() && !"__space__".equals(resolvedPkg)) {
+            CloneMeta a = getCloneMeta(resolvedPkg, resolvedUser);
+            if (a.hasExclusiveDevice) {
+                out.devicePriorityTier = 1;
+                out.brand = a.deviceBrand;
+                out.model = cleanModelOnly(a.deviceBrand, a.deviceModel);
+                out.manufacturer = a.deviceManufacturer;
+                out.product = a.deviceProduct;
+                out.hardware = a.deviceHardware;
+            }
+            if (a.hasExclusiveLocation) {
+                out.locationPriorityTier = 1;
+                out.latitude = a.latitude;
+                out.longitude = a.longitude;
+                out.regionLabel = a.regionLabel;
+                out.timezoneId = a.timezoneId;
+                if (a.proxyAddress != null && !a.proxyAddress.isEmpty()) out.proxyAddress = a.proxyAddress;
+            }
+            if (a.hasExclusiveSim) {
+                out.simPriorityTier = 1;
+                out.simOperatorName = a.simOperatorName;
+                out.simOperatorNumeric = a.simOperatorNumeric;
+                out.simCountryIso = a.simCountryIso;
+                out.simPhoneNumber = a.simPhoneNumber;
+            }
+        }
+
+        out.brand = orDefault(out.brand, SAFE_DEFAULT_BRAND);
+        out.regionLabel = orDefault(out.regionLabel, SAFE_DEFAULT_REGION);
+        out.timezoneId = orDefault(out.timezoneId, SAFE_DEFAULT_TZ);
+        out.simOperatorName = orDefault(out.simOperatorName, SAFE_DEFAULT_SIM_OP);
+        out.simOperatorNumeric = orDefault(out.simOperatorNumeric, SAFE_DEFAULT_SIM_NUM);
+        out.simCountryIso = orDefault(out.simCountryIso, SAFE_DEFAULT_SIM_ISO);
+        out.simPhoneNumber = orDefault(out.simPhoneNumber, SAFE_DEFAULT_SIM_PHONE);
+        out.proxyAddress = (out.proxyAddress == null) ? "" : out.proxyAddress;
+        out.displayBrandModel = formatBrandModel(out.brand, out.model);
+        return out;
+    }
+
+    public String getGlobalBrand() {
+        return getGlobalConfig().brand;
+    }
+
+    public String getGlobalModel() {
+        GlobalEnvConfig g = getGlobalConfig();
+        return cleanModelOnly(g.brand, g.model);
+    }
+
+    public String getGlobalRegionLabel() {
+        return getGlobalConfig().regionLabel;
+    }
+
+    public String getEffectiveModelSummary(String pkg, int userId) {
+        return resolveEffectiveIdentity(pkg, userId).displayBrandModel;
+    }
+
+    public String getEffectiveRegionSummary(String pkg, int userId) {
+        return resolveEffectiveIdentity(pkg, userId).regionLabel;
+    }
+
+    public static File getVaultDir(Context context, String sub) {
+        File dir = new File(context.getFilesDir(), "veyra_vault/" + sub);
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    public static File backupApkToVault(Context context, String pkg, String sourceApkPath) {
+        try {
+            File src = new File(sourceApkPath);
+            if (!src.exists()) return null;
+            File dst = new File(getVaultDir(context, "apks"), pkg + ".apk");
+            try (FileInputStream in = new FileInputStream(src);
+                 FileOutputStream out = new FileOutputStream(dst)) {
+                byte[] buf = new byte[16384];
+                int len;
+                while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+            }
+            return dst;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    public static File getVaultApkFile(String pkg) {
+        try {
+            Context ctx = com.veyravault.space.VeyraApplication.getAppContext();
+            if (ctx == null) return null;
+            File f = new File(getVaultDir(ctx, "apks"), pkg + ".apk");
+            return f.exists() ? f : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+}
+"""
+write_file(os.path.join(JAVA_BASE, "core/CloneMetadataStore.java"), CLONE_METADATA_STORE)
+
 MAIN_ACTIVITY = r"""package com.veyravault.space.ui;
 
 import android.app.AlertDialog;
