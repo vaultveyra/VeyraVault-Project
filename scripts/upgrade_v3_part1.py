@@ -104,8 +104,7 @@ write_file(os.path.join(RES_BASE, "xml/device_admin_receiver.xml"), DEVICE_ADMIN
 # 3. AndroidManifest.xml with App Disguise Aliases
 MANIFEST_CONTENT = """<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.veyravault.app">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
