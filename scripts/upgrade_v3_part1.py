@@ -2126,4 +2126,26 @@ public class AboutActivity extends AppCompatActivity {
     }
 }"""
 write_file(os.path.join(JAVA_BASE, "ui/AboutActivity.java"), ABOUT_ACTIVITY)
+
+# --- FIX: mipmap/ic_launcher not found ---
+IC_LAUNCHER = """<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#0F172A" android:pathData="M0,0h24v24H0z"/>
+    <path android:fillColor="#38BDF8" android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12 5.16,-1.26 9,-6.45 9,-12V5L12,1z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M8.5,9.5L12,15l3.5,-5.5h-2L12,12.2 10.5,9.5z"/>
+</vector>"""
+write_file(os.path.join(RES_BASE, "drawable/ic_launcher.xml"), IC_LAUNCHER)
+write_file(os.path.join(RES_BASE, "drawable/ic_launcher_round.xml"), IC_LAUNCHER)
+try:
+    with open(MANIFEST_PATH, "r", encoding="utf-8") as _f:
+        _txt = _f.read()
+    _txt = _txt.replace("@mipmap/ic_launcher_round", "@drawable/ic_launcher_round")
+    _txt = _txt.replace("@mipmap/ic_launcher", "@drawable/ic_launcher")
+    write_file(MANIFEST_PATH, _txt)
+except Exception as _e:
+    print(f"[PART1] manifest patch error: {_e}")
+
 print("[PART1] Upgrade V3 Part 1 completed successfully.")
