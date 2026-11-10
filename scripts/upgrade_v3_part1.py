@@ -2148,4 +2148,159 @@ try:
 except Exception as _e:
     print(f"[PART1] manifest patch error: {_e}")
 
+# --- FIX: unclosed string literal in Guide/About ---
+GUIDE_ACTIVITY_FIXED = """package com.veyravault.app.ui;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.veyravault.app.util.LocaleHelper;
+import com.veyravault.app.util.ThemeHelper;
+
+public class GuideActivity extends AppCompatActivity {
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applyTheme(this);
+        super.onCreate(savedInstanceState);
+
+        boolean isDark = ThemeHelper.isDarkMode(this);
+        ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(isDark ? Color.parseColor("#0A0F1D") : Color.parseColor("#F1F5F9"));
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(20), dp(18), dp(30));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("📖 راهنمای جامع VeyraVault Pro");
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        tvTitle.setTextColor(isDark ? Color.WHITE : Color.parseColor("#0F172A"));
+        tvTitle.setPadding(0, 0, 0, dp(12));
+        box.addView(tvTitle);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("1. سیستم اولویت‌بندی 3 لایه در تمام پردازش‌ها:");
+        sb.append((char)10);
+        sb.append("• اولویت 1 (تنظیمات هر اپ): با لمس چرخ‌دنده کنار هر برنامه در فضاها، مدل گوشی، سیم‌کارت و مختصات اختصاصی همان برنامه را تعیین کنید.");
+        sb.append((char)10);
+        sb.append("• اولویت 2 (تنظیمات هر فضا): با دکمه هویت فضا برای کل برنامه‌های یک فضا هویت یکپارچه بگذارید.");
+        sb.append((char)10);
+        sb.append("• اولویت 3 (تنظیمات کلی برنامه): هویت پیش‌فرض که مانع از دیده شدن مشخصات گوشی واقعی شما می‌شود.");
+        sb.append((char)10);
+        sb.append((char)10);
+        sb.append("2. کلون کامل اینستاگرام، سروش، کروم و ایتا:");
+        sb.append((char)10);
+        sb.append("• موتور نصب چندتکه (Split APK) باعث می‌شود اینستاگرام و سروش بدون خطا کلون شوند و کروم مستقیماً مرورگر اصلی را باز کند.");
+        sb.append((char)10);
+        sb.append((char)10);
+        sb.append("3. مرکز VPN دایره‌ای و دسته‌بندی کشوری:");
+        sb.append((char)10);
+        sb.append("• روی دایره وسط صفحه بزنید تا تونل متصل (سبز) یا قطع (قرمز) شود.");
+        sb.append((char)10);
+        sb.append("• روی نام هر کشور بزنید تا لیست سرورهایش باز یا بسته شود. با دکمه + روبه‌روی هر کشور یک VPN جدید در همان کشور اضافه کنید.");
+        sb.append((char)10);
+        sb.append((char)10);
+        sb.append("4. تغییر آیکون و نام برنامه (استتار):");
+        sb.append((char)10);
+        sb.append("• از تب تنظیمات می‌توانید آیکون و نام برنامه را به ماشین‌حساب، یادداشت، باتری یا هواشناسی تغییر دهید.");
+
+        TextView tvBody = new TextView(this);
+        tvBody.setText(sb.toString());
+        tvBody.setTextSize(13.5f);
+        tvBody.setLineSpacing(dp(4), 1.1f);
+        tvBody.setTextColor(isDark ? Color.parseColor("#CBD5E1") : Color.parseColor("#334155"));
+        box.addView(tvBody);
+
+        sv.addView(box);
+        setContentView(sv);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+}"""
+write_file(os.path.join(JAVA_BASE, "ui/GuideActivity.java"), GUIDE_ACTIVITY_FIXED)
+
+ABOUT_ACTIVITY_FIXED = """package com.veyravault.app.ui;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.veyravault.app.util.LocaleHelper;
+import com.veyravault.app.util.ThemeHelper;
+
+public class AboutActivity extends AppCompatActivity {
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applyTheme(this);
+        super.onCreate(savedInstanceState);
+
+        boolean isDark = ThemeHelper.isDarkMode(this);
+        ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(isDark ? Color.parseColor("#0A0F1D") : Color.parseColor("#F1F5F9"));
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(20), dp(18), dp(30));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("ℹ️ درباره VeyraVault Pro");
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        tvTitle.setTextColor(isDark ? Color.WHITE : Color.parseColor("#0F172A"));
+        tvTitle.setPadding(0, 0, 0, dp(12));
+        box.addView(tvTitle);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("• نام محصول: VeyraVault (محیط ایزوله و چندفضایی اندروید)");
+        sb.append((char)10);
+        sb.append("• نسخه: 3.4.0 Enterprise Edition");
+        sb.append((char)10);
+        sb.append("• ویژگی‌ها: تزریق هویت بین‌پردازشی در نشست‌ها، کلون Split-APK، مرکز VPN خوشه‌ای و استتار آیکون برنامه");
+        sb.append((char)10);
+        sb.append("• حریم خصوصی: 100% بدون تبلیغات، بدون ردیاب و بدون نشت اطلاعات گوشی میزبان");
+
+        TextView tvBody = new TextView(this);
+        tvBody.setText(sb.toString());
+        tvBody.setTextSize(13.5f);
+        tvBody.setLineSpacing(dp(4), 1.1f);
+        tvBody.setTextColor(isDark ? Color.parseColor("#CBD5E1") : Color.parseColor("#334155"));
+        box.addView(tvBody);
+
+        sv.addView(box);
+        setContentView(sv);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+}"""
+write_file(os.path.join(JAVA_BASE, "ui/AboutActivity.java"), ABOUT_ACTIVITY_FIXED)
+
+
 print("[PART1] Upgrade V3 Part 1 completed successfully.")
