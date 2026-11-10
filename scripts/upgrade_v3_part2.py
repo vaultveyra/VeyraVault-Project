@@ -223,4 +223,115 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
             f.write(mc)
         print("[PART2] Patched R references in:", main_act_path)
 
+import re
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
+    manifest_p = os.path.join(candidate, "app/src/main/AndroidManifest.xml")
+    if os.path.exists(manifest_p):
+        with open(manifest_p, "r", encoding="utf-8") as f:
+            mf = f.read()
+        mf = mf.replace("Theme.AppCompat.DayNight.NoActionBar", "Theme.MaterialComponents.DayNight.NoActionBar")
+        with open(manifest_p, "w", encoding="utf-8") as f:
+            f.write(mf)
+
+    app_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/VeyraApplication.java")
+    if os.path.exists(app_p):
+        with open(app_p, "r", encoding="utf-8") as f:
+            ap = f.read()
+        ap = ap.replace("Context localized = LocaleHelper.onAttach(base);\n        super.attachBaseContext(localized);", "super.attachBaseContext(base);\n        Context localized = base;")
+        with open(app_p, "w", encoding="utf-8") as f:
+            f.write(ap)
+
+    main_act_path = os.path.join(candidate, "app/src/main/java/com/veyravault/app/ui/MainActivity.java")
+    if os.path.exists(main_act_path):
+        with open(main_act_path, "r", encoding="utf-8") as f:
+            mc = f.read()
+        mc = mc.replace("import com.veyravault.app.R;", "")
+        mc = mc.replace("bottomNav.setSelectedItemId(2);", "")
+        custom_nav = """private final LinearLayout[] navTabViews = new LinearLayout[7];
+    private final ImageView[] navTabIcons = new ImageView[7];
+    private final TextView[] navTabLabels = new TextView[7];
+    private int resDrawable(String n){int id=getResources().getIdentifier(n,"drawable",getPackageName());return id!=0?id:android.R.drawable.ic_menu_manage;}
+    private void updateBottomNavSelection(int activeId){
+        boolean d=ThemeHelper.isDarkMode(this);
+        int activeColor=Color.parseColor("#3B82F6");
+        int inactiveColor=d?Color.parseColor("#94A3B8"):Color.parseColor("#64748B");
+        int[] ids=new int[]{1,2,4,5,6};
+        for(int id:ids){
+            if(navTabIcons[id]!=null) navTabIcons[id].setColorFilter(id==activeId?activeColor:inactiveColor);
+            if(navTabLabels[id]!=null){
+                navTabLabels[id].setTextColor(id==activeId?activeColor:inactiveColor);
+                navTabLabels[id].setTypeface(Typeface.DEFAULT,id==activeId?Typeface.BOLD:Typeface.NORMAL);
+            }
+        }
+    }
+    private View createNavTab(int id,String title,String iconName){
+        LinearLayout tab=new LinearLayout(this);
+        tab.setOrientation(LinearLayout.VERTICAL);
+        tab.setGravity(Gravity.CENTER);
+        tab.setPadding(dp(2),dp(8),dp(2),dp(8));
+        ImageView iv=new ImageView(this);
+        iv.setImageResource(resDrawable(iconName));
+        tab.addView(iv,new LinearLayout.LayoutParams(dp(22),dp(22)));
+        TextView tv=new TextView(this);
+        tv.setText(title);
+        tv.setTextSize(10f);
+        tv.setGravity(Gravity.CENTER);
+        tv.setSingleLine(true);
+        LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+        tlp.topMargin=dp(3);
+        tab.addView(tv,tlp);
+        navTabViews[id]=tab;
+        navTabIcons[id]=iv;
+        navTabLabels[id]=tv;
+        tab.setOnClickListener(v->switchTab(id));
+        return tab;
+    }
+    private void buildRootInterface(){
+        boolean d=ThemeHelper.isDarkMode(this);
+        FrameLayout root=new FrameLayout(this);
+        root.setBackgroundColor(bgPage(d));
+        LinearLayout col=new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        contentContainer=new FrameLayout(this);
+        col.addView(contentContainer,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));
+        LinearLayout navBar=new LinearLayout(this);
+        navBar.setOrientation(LinearLayout.HORIZONTAL);
+        navBar.setGravity(Gravity.CENTER_VERTICAL);
+        navBar.setBackgroundColor(bgCard(d));
+        navBar.setPadding(dp(4),dp(6),dp(4),dp(6));
+        navBar.addView(createNavTab(1,"داشبورد","ic_nav_dashboard"),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        navBar.addView(createNavTab(2,"فضاها","ic_nav_spaces"),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        FrameLayout centerSlot=new FrameLayout(this);
+        LinearLayout plusBtn=new LinearLayout(this);
+        plusBtn.setGravity(Gravity.CENTER);
+        GradientDrawable plusBg=new GradientDrawable();
+        plusBg.setShape(GradientDrawable.OVAL);
+        plusBg.setColor(Color.parseColor("#2563EB"));
+        plusBg.setStroke(dp(2),Color.parseColor("#60A5FA"));
+        plusBtn.setBackground(plusBg);
+        ImageView plusIcon=new ImageView(this);
+        plusIcon.setImageResource(resDrawable("ic_nav_add"));
+        plusIcon.setColorFilter(Color.WHITE);
+        plusBtn.addView(plusIcon,new LinearLayout.LayoutParams(dp(24),dp(24)));
+        plusBtn.setOnClickListener(v->openSmartAutoSpaceCloner());
+        FrameLayout.LayoutParams cLp=new FrameLayout.LayoutParams(dp(46),dp(46));
+        cLp.gravity=Gravity.CENTER;
+        centerSlot.addView(plusBtn,cLp);
+        navBar.addView(centerSlot,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        navBar.addView(createNavTab(4,"مرکز VPN","ic_nav_vpn"),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        navBar.addView(createNavTab(5,"نشست‌ها","ic_nav_session"),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        navBar.addView(createNavTab(6,"تنظیمات","ic_nav_settings"),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        col.addView(navBar,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(col,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+        updateBottomNavSelection(currentTab);
+    }"""
+        mc = re.sub(r'private void buildRootInterface\(\)\{.*?setContentView\(root\);\}', custom_nav, mc, flags=re.DOTALL)
+        mc = mc.replace("private void switchTab(int tabId){currentTab=tabId;", "private void switchTab(int tabId){currentTab=tabId;updateBottomNavSelection(tabId);")
+        with open(main_act_path, "w", encoding="utf-8") as f:
+            f.write(mc)
+        print("[PART2] Applied crash-proof custom bottom navigation bar to:", main_act_path)
+
 print("[PART2] Upgrade V3 Part 2 completed successfully.")
