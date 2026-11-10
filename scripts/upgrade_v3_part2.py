@@ -248,7 +248,8 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         with open(main_act_path, "r", encoding="utf-8") as f:
             mc = f.read()
         mc = mc.replace("import com.veyravault.app.R;", "")
-        mc = mc.replace("bottomNav.setSelectedItemId(2);", "")
+        mc = mc.replace('private int resDrawable(String n){int id=getResources().getIdentifier(n,"drawable",getPackageName());return id!=0?id:android.R.drawable.ic_menu_manage;}', "")
+        mc = re.sub(r'bottomNav\.setSelectedItemId\(([^)]+)\)', r'switchTab(\1)', mc)
         custom_nav = """private final LinearLayout[] navTabViews = new LinearLayout[7];
     private final ImageView[] navTabIcons = new ImageView[7];
     private final TextView[] navTabLabels = new TextView[7];
@@ -326,10 +327,10 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         col.addView(navBar,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(col,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
-        updateBottomNavSelection(currentTab);
+        updateBottomNavSelection(1);
     }"""
         mc = re.sub(r'private void buildRootInterface\(\)\{.*?setContentView\(root\);\}', custom_nav, mc, flags=re.DOTALL)
-        mc = mc.replace("private void switchTab(int tabId){currentTab=tabId;", "private void switchTab(int tabId){currentTab=tabId;updateBottomNavSelection(tabId);")
+        mc = re.sub(r'private void switchTab\(int (\w+)\)\{', r'private void switchTab(int \1){updateBottomNavSelection(\1);', mc, count=1)
         with open(main_act_path, "w", encoding="utf-8") as f:
             f.write(mc)
         print("[PART2] Applied crash-proof custom bottom navigation bar to:", main_act_path)
