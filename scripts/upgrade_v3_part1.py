@@ -2302,5 +2302,72 @@ public class AboutActivity extends AppCompatActivity {
 }"""
 write_file(os.path.join(JAVA_BASE, "ui/AboutActivity.java"), ABOUT_ACTIVITY_FIXED)
 
+علت خطا مشخص است عزیزم: در نسخه جدید NewBlackbox متد `installPackageAsUser` سه پارامتر می‌خواهد `String, InstallOption, int` ولی در `Engine.java` با دو پارامتر صدا زده شده. فقط همین سه خط باید با یک تابع سازگار جایگزین شود. به پارت ۲ دست نزنید.
+
+**فقط این یک کار را انجام بدهید:**
+
+۱. این فایل را باز کنید و روی ✏️ بزنید:
+`https://github.com/vaultveyra/VeyraVault-Project/blob/main/scripts/upgrade_v3_part1.py`
+
+۲. با `Ctrl + F` این خط آخر را پیدا کنید:
+```
+print("[PART1] Upgrade V3 Part 1 completed successfully.")
+```
+
+۳. کلیک کنید ابتدای همین خط، یک `Enter` بزنید تا یک خط خالی بالای آن ساخته شود، و دقیقاً کد زیر را آنجا جایگذاری (Paste) کنید:
+
+```python
+# --- FIX: installPackageAsUser needs InstallOption (3 args) ---
+try:
+    _engine_path = os.path.join(JAVA_BASE, "core/Engine.java")
+    with open(_engine_path, "r", encoding="utf-8") as _f:
+        _txt = _f.read()
+    _txt = _txt.replace("BlackBoxCore.getBPackageManager().installPackageAsUser(apkSource, userId)", "installPackageCompat(apkSource, userId)")
+    _txt = _txt.replace("BlackBoxCore.getBPackageManager().installPackageAsUser(split, userId)", "installPackageCompat(split, userId)")
+    _txt = _txt.replace("BlackBoxCore.getBPackageManager().installPackageAsUser(vaultApk.getAbsolutePath(), userId)", "installPackageCompat(vaultApk.getAbsolutePath(), userId)")
+    _helper = '''
+    private static InstallResult installPackageCompat(String path, int userId) {
+        try {
+            Class<?> optionClass = null;
+            try { optionClass = Class.forName("top.niunaijun.blackbox.entity.pm.InstallOption"); } catch (Throwable t) {}
+            if (optionClass == null) {
+                try { optionClass = Class.forName("top.niunaijun.blackbox.fake.frameworks.InstallOption"); } catch (Throwable t) {}
+            }
+            if (optionClass != null && optionClass.isEnum()) {
+                Object[] constants = optionClass.getEnumConstants();
+                Object opt = null;
+                if (constants != null && constants.length > 0) {
+                    opt = constants[0];
+                    for (Object c : constants) {
+                        String n = ((Enum<?>) c).name();
+                        if (n.contains("NONE") || n.contains("NORMAL")) { opt = c; break; }
+                    }
+                }
+                java.lang.reflect.Method m = BlackBoxCore.getBPackageManager().getClass().getMethod("installPackageAsUser", String.class, optionClass, int.class);
+                Object res = m.invoke(BlackBoxCore.getBPackageManager(), path, opt, userId);
+                return (InstallResult) res;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            java.lang.reflect.Method m2 = BlackBoxCore.getBPackageManager().getClass().getMethod("installPackageAsUser", String.class, int.class);
+            Object res2 = m2.invoke(BlackBoxCore.getBPackageManager(), path, userId);
+            return (InstallResult) res2;
+        } catch (Throwable ignored) {}
+        return null;
+    }
+'''
+    _idx = _txt.rstrip().rfind("}")
+    if _idx != -1 and "installPackageCompat" not in _txt.split("private static InstallResult installPackageCompat")[-1][:50]:
+        _txt = _txt[:_idx] + _helper + _txt[_idx:]
+    write_file(_engine_path, _txt)
+except Exception as _e:
+    print(f"[PART1] installPackageAsUser patch error: {_e}")
+```
+
+۴. روی **Commit changes** بزنید. تمام شد. این کد هنگام بیلد هر سه فراخوانی خراب را به تابع سازگار تبدیل می‌کند و خطای `installPackageAsUser` برطرف می‌شود.
+
+**اگر دوباره قرمز شد:**
+وارد تب **Actions** شوید، روی بیلد قرمز کلیک کنید، وارد بخش **build** شوید، در کادر **Search logs** عبارت `error:` یا `What went wrong` را جستجو کنید و خطوطی که با `error:` شروع می‌شوند شامل نام فایل و `symbol:` را برایم بفرستید.
+
 
 print("[PART1] Upgrade V3 Part 1 completed successfully.")
