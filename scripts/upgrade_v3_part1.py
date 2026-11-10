@@ -2317,7 +2317,7 @@ print("[PART1] Upgrade V3 Part 1 completed successfully.")
 ۳. کلیک کنید ابتدای همین خط، یک `Enter` بزنید تا یک خط خالی بالای آن ساخته شود، و دقیقاً کد زیر را آنجا جایگذاری (Paste) کنید:
 
 ```python
-# --- FIX: installPackageAsUser needs InstallOption (3 args) ---
+
 try:
     _engine_path = os.path.join(JAVA_BASE, "core/Engine.java")
     with open(_engine_path, "r", encoding="utf-8") as _f:
@@ -2362,12 +2362,6 @@ try:
     write_file(_engine_path, _txt)
 except Exception as _e:
     print(f"[PART1] installPackageAsUser patch error: {_e}")
-```
-
-۴. روی **Commit changes** بزنید. تمام شد. این کد هنگام بیلد هر سه فراخوانی خراب را به تابع سازگار تبدیل می‌کند و خطای `installPackageAsUser` برطرف می‌شود.
-
-**اگر دوباره قرمز شد:**
-وارد تب **Actions** شوید، روی بیلد قرمز کلیک کنید، وارد بخش **build** شوید، در کادر **Search logs** عبارت `error:` یا `What went wrong` را جستجو کنید و خطوطی که با `error:` شروع می‌شوند شامل نام فایل و `symbol:` را برایم بفرستید.
 
 
 print("[PART1] Upgrade V3 Part 1 completed successfully.")
