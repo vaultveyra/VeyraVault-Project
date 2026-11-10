@@ -2302,21 +2302,6 @@ public class AboutActivity extends AppCompatActivity {
 }"""
 write_file(os.path.join(JAVA_BASE, "ui/AboutActivity.java"), ABOUT_ACTIVITY_FIXED)
 
-علت خطا مشخص است عزیزم: در نسخه جدید NewBlackbox متد `installPackageAsUser` سه پارامتر می‌خواهد `String, InstallOption, int` ولی در `Engine.java` با دو پارامتر صدا زده شده. فقط همین سه خط باید با یک تابع سازگار جایگزین شود. به پارت ۲ دست نزنید.
-
-**فقط این یک کار را انجام بدهید:**
-
-۱. این فایل را باز کنید و روی ✏️ بزنید:
-`https://github.com/vaultveyra/VeyraVault-Project/blob/main/scripts/upgrade_v3_part1.py`
-
-۲. با `Ctrl + F` این خط آخر را پیدا کنید:
-```
-print("[PART1] Upgrade V3 Part 1 completed successfully.")
-```
-
-۳. کلیک کنید ابتدای همین خط، یک `Enter` بزنید تا یک خط خالی بالای آن ساخته شود، و دقیقاً کد زیر را آنجا جایگذاری (Paste) کنید:
-
-```python
 
 try:
     _engine_path = os.path.join(JAVA_BASE, "core/Engine.java")
