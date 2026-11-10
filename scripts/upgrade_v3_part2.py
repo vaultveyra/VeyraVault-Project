@@ -207,4 +207,17 @@ public class MainActivity extends AppCompatActivity {
  private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
 }"""
 write_file(os.path.join(JAVA_BASE, "ui/MainActivity.java"), MAIN_ACTIVITY)
+
+main_act_path = os.path.join(WORKSPACE, "app/src/main/java/com/veyravault/app/ui/MainActivity.java")
+if os.path.exists(main_act_path):
+    with open(main_act_path, "r", encoding="utf-8") as f:
+        mc = f.read()
+    mc = mc.replace("import com.veyravault.app.R;", "")
+    for icon_name in ["ic_nav_dashboard", "ic_nav_spaces", "ic_nav_vpn", "ic_nav_session", "ic_nav_settings", "ic_nav_add"]:
+        mc = mc.replace("R.drawable." + icon_name, 'resDrawable("' + icon_name + '")')
+    helper_fn = 'private int resDrawable(String n){int id=getResources().getIdentifier(n,"drawable",getPackageName());return id!=0?id:android.R.drawable.ic_menu_manage;} private void buildRootInterface(){'
+    mc = mc.replace("private void buildRootInterface(){", helper_fn, 1)
+    with open(main_act_path, "w", encoding="utf-8") as f:
+        f.write(mc)
+
 print("[PART2] Upgrade V3 Part 2 completed successfully.")
