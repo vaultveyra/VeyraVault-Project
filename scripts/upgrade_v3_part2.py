@@ -225,23 +225,200 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
 
 import re
 
+VAPP_SAFE_JAVA = """package com.veyravault.app;
+
+import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.Application;
+import android.content.Context;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Process;
+import android.util.Log;
+
+import com.veyravault.app.core.Engine;
+import com.veyravault.app.core.VirtualHookManager;
+
+import java.util.List;
+
+public class VeyraApplication extends Application {
+    private static final String TAG = "VeyraApplication";
+    private static Context sInstance;
+
+    public static Context getAppContext() {
+        return sInstance;
+    }
+
+    private static String resolveProcessName(Context context) {
+        if (Build.VERSION.SDK_INT >= 28) {
+            try {
+                String pn = Application.getProcessName();
+                if (pn != null && !pn.isEmpty()) return pn;
+            } catch (Throwable ignored) {}
+        }
+        try {
+            int pid = Process.myPid();
+            ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                List<ActivityManager.RunningAppProcessInfo> list = am.getRunningAppProcesses();
+                if (list != null) {
+                    for (ActivityManager.RunningAppProcessInfo info : list) {
+                        if (info.pid == pid && info.processName != null) {
+                            return info.processName;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return context != null ? context.getPackageName() : "";
+    }
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        sInstance = base;
+        String proc = resolveProcessName(base);
+        boolean isVirtual = proc != null && proc.contains(":p");
+        if (isVirtual) {
+            try {
+                VirtualHookManager.enforceJavaOnlyIdentity(base);
+            } catch (Throwable ignored) {}
+        }
+        try {
+            Engine.doAttachBaseContext(base);
+        } catch (Throwable t) {
+            Log.e(TAG, "attachBaseContext error", t);
+        }
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        sInstance = this;
+        String proc = resolveProcessName(this);
+        boolean isServer = proc != null && (proc.endsWith(":blackbox") || proc.endsWith(":server"));
+        boolean isVirtual = proc != null && proc.contains(":p");
+
+        try {
+            Engine.initialize(this);
+        } catch (Throwable t) {
+            Log.e(TAG, "onCreate engine init error", t);
+        }
+
+        if (isServer) {
+            return;
+        }
+
+        if (isVirtual) {
+            try {
+                VirtualHookManager.enforceProcessIdentity(this);
+            } catch (Throwable ignored) {}
+        } else {
+            try {
+                VirtualHookManager.enforceJavaOnlyIdentity(this);
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(900);
+                        VirtualHookManager.enforceProcessIdentity(VeyraApplication.this);
+                    } catch (Throwable ignored) {}
+                }).start();
+            } catch (Throwable ignored) {}
+        }
+
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                try {
+                    if (!activity.getClass().getName().startsWith("com.veyravault.app.ui.")) {
+                        VirtualHookManager.enforceJavaOnlyIdentity(activity);
+                    }
+                } catch (Throwable ignored) {}
+            }
+            @Override public void onActivityStarted(Activity activity) {}
+            @Override
+            public void onActivityResumed(Activity activity) {
+                try {
+                    if (!activity.getClass().getName().startsWith("com.veyravault.app.ui.")) {
+                        VirtualHookManager.enforceJavaOnlyIdentity(activity);
+                    }
+                } catch (Throwable ignored) {}
+            }
+            @Override public void onActivityPaused(Activity activity) {}
+            @Override public void onActivityStopped(Activity activity) {}
+            @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
+            @Override public void onActivityDestroyed(Activity activity) {}
+        });
+    }
+}
+"""
+
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
+    gradle_p = os.path.join(candidate, "app/build.gradle")
+    if os.path.exists(gradle_p):
+        with open(gradle_p, "r", encoding="utf-8") as f:
+            gr = f.read()
+        gr = gr.replace("targetSdk 34", "targetSdk 28")
+        if "useLegacyPackaging" not in gr:
+            gr = gr.replace("packagingOptions {", "packagingOptions {\n        jniLibs {\n            useLegacyPackaging true\n        }")
+        with open(gradle_p, "w", encoding="utf-8") as f:
+            f.write(gr)
+
     manifest_p = os.path.join(candidate, "app/src/main/AndroidManifest.xml")
     if os.path.exists(manifest_p):
         with open(manifest_p, "r", encoding="utf-8") as f:
             mf = f.read()
-        mf = mf.replace("Theme.AppCompat.DayNight.NoActionBar", "Theme.MaterialComponents.DayNight.NoActionBar")
+        mf = mf.replace("Theme.MaterialComponents.DayNight.NoActionBar", "Theme.AppCompat.DayNight.NoActionBar")
+        if "requestLegacyExternalStorage" not in mf:
+            mf = mf.replace('android:extractNativeLibs="true"', 'android:extractNativeLibs="true"\n        android:requestLegacyExternalStorage="true"')
         with open(manifest_p, "w", encoding="utf-8") as f:
             f.write(mf)
 
+    theme_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/util/ThemeHelper.java")
+    if os.path.exists(theme_p):
+        with open(theme_p, "r", encoding="utf-8") as f:
+            th = f.read()
+        th = re.sub(r'public static void applyTheme\(Context context\)\s*\{.*?\}', 'public static void applyTheme(Context context) {}', th, flags=re.DOTALL)
+        with open(theme_p, "w", encoding="utf-8") as f:
+            f.write(th)
+
+    vhm_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/core/VirtualHookManager.java")
+    if os.path.exists(vhm_p):
+        with open(vhm_p, "r", encoding="utf-8") as f:
+            vh = f.read()
+        if "enforceJavaOnlyIdentity" not in vh:
+            java_only_fn = """public static void enforceJavaOnlyIdentity(Context context) {
+        if (context == null) return;
+        try {
+            EnvConfig cfg = readActiveIdentityFile(context);
+            if (cfg == null) {
+                cfg = resolveEffectiveConfig(context, 0, null);
+            }
+            applyJavaAndReflectionHooks(cfg);
+        } catch (Throwable ignored) {}
+    }
+
+    public static void enforceProcessIdentity("""
+            vh = vh.replace("public static void enforceProcessIdentity(", java_only_fn, 1)
+            with open(vhm_p, "w", encoding="utf-8") as f:
+                f.write(vh)
+
+    eng_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/core/Engine.java")
+    if os.path.exists(eng_p):
+        with open(eng_p, "r", encoding="utf-8") as f:
+            eg = f.read()
+        if "isEnableDaemonService" not in eg:
+            eg = eg.replace(
+                "public String getHostPackageName() {\n                    return context.getPackageName();\n                }",
+                "public String getHostPackageName() {\n                    return context.getPackageName();\n                }\n                @Override\n                public boolean isEnableDaemonService() {\n                    return false;\n                }"
+            )
+            with open(eng_p, "w", encoding="utf-8") as f:
+                f.write(eg)
+
     app_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/VeyraApplication.java")
     if os.path.exists(app_p):
-        with open(app_p, "r", encoding="utf-8") as f:
-            ap = f.read()
-        ap = ap.replace("Context localized = LocaleHelper.onAttach(base);\n        super.attachBaseContext(localized);", "super.attachBaseContext(base);\n        Context localized = base;")
         with open(app_p, "w", encoding="utf-8") as f:
-            f.write(ap)
+            f.write(VAPP_SAFE_JAVA)
 
     main_act_path = os.path.join(candidate, "app/src/main/java/com/veyravault/app/ui/MainActivity.java")
     if os.path.exists(main_act_path):
@@ -333,6 +510,6 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         mc = re.sub(r'private void switchTab\(int (\w+)\)\{', r'private void switchTab(int \1){updateBottomNavSelection(\1);', mc, count=1)
         with open(main_act_path, "w", encoding="utf-8") as f:
             f.write(mc)
-        print("[PART2] Applied crash-proof custom bottom navigation bar to:", main_act_path)
+        print("[PART2] Applied full startup stability & Android 14 compatibility fixes to:", candidate)
 
 print("[PART2] Upgrade V3 Part 2 completed successfully.")
