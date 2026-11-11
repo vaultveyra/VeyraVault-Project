@@ -263,14 +263,14 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         with open(manifest_p, "w", encoding="utf-8") as f:
             f.write(mf)
 
-    # 3. Fix LocaleHelper so Activity never loses its AppCompat Theme on Samsung/Xiaomi Android 12-14
+    # 3. Fix LocaleHelper cleanly without undefined variables
     locale_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/util/LocaleHelper.java")
     if os.path.exists(locale_p):
         with open(locale_p, "r", encoding="utf-8") as f:
             lh = f.read()
         lh = lh.replace(
             "return context.createConfigurationContext(config);",
-            "res.updateConfiguration(config, res.getDisplayMetrics());\n            return context;"
+            "context.getResources().updateConfiguration(config, context.getResources().getDisplayMetrics());\n            return context;"
         )
         with open(locale_p, "w", encoding="utf-8") as f:
             f.write(lh)
@@ -297,29 +297,40 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
             with open(eng_p, "w", encoding="utf-8") as f:
                 f.write(eg)
 
-    # 6. Prevent VeyraApplication from deadlocking :blackbox server process during startup
+    # 6. Guard BLocationManager IPC in VirtualHookManager so it never blocks attachBaseContext
+    vhm_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/core/VirtualHookManager.java")
+    if os.path.exists(vhm_p):
+        with open(vhm_p, "r", encoding="utf-8") as f:
+            vh = f.read()
+        vh = vh.replace(
+            "BLocationManager.get().setPattern(",
+            "if (isVirtualSubProcess()) BLocationManager.get().setPattern("
+        )
+        if "private static boolean isVirtualSubProcess()" not in vh:
+            sub_fn = """    private static boolean isVirtualSubProcess() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                String pn = android.app.Application.getProcessName();
+                return pn != null && pn.contains(":p");
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+"""
+            vh = vh.replace("public class VirtualHookManager {", "public class VirtualHookManager {\n" + sub_fn, 1)
+        with open(vhm_p, "w", encoding="utf-8") as f:
+            f.write(vh)
+
+    # 7. Prevent VeyraApplication from deadlocking :blackbox server process during startup
     app_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/VeyraApplication.java")
     if os.path.exists(app_p):
         with open(app_p, "r", encoding="utf-8") as f:
             ap = f.read()
-        ap = ap.replace(
-            "Context localized = LocaleHelper.onAttach(base);\n        super.attachBaseContext(localized);",
-            "super.attachBaseContext(base);\n        Context localized = base;"
-        )
-        ap = ap.replace(
-            "VirtualHookManager.enforceProcessIdentity(localized);",
-            "if ( isVirtualProcess(localized) ) { try { VirtualHookManager.enforceProcessIdentity(localized); } catch (Throwable ignored) {} }"
-        )
-        ap = ap.replace(
-            "VirtualHookManager.enforceProcessIdentity(this);",
-            "if ( isVirtualProcess(this) ) { try { VirtualHookManager.enforceProcessIdentity(this); } catch (Throwable ignored) {} }"
-        )
-        ap = ap.replace(
-            "GmsSupportManager.syncGmsStateOnStartup(this);",
-            "/* GMS sync deferred to user action to prevent startup IPC deadlock */"
-        )
-        if "private static boolean isVirtualProcess" not in ap:
-            helper_proc = """    private static boolean isVirtualProcess(Context c) {
+        ap = re.sub(r'Context\s+localized\s*=\s*LocaleHelper\.onAttach\(base\);\s*super\.attachBaseContext\(localized\);', 'super.attachBaseContext(base);\n        Context localized = base;', ap)
+        ap = re.sub(r'VirtualHookManager\.enforceProcessIdentity\([^)]+\);', 'if (isVirtualProcess()) { try { VirtualHookManager.enforceProcessIdentity(this); } catch (Throwable ignored) {} }', ap)
+        ap = re.sub(r'GmsSupportManager\.syncGmsStateOnStartup\([^)]+\);', '/* GMS sync deferred */', ap)
+        if "private static boolean isVirtualProcess()" not in ap:
+            helper_proc = """    private static boolean isVirtualProcess() {
         try {
             if (android.os.Build.VERSION.SDK_INT >= 28) {
                 String pn = Application.getProcessName();
@@ -333,7 +344,7 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         with open(app_p, "w", encoding="utf-8") as f:
             f.write(ap)
 
-    # 7. Patch MainActivity with explicit AppCompat theme enforcement and 6-tab custom bottom bar
+    # 8. Patch MainActivity with explicit AppCompat theme enforcement and 6-tab custom bottom bar
     main_act_path = os.path.join(candidate, "app/src/main/java/com/veyravault/app/ui/MainActivity.java")
     if os.path.exists(main_act_path):
         with open(main_act_path, "r", encoding="utf-8") as f:
