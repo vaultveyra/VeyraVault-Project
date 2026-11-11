@@ -223,20 +223,36 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
             f.write(mc)
         print("[PART2] Patched R references in:", main_act_path)
 
+
 import re
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
-    gradle_p = os.path.join(candidate, "app/build.gradle")
-    if os.path.exists(gradle_p):
-        with open(gradle_p, "r", encoding="utf-8") as f:
-            gr = f.read()
-        gr = gr.replace("targetSdk 34", "targetSdk 28")
-        if "useLegacyPackaging" not in gr:
-            gr = gr.replace("packagingOptions {", "packagingOptions {\n        jniLibs {\n            useLegacyPackaging true\n        }")
-        with open(gradle_p, "w", encoding="utf-8") as f:
-            f.write(gr)
+    if not os.path.exists(candidate):
+        continue
 
+    # 1. Disable R8/ProGuard minification in ALL gradle files (especially Bcore/build.gradle) & set targetSdk 28
+    for root_dir, _, files in os.walk(candidate):
+        for fn in files:
+            if fn == "build.gradle":
+                gp = os.path.join(root_dir, fn)
+                try:
+                    with open(gp, "r", encoding="utf-8") as f:
+                        gr = f.read()
+                    gr_new = re.sub(r'minifyEnabled\s+true', 'minifyEnabled false', gr)
+                    gr_new = re.sub(r'shrinkResources\s+true', 'shrinkResources false', gr_new)
+                    if "app" in root_dir:
+                        gr_new = re.sub(r'targetSdk(Version)?\s+34', 'targetSdk 28', gr_new)
+                        if "useLegacyPackaging" not in gr_new and "packagingOptions {" in gr_new:
+                            gr_new = gr_new.replace("packagingOptions {", "packagingOptions {\n        jniLibs {\n            useLegacyPackaging true\n        }")
+                    if gr_new != gr:
+                        with open(gp, "w", encoding="utf-8") as f:
+                            f.write(gr_new)
+                        print("[PART2] Patched gradle file:", gp)
+                except Exception as e:
+                    print("[PART2] Gradle patch warning:", e)
+
+    # 2. Fix AndroidManifest theme & storage flags
     manifest_p = os.path.join(candidate, "app/src/main/AndroidManifest.xml")
     if os.path.exists(manifest_p):
         with open(manifest_p, "r", encoding="utf-8") as f:
@@ -247,6 +263,19 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         with open(manifest_p, "w", encoding="utf-8") as f:
             f.write(mf)
 
+    # 3. Fix LocaleHelper so Activity never loses its AppCompat Theme on Samsung/Xiaomi Android 12-14
+    locale_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/util/LocaleHelper.java")
+    if os.path.exists(locale_p):
+        with open(locale_p, "r", encoding="utf-8") as f:
+            lh = f.read()
+        lh = lh.replace(
+            "return context.createConfigurationContext(config);",
+            "res.updateConfiguration(config, res.getDisplayMetrics());\n            return context;"
+        )
+        with open(locale_p, "w", encoding="utf-8") as f:
+            f.write(lh)
+
+    # 4. Prevent ThemeHelper from triggering recreation loop before setContentView
     theme_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/util/ThemeHelper.java")
     if os.path.exists(theme_p):
         with open(theme_p, "r", encoding="utf-8") as f:
@@ -255,6 +284,7 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         with open(theme_p, "w", encoding="utf-8") as f:
             f.write(th)
 
+    # 5. Disable DaemonService in Engine.java to prevent ForegroundService crash on Android 12-14
     eng_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/core/Engine.java")
     if os.path.exists(eng_p):
         with open(eng_p, "r", encoding="utf-8") as f:
@@ -267,6 +297,7 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
             with open(eng_p, "w", encoding="utf-8") as f:
                 f.write(eg)
 
+    # 6. Prevent VeyraApplication from deadlocking :blackbox server process during startup
     app_p = os.path.join(candidate, "app/src/main/java/com/veyravault/app/VeyraApplication.java")
     if os.path.exists(app_p):
         with open(app_p, "r", encoding="utf-8") as f:
@@ -277,11 +308,32 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         )
         ap = ap.replace(
             "VirtualHookManager.enforceProcessIdentity(localized);",
-            "/* deferred until after engine init */"
+            "if ( isVirtualProcess(localized) ) { try { VirtualHookManager.enforceProcessIdentity(localized); } catch (Throwable ignored) {} }"
         )
+        ap = ap.replace(
+            "VirtualHookManager.enforceProcessIdentity(this);",
+            "if ( isVirtualProcess(this) ) { try { VirtualHookManager.enforceProcessIdentity(this); } catch (Throwable ignored) {} }"
+        )
+        ap = ap.replace(
+            "GmsSupportManager.syncGmsStateOnStartup(this);",
+            "/* GMS sync deferred to user action to prevent startup IPC deadlock */"
+        )
+        if "private static boolean isVirtualProcess" not in ap:
+            helper_proc = """    private static boolean isVirtualProcess(Context c) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                String pn = Application.getProcessName();
+                return pn != null && pn.contains(":p");
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+"""
+            ap = ap.replace("public class VeyraApplication extends Application {", "public class VeyraApplication extends Application {\n" + helper_proc, 1)
         with open(app_p, "w", encoding="utf-8") as f:
             f.write(ap)
 
+    # 7. Patch MainActivity with explicit AppCompat theme enforcement and 6-tab custom bottom bar
     main_act_path = os.path.join(candidate, "app/src/main/java/com/veyravault/app/ui/MainActivity.java")
     if os.path.exists(main_act_path):
         with open(main_act_path, "r", encoding="utf-8") as f:
@@ -289,6 +341,10 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         mc = mc.replace("import com.veyravault.app.R;", "")
         mc = mc.replace('private int resDrawable(String n){int id=getResources().getIdentifier(n,"drawable",getPackageName());return id!=0?id:android.R.drawable.ic_menu_manage;}', "")
         mc = re.sub(r'bottomNav\.setSelectedItemId\(([^)]+)\)', r'switchTab(\1)', mc)
+        mc = mc.replace(
+            "super.onCreate(savedInstanceState);",
+            "try { setTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar); } catch (Throwable ignored) {}\n        super.onCreate(savedInstanceState);"
+        )
         custom_nav = """private final LinearLayout[] navTabViews = new LinearLayout[7];
     private final ImageView[] navTabIcons = new ImageView[7];
     private final TextView[] navTabLabels = new TextView[7];
@@ -372,6 +428,6 @@ for candidate in [base_dir, os.path.join(base_dir, "build_workspace")]:
         mc = re.sub(r'private void switchTab\(int (\w+)\)\{', r'private void switchTab(int \1){updateBottomNavSelection(\1);', mc, count=1)
         with open(main_act_path, "w", encoding="utf-8") as f:
             f.write(mc)
-        print("[PART2] Patched startup crash fixes cleanly in:", candidate)
+        print("[PART2] Applied complete Bcore R8 fix + Deadlock fix + Theme fix in:", candidate)
 
 print("[PART2] Upgrade V3 Part 2 completed successfully.")
