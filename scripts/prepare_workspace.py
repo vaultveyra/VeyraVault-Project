@@ -178,14 +178,6 @@ def main():
     id 'com.android.application'
 }}
 
-def signingStorePassword = System.getenv("V_KS_PASS")
-def signingKeyAlias = System.getenv("V_KEY_ALIAS")
-def signingKeyPassword = System.getenv("V_KEY_PASS")
-def hasReleaseSigning = file("release.keystore").exists() &&
-        signingStorePassword != null && !signingStorePassword.isEmpty() &&
-        signingKeyAlias != null && !signingKeyAlias.isEmpty() &&
-        signingKeyPassword != null && !signingKeyPassword.isEmpty()
-
 android {{
     namespace "com.veyravault.space"
     compileSdk {compile_sdk}
@@ -203,32 +195,11 @@ android {{
         }}
     }}
 
-    signingConfigs {{
-        if (hasReleaseSigning) {{
-            release {{
-                storeFile file("release.keystore")
-                storePassword signingStorePassword
-                keyAlias signingKeyAlias
-                keyPassword signingKeyPassword
-                v1SigningEnabled true
-                v2SigningEnabled true
-            }}
-        }}
-    }}
-
     buildTypes {{
         release {{
             minifyEnabled false
             shrinkResources false
-            if (hasReleaseSigning) {{
-                signingConfig signingConfigs.release
-            }}
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }}
-        debug {{
-            if (hasReleaseSigning) {{
-                signingConfig signingConfigs.release
-            }}
         }}
     }}
 
