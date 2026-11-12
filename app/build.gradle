@@ -15,24 +15,13 @@ android {
         }
     }
 
-    signingConfigs {
-        release {
-            storeFile file("release.keystore")
-            storePassword System.getenv("V_KS_PASS") ?: "VeyraVaultKeyPass2025"
-            keyAlias System.getenv("V_KEY_ALIAS") ?: "veyravault"
-            keyPassword System.getenv("V_KEY_PASS") ?: "VeyraVaultKeyPass2025"
-        }
-    }
-
     buildTypes {
         release {
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            signingConfig signingConfigs.release
         }
     }
 
