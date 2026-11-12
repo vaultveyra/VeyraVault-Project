@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+def signingStorePassword = System.getenv("V_KS_PASS")
+def signingKeyAlias = System.getenv("V_KEY_ALIAS")
+def signingKeyPassword = System.getenv("V_KEY_PASS")
+def hasReleaseSigning = file("release.keystore").exists() &&
+        signingStorePassword != null && !signingStorePassword.isEmpty() &&
+        signingKeyAlias != null && !signingKeyAlias.isEmpty() &&
+        signingKeyPassword != null && !signingKeyPassword.isEmpty()
+
 android {
     compileSdkVersion __COMPILE_SDK__
 
@@ -16,11 +24,13 @@ android {
     }
 
     signingConfigs {
-        release {
-            storeFile file("release.keystore")
-            storePassword System.getenv("V_KS_PASS") ?: "VeyraVaultKeyPass2025"
-            keyAlias System.getenv("V_KEY_ALIAS") ?: "veyravault"
-            keyPassword System.getenv("V_KEY_PASS") ?: "VeyraVaultKeyPass2025"
+        if (hasReleaseSigning) {
+            release {
+                storeFile file("release.keystore")
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+            }
         }
     }
 
@@ -28,11 +38,11 @@ android {
         release {
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) signingConfig signingConfigs.release
         }
     }
 
