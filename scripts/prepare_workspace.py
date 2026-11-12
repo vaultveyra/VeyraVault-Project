@@ -77,7 +77,7 @@ def pin_ndk_version(gradle_file, label):
 
 
 def post_build():
-    print("[*] Collecting signed APK and running Stage-2 binary audit...")
+    print("[*] Collecting APK and running Stage-2 binary audit...")
     if os.path.isdir(OUTPUT_DIR):
         shutil.rmtree(OUTPUT_DIR)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -280,7 +280,7 @@ android.nonTransitiveRClass=false
     with open(gradle_props, "w", encoding="utf-8") as f:
         f.write(props_content)
 
-    print("[+] Workspace and NDK pin prepared. Release signing is enabled only when a private keystore and secrets are supplied.")
+    print("[+] Workspace and NDK pin prepared. Signing is handled in a separate job; this build step never receives signing secrets.")
 
 
 if __name__ == "__main__":
