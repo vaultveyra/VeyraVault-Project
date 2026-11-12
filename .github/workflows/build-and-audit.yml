@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build-and-audit:
+  build:
+    name: Build and audit unsigned APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,8 +35,38 @@ jobs:
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
-      - name: Configure release signing from repository secrets
-        if: github.event_name != 'pull_request'
+      - name: Run source audit
+        run: python3 scripts/audit_source.py > source_audit_report.txt
+
+      - name: Compile unsigned release APK
+        working-directory: ./build_workspace
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Package and audit APK
+        run: python3 scripts/prepare_workspace.py --post-build
+
+      - name: Upload unsigned APK and audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: output_artifacts/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-release:
+    name: Sign APK in isolated job
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download unsigned build
+        uses: actions/download-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: unsigned
+
+      - name: Sign APK using private repository secrets
+        id: sign
         env:
           KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -43,38 +74,39 @@ jobs:
           KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -n "${KEYSTORE_B64:-}" && -n "${KS_PASS:-}" && -n "${KEY_ALIAS:-}" && -n "${KEY_PASS:-}" ]]; then
-            printf '%s' "$KEYSTORE_B64" | base64 --decode > build_workspace/app/release.keystore
-            chmod 600 build_workspace/app/release.keystore
-            test -s build_workspace/app/release.keystore
-            keytool -list -keystore build_workspace/app/release.keystore -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null
-            {
-              printf 'V_KS_PASS=%s\n' "$KS_PASS"
-              printf 'V_KEY_ALIAS=%s\n' "$KEY_ALIAS"
-              printf 'V_KEY_PASS=%s\n' "$KEY_PASS"
-            } >> "$GITHUB_ENV"
-            echo "Private release signing configured."
-          else
-            echo "Signing secrets are not fully configured; building an unsigned release APK."
+          if [[ -z "${KEYSTORE_B64:-}" || -z "${KS_PASS:-}" || -z "${KEY_ALIAS:-}" || -z "${KEY_PASS:-}" ]]; then
+            echo "Signing secrets are not configured. Only the unsigned CI artifact is available."
+            exit 0
           fi
 
-      - name: Run source audit
-        run: python3 scripts/audit_source.py > source_audit_report.txt
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          test -x "$APKSIGNER"
 
-      - name: Compile release APK
-        working-directory: ./build_workspace
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/veyravault-release.keystore"
+          chmod 600 "$RUNNER_TEMP/veyravault-release.keystore"
+          test -s "$RUNNER_TEMP/veyravault-release.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/veyravault-release.keystore" -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null
 
-      - name: Package and audit APK
-        run: python3 scripts/prepare_workspace.py --post-build
+          mkdir -p signed
+          cp unsigned/VeyraVault-release.apk signed/VeyraVault-release.apk
+          "$APKSIGNER" sign \
+            --ks "$RUNNER_TEMP/veyravault-release.keystore" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS \
+            --key-pass env:KEY_PASS \
+            signed/VeyraVault-release.apk
+          "$APKSIGNER" verify --verbose signed/VeyraVault-release.apk
+          cp unsigned/source_audit_report.txt signed/ 2>/dev/null || true
+          cp unsigned/apk_audit_report.txt signed/ 2>/dev/null || true
+          echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK and audit reports
+      - name: Upload signed release APK
+        if: steps.sign.outputs.signed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: VeyraVault-Release-Bundle
-          path: |
-            output_artifacts/VeyraVault-release.apk
-            output_artifacts/source_audit_report.txt
-            output_artifacts/apk_audit_report.txt
+          name: VeyraVault-Signed-Release
+          path: signed/
           if-no-files-found: error
           retention-days: 7
