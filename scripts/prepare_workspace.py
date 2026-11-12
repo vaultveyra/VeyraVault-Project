@@ -78,6 +78,8 @@ def pin_ndk_version(gradle_file, label):
 
 def post_build():
     print("[*] Collecting signed APK and running Stage-2 binary audit...")
+    if os.path.isdir(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     apks = glob.glob(os.path.join(WORKSPACE, "app", "build", "outputs", "apk", "release", "*.apk"))
@@ -86,10 +88,6 @@ def post_build():
         sys.exit(1)
     apk_out = os.path.join(OUTPUT_DIR, "VeyraVault-release.apk")
     shutil.copy2(apks[0], apk_out)
-
-    ks_path = os.path.join(WORKSPACE, "app", "release.keystore")
-    if os.path.exists(ks_path):
-        shutil.copy2(ks_path, os.path.join(OUTPUT_DIR, "release.keystore"))
 
     src_rep = os.path.join(ROOT, "source_audit_report.txt")
     if os.path.exists(src_rep):
@@ -180,6 +178,14 @@ def main():
     id 'com.android.application'
 }}
 
+def signingStorePassword = System.getenv("V_KS_PASS")
+def signingKeyAlias = System.getenv("V_KEY_ALIAS")
+def signingKeyPassword = System.getenv("V_KEY_PASS")
+def hasReleaseSigning = file("release.keystore").exists() &&
+        signingStorePassword != null && !signingStorePassword.isEmpty() &&
+        signingKeyAlias != null && !signingKeyAlias.isEmpty() &&
+        signingKeyPassword != null && !signingKeyPassword.isEmpty()
+
 android {{
     namespace "com.veyravault.space"
     compileSdk {compile_sdk}
@@ -198,13 +204,15 @@ android {{
     }}
 
     signingConfigs {{
-        release {{
-            storeFile file("release.keystore")
-            storePassword "VeyraVaultPass2025"
-            keyAlias "veyravault_key"
-            keyPassword "VeyraVaultPass2025"
-            v1SigningEnabled true
-            v2SigningEnabled true
+        if (hasReleaseSigning) {{
+            release {{
+                storeFile file("release.keystore")
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }}
         }}
     }}
 
@@ -212,11 +220,15 @@ android {{
         release {{
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {{
+                signingConfig signingConfigs.release
+            }}
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }}
         debug {{
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {{
+                signingConfig signingConfigs.release
+            }}
         }}
     }}
 
@@ -297,17 +309,7 @@ android.nonTransitiveRClass=false
     with open(gradle_props, "w", encoding="utf-8") as f:
         f.write(props_content)
 
-    ks_file = os.path.join(ws_app, "release.keystore")
-    if not os.path.exists(ks_file):
-        print("[*] Generating dedicated RSA-2048 release keystore...")
-        run(
-            f'keytool -genkeypair -v -keystore "{ks_file}" '
-            f'-alias veyravault_key -keyalg RSA -keysize 2048 -validity 10000 '
-            f'-storepass VeyraVaultPass2025 -keypass VeyraVaultPass2025 '
-            f'-dname "CN=VeyraVault, OU=Security, O=VeyraVault, L=Global, S=Global, C=US"'
-        )
-
-    print("[+] Workspace, NDK pin and release keystore prepared successfully!")
+    print("[+] Workspace and NDK pin prepared. Release signing is enabled only when a private keystore and secrets are supplied.")
 
 
 if __name__ == "__main__":
