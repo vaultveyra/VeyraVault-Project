@@ -64,7 +64,6 @@ THEMES_XML = """<?xml version="1.0" encoding="utf-8"?>
     <style name="AppTheme" parent="Theme.VeyraVault" />
 </resources>
 """
-write_file(os.path.join(RES_DIR, "values", "themes.xml"), THEMES_XML)
 write_file(os.path.join(RES_DIR, "values-night", "themes.xml"), THEMES_XML)
 write_file(os.path.join(RES_DIR, "values", "styles.xml"), THEMES_XML)
 
