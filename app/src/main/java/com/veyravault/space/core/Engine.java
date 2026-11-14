@@ -49,6 +49,12 @@ public class Engine {
                 public String getHostPackageName() {
                     return ctx.getPackageName();
                 }
+
+                // Disable upstream automatic crash-log uploads by leaving no destination configured.
+                @Override
+                public String getLogSenderChatId() {
+                    return null;
+                }
             };
         } catch (Throwable t) {
             return null;
