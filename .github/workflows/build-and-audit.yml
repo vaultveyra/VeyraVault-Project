@@ -75,8 +75,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${KEYSTORE_B64:-}" || -z "${KS_PASS:-}" || -z "${KEY_ALIAS:-}" || -z "${KEY_PASS:-}" ]]; then
-            echo "Signing secrets are not configured. Only the unsigned CI artifact is available."
-            exit 0
+            echo "ERROR: Required signing secrets are missing. Refusing to report a successful release without a signed APK."
+            exit 1
           fi
 
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
