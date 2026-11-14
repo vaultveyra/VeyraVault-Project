@@ -8,6 +8,7 @@ OUTPUT_DIR = os.path.join(ROOT, "output_artifacts")
 
 # NDK pinned to a stable release that builds BOTH armeabi-v7a and arm64-v8a for legacy C++ code
 NDK_VERSION = "27.0.12077973"
+ENGINE_COMMIT = "89b59836c66f173756a4ae258cf379a957649820"
 NDK_LICENSE_HASH = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
 
 
