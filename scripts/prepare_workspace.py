@@ -116,7 +116,9 @@ def main():
         shutil.copytree(BUNDLED_ENGINE, WORKSPACE)
     else:
         print("[*] Cloning upstream BlackBox engine into build_workspace...")
-        run(f'git clone --depth 1 https://github.com/ALEX5402/NewBlackbox.git "{WORKSPACE}"')
+        run(f'git clone --no-checkout https://github.com/ALEX5402/NewBlackbox.git "{WORKSPACE}"')
+        run(f'git -C "{WORKSPACE}" fetch --depth 1 origin {ENGINE_COMMIT}')
+        run(f'git -C "{WORKSPACE}" checkout --detach FETCH_HEAD')
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")
     if os.path.exists(gradlew_path):
