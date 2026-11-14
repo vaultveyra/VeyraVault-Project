@@ -29,8 +29,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Apply VeyraVault upgrades
-        run: python3 scripts/upgrade_v3_part1.py && python3 scripts/upgrade_v3_part2.py
+      # The V3 upgrade scripts currently generate a second, incompatible
+      # com.veyravault.app source tree. Keep them staged until the migration
+      # is completed; do not overwrite the working com.veyravault.space app.
+      - name: Validate staged V3 migration scripts
+        run: python3 -c "import ast; [ast.parse(open(p, encoding='utf-8').read(), filename=p) for p in ('scripts/upgrade_v3_part1.py', 'scripts/upgrade_v3_part2.py')]"
 
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
