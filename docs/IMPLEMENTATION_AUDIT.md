@@ -66,6 +66,12 @@ The stabilization workflow change keeps the existing checked-in app as the build
 7. Add encrypted backup/restore, storage management, batch policies, and in-app diagnostics.
 8. Expand automated tests and device compatibility coverage before release.
 
+## Additional security changes on the stabilization branch
+
+- The upstream default crash-log destination is explicitly disabled through the app's `ClientConfiguration` override. The upstream sender code remains in the third-party engine, so this configuration must not be removed; a future engine migration should remove or replace that feature deliberately.
+- Cleartext HTTP traffic is disabled by the app manifest override.
+- The upstream BlackBox engine is pinned to the audited commit listed above to make builds reproducible and prevent silent upstream changes.
+
 ## Release gate
 
 Do not merge a build change until the unsigned APK build, source audit, APK audit, and (on a protected non-PR release run) keystore signature verification all pass. Do not claim a feature is complete until its behavior is tested, not merely because a screen or class exists.
