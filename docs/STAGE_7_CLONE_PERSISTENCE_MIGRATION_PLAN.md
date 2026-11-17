@@ -211,7 +211,7 @@ An AndroidX instrumentation suite is now added under `app/src/androidTest`. It u
 - Close and reopen an on-disk Room database and verify the imported snapshot, including a stale active marker.
 - Import an empty snapshot with no active marker and verify singleton defaults and absence of an active row.
 
-The test APK uses a debug-only `RoomTestApplication` so the instrumentation process does not start the virtual-app engine. Debug packaging excludes native shared libraries because these tests exercise persistence only; the production `VaultApp`, release manifest, release ABI filters and release APK packaging remain unchanged. The test suite runs on an x86_64 Android API 35 emulator through GitHub Actions.
+The test APK uses a debug-only `RoomTestApplication` so the instrumentation process does not start the virtual-app engine. The generated Debug variant explicitly targets the CI emulator's `x86_64` ABI and excludes native shared libraries because these tests exercise persistence only; the production `VaultApp`, release manifest, release ARM ABI filters and release APK packaging remain unchanged. The test suite runs on an x86_64 Android API 34 emulator through GitHub Actions. An initial emulator run exposed the inherited ARM-only ABI filter as the cause of `No compatible devices connected`; the Debug-only ABI override now addresses that mismatch.
 
 ### Boundary and remaining validation
 
