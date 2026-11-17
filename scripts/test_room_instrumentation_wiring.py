@@ -36,6 +36,7 @@ for dep in (
 ):
     assert dep in prepare, f"Missing instrumentation dependency: {dep}"
 assert 'excludes += ["**/*.so"]' in prepare, "Debug Room test APK must not package virtual-engine native libraries"
+assert "releaseImplementation project(':Bcore')" in prepare and "debugCompileOnly project(':Bcore')" in prepare, "Debug Room harness must compile against Bcore without packaging its ARM-only engine/native runtime"
 assert 'abiFilters "x86_64"' in prepare, "Debug instrumentation variant must match the x86_64 CI emulator"
 assert "reactivecircus/android-emulator-runner@v2" in workflow
 assert ":app:connectedDebugAndroidTest" in workflow
