@@ -108,7 +108,8 @@ public final class ProfileStore {
      */
     public static synchronized boolean migrateLegacyLocationSettings(Context context) {
         SharedPreferences p = prefs(context);
-        if (p.getBoolean(KEY_MIGRATED, false)) return true;
+        // Re-scan on later launches as new clones may be added after the first import.
+        // Existing profile fields are never overwritten, so this remains idempotent.
 
         // Validate the legacy JSON before reading through CloneStore, whose public
         // accessor intentionally returns an empty list when parsing fails.
@@ -128,21 +129,35 @@ public final class ProfileStore {
         try {
             JSONObject clones = root.optJSONObject("clones");
             if (clones == null) clones = new JSONObject();
+            boolean changed = false;
             List<CloneStore.CloneEntry> legacy = CloneStore.getAll(context);
             for (CloneStore.CloneEntry entry : legacy) {
                 if (entry == null || entry.packageName == null || !entry.mockGpsEnabled) continue;
                 String key = cloneKey(entry.packageName, entry.userId);
                 JSONObject existing = clones.optJSONObject(key);
                 JSONObject imported = existing == null ? new JSONObject() : new JSONObject(existing.toString());
-                if (!imported.has("locationEnabled")) imported.put("locationEnabled", true);
-                if (!imported.has("latitude") && validLatitude(entry.latitude))
+                boolean entryChanged = false;
+                if (!imported.has("locationEnabled")) {
+                    imported.put("locationEnabled", true);
+                    entryChanged = true;
+                }
+                if (!imported.has("latitude") && validLatitude(entry.latitude)) {
                     imported.put("latitude", entry.latitude);
-                if (!imported.has("longitude") && validLongitude(entry.longitude))
+                    entryChanged = true;
+                }
+                if (!imported.has("longitude") && validLongitude(entry.longitude)) {
                     imported.put("longitude", entry.longitude);
-                clones.put(key, imported);
+                    entryChanged = true;
+                }
+                if (entryChanged) {
+                    clones.put(key, imported);
+                    changed = true;
+                }
             }
-            root.put("clones", clones);
-            if (!writeRoot(context, root)) return false;
+            if (changed) {
+                root.put("clones", clones);
+                if (!writeRoot(context, root)) return false;
+            }
             return p.edit().putBoolean(KEY_MIGRATED, true).commit();
         } catch (Exception ignored) {
             return false;
