@@ -103,12 +103,12 @@ public class Engine {
     }
 
     public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
-        CloneStore.recordActiveLaunch(ctx, entry);
-        VirtualHookManager.syncCloneHooks(ctx, entry);
         if (!isInstalledAsUser(entry.packageName, entry.userId)
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
             return false;
         }
+        CloneStore.recordActiveLaunch(ctx, entry);
+        VirtualHookManager.syncCloneHooks(ctx, entry);
         try {
             Object core = getCore();
             if (core == null) return false;
