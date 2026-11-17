@@ -88,3 +88,12 @@ A first read-only in-app compatibility report has been added on the feature bran
 This is an initial diagnostics foundation, not a full compatibility certification. No physical-device test has been performed. The report does not verify permission grants, per-clone runtime behavior, or remote service observations. See `STAGE_3_COMPATIBILITY_DIAGNOSTICS.md`.
 
 Outstanding high-priority reliability findings remain: `Engine.installPackageAsUser` currently returns success from its exception path, and process-wide hooks require cross-clone isolation review. These must be addressed with targeted tests before modifying the virtualization runtime.
+
+
+## Stage 5 — Engine install/launch failure semantics
+
+The pinned upstream BlackBox revision was inspected directly. Its `BlackBoxCore.installPackageAsUser(String, int)` returns an `InstallResult` with a public boolean `success` field; its `isInstalled(String, int)` method reports installation for a specific virtual user. The previous host wrapper returned `true` after reflection exceptions, masking failed installs.
+
+The feature branch now fails closed when the core, reflected result, success field, or invocation is unavailable. Clone launch first checks whether the package is already installed for its virtual user; only absent clones are installed, and a failed installation stops the launch attempt. This avoids reinstalling an existing clone on every launch while preventing failed installation from being treated as success.
+
+This is a targeted reliability fix, not a claim that all engine operations are now verified. Other reflection paths still require method-by-method review. This change does not alter clone IDs, CloneStore persistence, session data, or VirtualHookManager behavior.
