@@ -16,4 +16,6 @@ public class CloneEntity {
     public boolean customDeviceEnabled;
     public String deviceBrand;
     public String deviceModel;
+    // Exact source JSON retains unknown legacy fields across migration.
+    @NonNull public String legacyJson = "{}";
 }
