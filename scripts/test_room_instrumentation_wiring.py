@@ -39,4 +39,7 @@ assert 'excludes += ["**/*.so"]' in prepare, "Debug Room test APK must not packa
 assert 'abiFilters "x86_64"' in prepare, "Debug instrumentation variant must match the x86_64 CI emulator"
 assert "reactivecircus/android-emulator-runner@v2" in workflow
 assert ":app:connectedDebugAndroidTest" in workflow
+assert ":app:assembleDebug :app:assembleDebugAndroidTest" in workflow, "Build debug APKs before native ABI diagnostics"
+assert "DEBUG APK NATIVE LIBRARIES" in workflow and "ANDROID TEST APK NATIVE LIBRARIES" in workflow, "CI must report native libraries in both instrumentation APKs before install"
+assert "MERGED DEBUG NATIVE LIBRARY INPUTS" in workflow, "CI must report merged debug native-library inputs"
 print("PASS: Android Room instrumentation harness and emulator CI wiring are present.")
