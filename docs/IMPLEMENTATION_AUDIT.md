@@ -97,3 +97,6 @@ The pinned upstream BlackBox revision was inspected directly. Its `BlackBoxCore.
 The feature branch now fails closed when the core, reflected result, success field, or invocation is unavailable. Clone launch first checks whether the package is already installed for its virtual user; only absent clones are installed, and a failed installation stops the launch attempt. This avoids reinstalling an existing clone on every launch while preventing failed installation from being treated as success.
 
 This is a targeted reliability fix, not a claim that all engine operations are now verified. Other reflection paths still require method-by-method review. This change does not alter clone IDs, CloneStore persistence, session data, or VirtualHookManager behavior.
+
+
+The Stage 5 reliability fix also updates both clone-creation entry points: Add App and Duplicate now save a CloneStore entry only after the engine confirms installation success. The Spaces launch action now surfaces a failure message rather than always displaying a launch toast. The regression contract test covers these guards. No existing clone records are migrated or rewritten by these changes.
