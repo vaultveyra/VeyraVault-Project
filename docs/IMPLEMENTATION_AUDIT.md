@@ -122,3 +122,12 @@ A non-destructive migration inventory and plan is added in `docs/STAGE_7_CLONE_P
 The inventory identified important migration hazards: malformed clone JSON is currently converted to an empty list by `getAll()`, write failures are swallowed, and whole-array read/modify/write operations can lose concurrent updates. These behaviors must be addressed with explicit error reporting and transactional repository APIs before any persistence cutover. Room must not be queried on the main thread. The build uses a generated Gradle app module from `scripts/prepare_workspace.py`, so a future Room dependency must be added to that generated template after checking the pinned engine's Gradle/AGP compatibility.
 
 CI now runs `scripts/test_clone_store_migration_inventory.py` to guard the existing preference namespace, keys, serialized fields, composite clone identity, and migration safety-plan requirements. This stage does not change clone records, virtual app storage, account/session data, or runtime persistence. Room implementation, import, cutover, and legacy-key retirement are deferred to later independently reviewed stages.
+
+
+### Stage 7.1 — Inactive Room schema foundation (2026-11-17)
+
+Pinned upstream build configuration was verified at `ALEX5402/NewBlackbox@89b59836c66f173756a4ae258cf379a957649820`: Gradle 8.14.5, AGP 8.13.2, Bcore Java 21, generated app Java 8, compileSdk 35, minSdk 21. Room 2.6.1 runtime and Java annotation processor are now included in the generated app module template in `scripts/prepare_workspace.py`.
+
+Added a non-active Room schema under `core/persistence`: composite clone identity, normalized denied-permission rows with a cascading clone FK, exact string collapsed-space keys, singleton global profile/master GPS/last-active entities, DAOs, database, and opt-in provider. The provider is not called by application startup or CloneStore. There is no destructive migration fallback and no main-thread query opt-in. The old SharedPreferences CloneStore remains the sole active persistence path; no import, preference rewrite, clone/session data change, or cutover has occurred.
+
+CI now checks the Room foundation boundary and will compile the Room annotations and generated DAO/database code as part of the release APK build. The schema is provisional until the next stage adds snapshot validation, backup/restore, transactional import and parity tests.
