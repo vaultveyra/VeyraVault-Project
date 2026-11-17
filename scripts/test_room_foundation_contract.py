@@ -31,6 +31,10 @@ assert "ClonePersistenceDatabaseProvider.get(" not in (
     java_root / "com/veyravault/space/VaultApp.java"
 ).read_text(encoding="utf-8")
 
+for source_path in java_root.rglob("*.java"):
+    if source_path.name != "ClonePersistenceDatabaseProvider.java":
+        assert "ClonePersistenceDatabaseProvider.get(" not in source_path.read_text(encoding="utf-8"), source_path
+
 # No destructive fallback and no main-thread query opt-in anywhere in persistence package.
 for path in room_root.glob("*.java"):
     source = path.read_text(encoding="utf-8")
