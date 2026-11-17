@@ -346,10 +346,12 @@ public class MainActivity extends BaseActivity {
         iconFrame.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                boolean launched = Engine.launchClone(MainActivity.this, item);
                 Toast.makeText(MainActivity.this,
-                        (fa ? "در حال اجرای " : "Launching ") + item.displayName + "...",
+                        launched
+                                ? ((fa ? "در حال اجرای " : "Launching ") + item.displayName + "...")
+                                : (fa ? "اجرای کلون ناموفق بود؛ وضعیت نصب و موتور را بررسی کنید." : "Clone launch failed. Check installation and engine status."),
                         Toast.LENGTH_SHORT).show();
-                Engine.launchClone(MainActivity.this, item);
             }
         });
         cell.addView(iconFrame);
@@ -490,7 +492,12 @@ public class MainActivity extends BaseActivity {
                 copy.packageName = item.packageName;
                 copy.userId = nextUid;
                 copy.displayName = item.displayName;
-                Engine.installPackageAsUser(copy.packageName, copy.userId);
+                if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "ساخت کلون ناموفق بود؛ اطلاعات فضا ثبت نشد." : "Clone installation failed; no space entry was saved.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
                 CloneStore.upsertClone(MainActivity.this, copy);
                 refreshSpaces();
             }
