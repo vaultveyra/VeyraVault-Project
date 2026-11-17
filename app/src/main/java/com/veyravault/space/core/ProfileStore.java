@@ -45,8 +45,16 @@ public final class ProfileStore {
         }
     }
 
+    private static boolean isCompatibleRoot(JSONObject root) {
+        if (root == null || root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
+        Object global = root.opt("global");
+        Object clones = root.opt("clones");
+        return (global == null || global instanceof JSONObject)
+                && (clones == null || clones instanceof JSONObject);
+    }
+
     private static boolean writeRoot(Context context, JSONObject root) {
-        if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
+        if (!isCompatibleRoot(root)) return false;
         try {
             root.put("schemaVersion", SCHEMA_VERSION);
             return prefs(context).edit().putString(KEY_DATA, root.toString()).commit();
@@ -68,9 +76,54 @@ public final class ProfileStore {
     public static synchronized boolean saveGlobal(Context context, ProfileSettings settings) {
         if (settings == null || !settings.isValid()) return false;
         JSONObject root = readRoot(context);
-        if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
+        if (!isCompatibleRoot(root)) return false;
         try {
             root.put("global", toJson(settings, root.optJSONObject("global")));
+            return writeRoot(context, root);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isKnownField(String field) {
+        return "localeTag".equals(field) || "timeZoneId".equals(field)
+                || "locationEnabled".equals(field) || "latitude".equals(field)
+                || "longitude".equals(field);
+    }
+
+    /** Remove one clone override only; all other fields and other clones are retained. */
+    public static synchronized boolean clearCloneOverrideField(Context context, String packageName,
+                                                                 int userId, String field) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || !isKnownField(field)) return false;
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) return false;
+        try {
+            JSONObject clones = root.optJSONObject("clones");
+            if (clones == null) return true;
+            String key = cloneKey(packageName, userId);
+            JSONObject profile = clones.optJSONObject(key);
+            if (profile == null || !profile.has(field)) return true;
+            profile.remove(field);
+            if (profile.length() == 0) clones.remove(key);
+            root.put("clones", clones);
+            return writeRoot(context, root);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /** Remove one global default only; all other defaults and clone overrides are retained. */
+    public static synchronized boolean clearGlobalField(Context context, String field) {
+        if (!isKnownField(field)) return false;
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) return false;
+        try {
+            JSONObject global = root.optJSONObject("global");
+            if (global == null || !global.has(field)) return true;
+            global.remove(field);
+            if (global.length() == 0) root.remove("global");
+            else root.put("global", global);
             return writeRoot(context, root);
         } catch (Exception ignored) {
             return false;
@@ -82,7 +135,7 @@ public final class ProfileStore {
         if (packageName == null || packageName.trim().isEmpty() || userId < 0
                 || settings == null || !settings.isValid()) return false;
         JSONObject root = readRoot(context);
-        if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
+        if (!isCompatibleRoot(root)) return false;
         try {
             JSONObject clones = root.optJSONObject("clones");
             if (clones == null) clones = new JSONObject();
@@ -125,14 +178,15 @@ public final class ProfileStore {
         }
 
         JSONObject root = readRoot(context);
-        if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
+        if (!isCompatibleRoot(root)) return false;
         try {
             JSONObject clones = root.optJSONObject("clones");
             if (clones == null) clones = new JSONObject();
             boolean changed = false;
             List<CloneStore.CloneEntry> legacy = CloneStore.getAll(context);
             for (CloneStore.CloneEntry entry : legacy) {
-                if (entry == null || entry.packageName == null || !entry.mockGpsEnabled) continue;
+                if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
+                        || entry.userId < 0 || !entry.mockGpsEnabled) continue;
                 String key = cloneKey(entry.packageName, entry.userId);
                 JSONObject existing = clones.optJSONObject(key);
                 JSONObject imported = existing == null ? new JSONObject() : new JSONObject(existing.toString());
@@ -196,6 +250,6 @@ public final class ProfileStore {
             out.locationEnabled = json.optBoolean("locationEnabled");
         if (json.has("latitude") && !json.isNull("latitude")) out.latitude = json.optDouble("latitude");
         if (json.has("longitude") && !json.isNull("longitude")) out.longitude = json.optDouble("longitude");
-        return out;
+        return out.isValid() ? out : new ProfileSettings();
     }
 }
