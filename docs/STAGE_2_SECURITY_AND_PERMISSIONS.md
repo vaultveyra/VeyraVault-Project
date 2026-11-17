@@ -48,3 +48,12 @@ The previous UI claimed that no user or app could uninstall VeyraVault. That cla
 - No biometric dependency or Android Keystore migration was added.
 - No attempt is made to revoke permissions granted to the host app or to modify third-party app security behavior.
 - No clone lifecycle, session, or stored clone data changes.
+
+
+## Upstream engine remote log transmission
+
+A review of the pinned upstream BlackBox engine commit found a hard-coded remote log destination and crash-handler calls capable of uploading logcat/device information. This path was not adequately covered by the earlier source-only review.
+
+The build preparation now fails closed if the expected engine files or source pattern are missing, sets the engine log destination to null, and replaces the network-capable LogSender with a no-network stub. Both source and compiled APK audits now fail if the known remote log-upload endpoint remains. This patch is applied to the pinned engine workspace before compilation; it does not rewrite clone data or session storage.
+
+The CI build must pass the new source and binary checks before this mitigation is considered validated. Device-level behavior remains untested.
