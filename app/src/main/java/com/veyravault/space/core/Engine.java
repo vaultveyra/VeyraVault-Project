@@ -107,14 +107,20 @@ public class Engine {
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
             return false;
         }
-        CloneStore.recordActiveLaunch(ctx, entry);
+        // Apply per-clone engine configuration before starting the virtual app process.
         VirtualHookManager.syncCloneHooks(ctx, entry);
         try {
             Object core = getCore();
             if (core == null) return false;
             Method m = core.getClass().getMethod("launchApk", String.class, int.class);
             Object r = m.invoke(core, entry.packageName, entry.userId);
-            return Boolean.TRUE.equals(r);
+            boolean launched = Boolean.TRUE.equals(r);
+            if (!launched) return false;
+
+            // Persist only a confirmed successful launch; failed attempts must not replace
+            // the last-known successful clone in the host-side active-launch marker.
+            CloneStore.recordActiveLaunch(ctx, entry);
+            return true;
         } catch (Throwable t) {
             return false;
         }
