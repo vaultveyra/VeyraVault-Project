@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+test = ROOT / "app/src/androidTest/java/com/veyravault/space/core/persistence/LegacyCloneRoomInstrumentationTest.java"
+debug_manifest = ROOT / "app/src/debug/AndroidManifest.xml"
+debug_app = ROOT / "app/src/debug/java/com/veyravault/space/RoomTestApplication.java"
+prepare = (ROOT / "scripts/prepare_workspace.py").read_text(encoding="utf-8")
+workflow = (ROOT / ".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
+
+assert test.is_file(), "Android Room instrumentation test source is missing"
+source = test.read_text(encoding="utf-8")
+for marker in (
+    "importsAndVerifiesAllModeledRowsAndProvenance",
+    "repeatedImportIsIdempotentOnlyWhenParityStillMatches",
+    "transactionRollsBackEveryTableWhenPermissionInsertFails",
+    "importedRowsSurviveDatabaseCloseAndReopen",
+    "emptySnapshotWithoutActiveMarkerImportsAndVerifies",
+    "CREATE TRIGGER fail_permission_insert",
+    "LegacyCloneRoomVerifier.matches",
+):
+    assert marker in source, f"Missing instrumentation scenario: {marker}"
+
+assert debug_manifest.is_file() and debug_app.is_file()
+assert "RoomTestApplication" in debug_manifest.read_text(encoding="utf-8")
+assert "Engine.doOnCreate" not in debug_app.read_text(encoding="utf-8")
+assert 'testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"' in prepare
+for dep in (
+    "androidx.test:runner:1.5.2",
+    "androidx.test:core:1.5.0",
+    "androidx.test.ext:junit:1.1.5",
+):
+    assert dep in prepare, f"Missing instrumentation dependency: {dep}"
+assert 'excludes += ["**/*.so"]' in prepare, "Debug Room test APK must not package virtual-engine native libraries"
+assert "reactivecircus/android-emulator-runner@v2" in workflow
+assert ":app:connectedDebugAndroidTest" in workflow
+print("PASS: Android Room instrumentation harness and emulator CI wiring are present.")
