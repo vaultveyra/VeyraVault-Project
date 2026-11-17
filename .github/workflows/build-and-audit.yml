@@ -59,6 +59,9 @@ jobs:
       - name: Test atomic legacy snapshot backup contract
         run: python3 scripts/test_legacy_clone_snapshot_backup_contract.py
 
+      - name: Test opt-in legacy Room import contract
+        run: python3 scripts/test_legacy_room_import_contract.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
