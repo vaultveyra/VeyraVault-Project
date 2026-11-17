@@ -112,6 +112,7 @@
         <activity android:name=".ui.SecuritySettingsActivity" android:exported="false" />
         <activity android:name=".ui.PermissionsActivity" android:exported="false" />
         <activity android:name=".ui.AboutActivity" android:exported="false" />
+        <activity android:name=".ui.CompatibilityReportActivity" android:exported="false" />
 
         <receiver
             android:name=".security.VaultDeviceAdminReceiver"
