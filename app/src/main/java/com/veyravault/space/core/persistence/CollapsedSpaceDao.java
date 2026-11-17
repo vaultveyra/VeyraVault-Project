@@ -14,6 +14,9 @@ public interface CollapsedSpaceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(List<CollapsedSpaceEntity> spaces);
 
+    @Query("SELECT COUNT(*) FROM collapsed_spaces")
+    int count();
+
     @Query("DELETE FROM collapsed_spaces")
     void deleteAll();
 }
