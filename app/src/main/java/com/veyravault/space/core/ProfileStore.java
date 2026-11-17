@@ -81,19 +81,6 @@ public final class ProfileStore {
                                                           int userId, ProfileSettings settings) {
         if (packageName == null || packageName.trim().isEmpty() || userId < 0
                 || settings == null || !settings.isValid()) return false;
-        // Validate the legacy JSON before reading through CloneStore, whose public
-        // accessor intentionally returns an empty list when parsing fails.
-        try {
-            String legacyRaw = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE)
-                    .getString("clones_json", "[]");
-            JSONArray legacyArray = new JSONArray(legacyRaw == null ? "[]" : legacyRaw);
-            for (int i = 0; i < legacyArray.length(); i++) {
-                if (!(legacyArray.opt(i) instanceof JSONObject)) return false;
-            }
-        } catch (Exception invalidLegacyData) {
-            return false;
-        }
-
         JSONObject root = readRoot(context);
         if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
         try {
@@ -122,6 +109,19 @@ public final class ProfileStore {
     public static synchronized boolean migrateLegacyLocationSettings(Context context) {
         SharedPreferences p = prefs(context);
         if (p.getBoolean(KEY_MIGRATED, false)) return true;
+
+        // Validate the legacy JSON before reading through CloneStore, whose public
+        // accessor intentionally returns an empty list when parsing fails.
+        try {
+            String legacyRaw = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE)
+                    .getString("clones_json", "[]");
+            JSONArray legacyArray = new JSONArray(legacyRaw == null ? "[]" : legacyRaw);
+            for (int i = 0; i < legacyArray.length(); i++) {
+                if (!(legacyArray.opt(i) instanceof JSONObject)) return false;
+            }
+        } catch (Exception invalidLegacyData) {
+            return false;
+        }
 
         JSONObject root = readRoot(context);
         if (root.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) return false;
