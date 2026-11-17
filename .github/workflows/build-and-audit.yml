@@ -38,6 +38,9 @@ jobs:
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
 
+      - name: Test security credential contract
+        run: python3 scripts/test_security_credentials.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
