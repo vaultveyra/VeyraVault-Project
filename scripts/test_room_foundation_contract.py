@@ -11,6 +11,7 @@ clone_store = (java_root / "com/veyravault/space/core/CloneStore.java").read_tex
 assert "androidx.room:room-runtime:2.6.1" in prepare
 assert "androidx.room:room-compiler:2.6.1" in prepare
 assert "annotationProcessor" in prepare
+assert '"room.schemaLocation": "$projectDir/schemas".toString()' in prepare
 
 expected = {
     "CloneEntity.java", "DeniedPermissionEntity.java", "CollapsedSpaceEntity.java",
@@ -44,8 +45,13 @@ assert "@NonNull @PrimaryKey public String spaceKey" in collapsed
 active = (room_root / "LastActiveLaunchEntity.java").read_text(encoding="utf-8")
 assert "no FK" in active
 
+database = (room_root / "ClonePersistenceDatabase.java").read_text(encoding="utf-8")
+assert "exportSchema = true" in database
+assert (root / "app/schemas/README.md").is_file()
+
 print("Room 2.6.1 generated Gradle dependency contract: PASS")
 print("Room entities, DAOs and database schema inventory: PASS")
 print("Legacy CloneStore remains the only active persistence path: PASS")
 print("No destructive migration or main-thread query escape hatch: PASS")
 print("Legacy collapsed-key and stale active-marker semantics preserved: PASS")
+print("Versioned Room schema export configuration: PASS")
