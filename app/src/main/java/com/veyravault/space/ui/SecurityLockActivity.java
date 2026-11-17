@@ -62,9 +62,13 @@ public class SecurityLockActivity extends BaseActivity {
                         return;
                     }
                     if (setupMode != -1) {
-                        SecurityManager.setLockCredential(SecurityLockActivity.this, SecurityManager.MODE_PATTERN, patternString);
-                        Toast.makeText(SecurityLockActivity.this, fa ? "الگوی امنیتی ذخیره شد" : "Pattern lock saved", Toast.LENGTH_SHORT).show();
-                        finish();
+                        if (SecurityManager.setLockCredential(SecurityLockActivity.this, SecurityManager.MODE_PATTERN, patternString)) {
+                            Toast.makeText(SecurityLockActivity.this, fa ? "الگوی امنیتی ذخیره شد" : "Pattern lock saved", Toast.LENGTH_SHORT).show();
+                            finish();
+                        } else {
+                            Toast.makeText(SecurityLockActivity.this, fa ? "ذخیره امن قفل ناموفق بود؛ دوباره تلاش کنید." : "Secure lock storage failed. Please try again.", Toast.LENGTH_LONG).show();
+                            patternView.clearPattern();
+                        }
                     } else if (SecurityManager.verifyCredential(SecurityLockActivity.this, patternString)) {
                         finish();
                     } else {
@@ -101,9 +105,12 @@ public class SecurityLockActivity extends BaseActivity {
                         return;
                     }
                     if (setupMode != -1) {
-                        SecurityManager.setLockCredential(SecurityLockActivity.this, SecurityManager.MODE_PIN, pin);
-                        Toast.makeText(SecurityLockActivity.this, fa ? "رمز پین فعال شد" : "PIN lock enabled", Toast.LENGTH_SHORT).show();
-                        finish();
+                        if (SecurityManager.setLockCredential(SecurityLockActivity.this, SecurityManager.MODE_PIN, pin)) {
+                            Toast.makeText(SecurityLockActivity.this, fa ? "رمز پین فعال شد" : "PIN lock enabled", Toast.LENGTH_SHORT).show();
+                            finish();
+                        } else {
+                            Toast.makeText(SecurityLockActivity.this, fa ? "ذخیره امن رمز ناموفق بود؛ دوباره تلاش کنید." : "Secure PIN storage failed. Please try again.", Toast.LENGTH_LONG).show();
+                        }
                     } else if (SecurityManager.verifyCredential(SecurityLockActivity.this, pin)) {
                         finish();
                     } else {
