@@ -81,18 +81,34 @@ public class Engine {
             if (core == null) return false;
             Method m = core.getClass().getMethod("installPackageAsUser", String.class, int.class);
             Object res = m.invoke(core, pkg, userId);
-            if (res == null) return true;
-            Field f = res.getClass().getField("success");
-            return f.getBoolean(res);
+            if (res == null) return false;
+            Field success = res.getClass().getField("success");
+            return success.getBoolean(res);
         } catch (Throwable t) {
-            return true;
+            // Never report an engine/reflection failure as a successful installation.
+            return false;
+        }
+    }
+
+    private static boolean isInstalledAsUser(String pkg, int userId) {
+        try {
+            Object core = getCore();
+            if (core == null) return false;
+            Method m = core.getClass().getMethod("isInstalled", String.class, int.class);
+            Object result = m.invoke(core, pkg, userId);
+            return Boolean.TRUE.equals(result);
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
     public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
         CloneStore.recordActiveLaunch(ctx, entry);
         VirtualHookManager.syncCloneHooks(ctx, entry);
-        installPackageAsUser(entry.packageName, entry.userId);
+        if (!isInstalledAsUser(entry.packageName, entry.userId)
+                && !installPackageAsUser(entry.packageName, entry.userId)) {
+            return false;
+        }
         try {
             Object core = getCore();
             if (core == null) return false;
