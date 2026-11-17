@@ -56,6 +56,9 @@ jobs:
       - name: Test read-only legacy CloneStore snapshot contract
         run: python3 scripts/test_legacy_clone_snapshot_contract.py
 
+      - name: Test atomic legacy snapshot backup contract
+        run: python3 scripts/test_legacy_clone_snapshot_backup_contract.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
