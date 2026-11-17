@@ -50,6 +50,9 @@ jobs:
       - name: Test CloneStore migration inventory contract
         run: python3 scripts/test_clone_store_migration_inventory.py
 
+      - name: Test inactive Room foundation contract
+        run: python3 scripts/test_room_foundation_contract.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
