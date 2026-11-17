@@ -5,6 +5,7 @@ import android.content.Context;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.ProfileStore;
 import com.veyravault.space.core.VirtualHookManager;
 
 public class VaultApp extends Application {
@@ -24,6 +25,8 @@ public class VaultApp extends Application {
         instance = this;
         LocaleHelper.applyLocale(this);
         Engine.doOnCreate(this);
+        // Additive import only: preserve legacy clone preferences and session lifecycle.
+        ProfileStore.migrateLegacyLocationSettings(this);
         VirtualHookManager.installProcessHooks(this);
         CloneStore.syncAllHooks(this);
     }
