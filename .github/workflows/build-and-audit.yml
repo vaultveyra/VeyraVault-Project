@@ -65,6 +65,17 @@ jobs:
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
+      - name: Run Room Android instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          working-directory: build_workspace
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
 
