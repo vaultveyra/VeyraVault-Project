@@ -112,8 +112,8 @@ public class MainActivity extends BaseActivity {
         bSub.setTextColor(Color.parseColor("#DBEAFE"));
         bSub.setTextSize(12f);
         bSub.setText(fa
-                ? ("مدل سراسری فعال: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | منطقه: " + gCfg.countryIso.toUpperCase())
-                : ("Global Device: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | Region: " + gCfg.countryIso.toUpperCase()));
+                ? ("پروفایل ذخیره‌شده: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | منطقه: " + gCfg.countryIso.toUpperCase())
+                : ("Saved Profile: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | Region: " + gCfg.countryIso.toUpperCase()));
         banner.addView(bSub);
         banner.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -447,7 +447,7 @@ public class MainActivity extends BaseActivity {
             TextView devSub = new TextView(this);
             devSub.setTextSize(11f);
             devSub.setTextColor(Color.parseColor("#10B981"));
-            devSub.setText("📱 " + item.deviceBrand + " " + item.deviceModel);
+            devSub.setText((fa ? "📱 پروفایل ذخیره‌شده: " : "📱 Saved profile: ") + item.deviceBrand + " " + item.deviceModel);
             infoCol.addView(devSub);
         }
 
@@ -647,10 +647,10 @@ public class MainActivity extends BaseActivity {
         }
 
         new AlertDialog.Builder(this)
-                .setTitle(fa ? ("هویت دستگاه برای " + item.displayName + " (فضای " + item.getSpaceNumber() + ")")
-                             : ("Device Identity for " + item.displayName))
+                .setTitle(fa ? ("اطلاعات پروفایل دستگاه برای " + item.displayName + " (فضای " + item.getSpaceNumber() + ")")
+                             : ("Saved Device Profile for " + item.displayName))
                 .setView(box)
-                .setPositiveButton(fa ? "فعال‌سازی و ذخیره" : "Enable & Save", new DialogInterface.OnClickListener() {
+                .setPositiveButton(fa ? "ذخیره اطلاعات پروفایل" : "Save Profile Metadata", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         item.customDeviceEnabled = true;
@@ -659,11 +659,11 @@ public class MainActivity extends BaseActivity {
                         CloneStore.upsertClone(MainActivity.this, item);
                         VirtualHookManager.syncCloneHooks(MainActivity.this, item);
                         Toast.makeText(MainActivity.this,
-                                fa ? "مشخصات دستگاه برای این کلون ثبت شد" : "Custom device identity saved for this clone",
+                                fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند." : "Profile metadata saved; the current engine does not apply it to this clone.",
                                 Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNeutralButton(fa ? "استفاده از مدل سراسری" : "Use Global Default", new DialogInterface.OnClickListener() {
+                .setNeutralButton(fa ? "استفاده از پروفایل سراسری ذخیره‌شده" : "Use Saved Global Profile", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         item.customDeviceEnabled = false;
