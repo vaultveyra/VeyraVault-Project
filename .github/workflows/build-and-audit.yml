@@ -84,7 +84,13 @@ jobs:
             set -euo pipefail
             ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
             echo "=== DEBUG APK NATIVE LIBRARIES ==="
-            unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.*\\.so
+            unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== ANDROID TEST APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== MERGED DEBUG NATIVE LIBRARY INPUTS ==="
+            find app/build/intermediates/merged_native_libs/debug -type f -name '*.so' -print 2>/dev/null || true
+            echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
