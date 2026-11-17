@@ -254,6 +254,10 @@ android {{
         }}
         // Debug instrumentation exercises Room without starting the virtual engine.
         debug {{
+            // The CI emulator is x86_64. Release keeps the production ARM ABI filters above.
+            ndk {{
+                abiFilters "x86_64"
+            }}
             packaging {{
                 jniLibs {{
                     excludes += ["**/*.so"]
