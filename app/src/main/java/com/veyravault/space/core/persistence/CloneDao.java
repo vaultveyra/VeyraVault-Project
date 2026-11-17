@@ -23,6 +23,9 @@ public interface CloneDao {
     @Query("DELETE FROM clones WHERE packageName = :packageName AND userId = :userId")
     int delete(String packageName, int userId);
 
+    @Query("SELECT COUNT(*) FROM clones")
+    int count();
+
     @Query("DELETE FROM clones")
     void deleteAll();
 }
