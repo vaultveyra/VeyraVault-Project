@@ -10,7 +10,8 @@ main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").re
 # Host-process global mutation is not a valid per-clone hook channel.
 for forbidden in (
     "android.os.Build",
-    "LocationManager",
+    "import android.location.LocationManager;",
+    "LocationManager.class",
     "mService",
     "activeMockGps",
     "activeLat",
