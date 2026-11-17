@@ -41,6 +41,9 @@ jobs:
       - name: Test security credential contract
         run: python3 scripts/test_security_credentials.py
 
+      - name: Test engine install/launch failure contract
+        run: python3 scripts/test_engine_contract.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
