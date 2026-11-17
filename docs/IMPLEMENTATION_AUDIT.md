@@ -100,3 +100,16 @@ This is a targeted reliability fix, not a claim that all engine operations are n
 
 
 The Stage 5 reliability fix also updates both clone-creation entry points: Add App and Duplicate now save a CloneStore entry only after the engine confirms installation success. The Spaces launch action now surfaces a failure message rather than always displaying a launch toast. The regression contract test covers these guards. No existing clone records are migrated or rewritten by these changes.
+
+
+## Feature branch updates — Stage 6 (2026-11-17)
+
+The pinned BlackBox revision was traced beyond the public launch API:
+- `BProcessManagerService` allocates virtual app processes in the host `:pN` process family and indexes process records by virtual UID and process name.
+- `BActivityThread` binds the virtual app package/Application inside that managed process.
+- The pinned engine's `BLocationManager` exposes package/user-scoped `setPattern(userId, packageName, ...)` and `setLocation(userId, packageName, ...)`.
+- The pinned source tree does not contain the `BDeviceManager` or `BDeviceConfig` classes previously targeted by the app's reflection code.
+
+Accordingly, the feature branch removes the host-process `Build` static-field override and host `LocationManager.mService` proxy from `VirtualHookManager`. Clone location configuration remains routed through the engine's package/user-scoped location manager. Existing device/SIM profile fields remain stored without migration or deletion, but the Persian and English UI now correctly describes them as metadata only because this pinned engine integration has no verified scoped API for applying them. CI adds `scripts/test_hook_isolation_contract.py` to prevent reintroducing host-global mutations or overstating device-profile behavior.
+
+The active-clone marker is also persisted only after `launchApk` returns explicit `true`. These changes do not modify clone IDs, clone registry keys, virtual package data, or session data. Physical-device validation with multiple concurrent clones is still required.
