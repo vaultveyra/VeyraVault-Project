@@ -231,6 +231,11 @@ android {{
     defaultConfig {{
         applicationId "com.veyravault.space"
         minSdk {min_sdk}
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += ["room.schemaLocation": "$projectDir/schemas".toString()]
+            }
+        }
         targetSdk 28
         versionCode 200
         versionName "2.0.0-Enterprise"
