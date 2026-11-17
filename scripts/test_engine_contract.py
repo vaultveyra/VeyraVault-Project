@@ -35,3 +35,13 @@ assert "return false;" in launch
 assert launch.index("installPackageAsUser(entry.packageName, entry.userId)") < launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
 assert launch.index("CloneStore.recordActiveLaunch(ctx, entry)") < launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")
 print("Engine install/launch failure contract: PASS")
+
+# UI must not persist a clone registry entry after a failed engine install.
+main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
+add_ui = Path("app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
+assert "if (!Engine.installPackageAsUser(copy.packageName, copy.userId))" in main_ui
+assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("CloneStore.upsertClone(MainActivity.this, copy)")
+assert "if (!Engine.installPackageAsUser(e.packageName, e.userId))" in add_ui
+assert add_ui.index("if (!Engine.installPackageAsUser(e.packageName, e.userId))") < add_ui.index("CloneStore.upsertClone(this, e)")
+assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
+print("Clone creation UI failure handling: PASS")
