@@ -131,3 +131,14 @@ Pinned upstream build configuration was verified at `ALEX5402/NewBlackbox@89b598
 Added a non-active Room schema under `core/persistence`: composite clone identity, normalized denied-permission rows with a cascading clone FK, exact string collapsed-space keys, singleton global profile/master GPS/last-active entities, DAOs, database, and opt-in provider. The provider is not called by application startup or CloneStore. There is no destructive migration fallback and no main-thread query opt-in. The old SharedPreferences CloneStore remains the sole active persistence path; no import, preference rewrite, clone/session data change, or cutover has occurred.
 
 CI now checks the Room foundation boundary and will compile the Room annotations and generated DAO/database code as part of the release APK build. The schema is provisional until the next stage adds snapshot validation, backup/restore, transactional import and parity tests.
+
+
+### Stage 7.2 — Read-only snapshot and verified backup (2026-11-17)
+
+The exact legacy CloneStore preference namespace and all five keys are now captured by a strict read-only snapshot reader. It preserves key-presence flags and original clone JSON, validates composite identities and enabled coordinates, rejects malformed/ambiguous data, and produces a canonical SHA-256 digest. The opt-in backup writer uses app-private storage, Android AtomicFile, fsync, read-back verification and immutable existing-backup semantics. Neither class is wired to startup or normal runtime flows.
+
+### Stage 7.3 — Opt-in transactional Room import and parity (2026-11-17)
+
+The Room schema now retains each clone's original JSON and adds a migration-provenance singleton with the full canonical source payload and digest. An explicit worker-thread-only importer writes into an empty Room database inside one transaction and refuses to overwrite existing data. Repeat import is considered idempotent only when the digest matches and the parity verifier confirms every persisted row still matches the snapshot. The verifier checks clone identity/fields, raw clone JSON, denied permissions, collapsed keys, global profile, master GPS, optional/stale active marker and migration provenance.
+
+The importer is not called from VaultApp, CloneStore, Activities or normal runtime flows. CI's new importer test is a source-contract regression check, while the APK build compiles Room and generated DAO code. This is not a substitute for Android instrumentation tests. Forced transaction rollback, process-death/restart, and real Room round-trip tests remain release gates. SharedPreferences remains authoritative; no cutover or legacy-key deletion has occurred.
