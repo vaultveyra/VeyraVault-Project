@@ -59,6 +59,19 @@ public final class LegacyCloneSnapshotBackup {
             throw new IOException("Unable to encode migration backup envelope", error);
         }
 
+        // A verified pre-migration backup is immutable. Reuse it only for the exact
+        // same snapshot; never silently replace it with a later/different state.
+        if (baseFile.exists()) {
+            byte[] existingBytes;
+            try (FileInputStream input = atomicFile.openRead()) {
+                existingBytes = readFully(input);
+            } catch (Exception error) {
+                throw new IOException("Existing migration backup cannot be read; refusing to overwrite it", error);
+            }
+            verifyBackupBytes(expectedBytes, existingBytes, digest);
+            return new Receipt(digest, existingBytes.length);
+        }
+
         FileOutputStream output = null;
         try {
             output = atomicFile.startWrite();
@@ -78,10 +91,14 @@ public final class LegacyCloneSnapshotBackup {
         } catch (Exception error) {
             throw new IOException("Unable to read back migration backup", error);
         }
+        verifyBackupBytes(expectedBytes, actualBytes, digest);
+        return new Receipt(digest, actualBytes.length);
+    }
+
+    private static void verifyBackupBytes(byte[] expectedBytes, byte[] actualBytes, String digest) throws IOException {
         if (!MessageDigest.isEqual(expectedBytes, actualBytes)) {
             throw new IOException("Migration backup read-back differs from the written bytes");
         }
-
         try {
             JSONObject verified = new JSONObject(new String(actualBytes, StandardCharsets.UTF_8));
             if (verified.getInt("formatVersion") != FORMAT_VERSION) {
@@ -105,7 +122,6 @@ public final class LegacyCloneSnapshotBackup {
         } catch (Exception error) {
             throw new IOException("Migration backup envelope is invalid", error);
         }
-        return new Receipt(digest, actualBytes.length);
     }
 
     private static byte[] readFully(FileInputStream input) throws IOException {
