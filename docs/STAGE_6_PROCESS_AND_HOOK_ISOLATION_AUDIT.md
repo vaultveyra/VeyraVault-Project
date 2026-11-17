@@ -1,55 +1,55 @@
-# Stage 6 — Process lifecycle and clone-hook isolation audit
+# Stage 6 — Process lifecycle and clone-hook isolation
 
 ## Scope and safety boundary
 
-This stage performs a source-level audit of host application startup, clone launch bookkeeping, and the existing environment hooks. It deliberately does not rewrite the BlackBox process model, clone identifiers, stored clone records, or virtual app data. No session data is cleared or migrated.
+This stage audits the exact pinned BlackBox revision and removes host-process mutations that were incorrectly being used as if they were per-clone settings. It does not rewrite the virtualization engine, clone identifiers, clone persistence, or virtual app data. No session data is cleared or migrated.
 
-## Confirmed source findings
+## Pinned engine evidence
 
-### 1. Host startup currently applies more than one clone's settings to process-global state
+The audited engine revision is `ALEX5402/NewBlackbox@89b59836c66f173756a4ae258cf379a957649820`.
 
-- `VaultApp.onCreate()` calls `VirtualHookManager.installProcessHooks()` and then `CloneStore.syncAllHooks()`.
-- `CloneStore.syncAllHooks()` iterates every saved clone and calls `VirtualHookManager.syncCloneHooks()`.
-- `VirtualHookManager` stores mock-location state in static fields (`activeMockGps`, `activeLat`, and `activeLng`).
-- The same manager replaces the host `LocationManager.mService` with a proxy whose location response reads those static fields.
-- Consequently, iterating multiple clone records can overwrite the single process-wide location state repeatedly. The final static values depend on iteration order, not on an independently isolated per-clone context. This is a confirmed source-level isolation hazard; exact runtime impact depends on the engine's process topology and API call paths.
+Source review confirms:
 
-### 2. Device Build fields are modified in the host process
+- `BProcessManagerService.startProcessLocked()` tracks virtual processes by virtual UID and process name, allocates a BlackBox process slot, and starts the app through a generated host process name from `ProxyManifest.getProcessName(app.bpid)` (the `host:pN` process family).
+- The process map is keyed using the virtual UID and process name; the process record carries package/process identity and virtual user ID.
+- `BActivityThread.bindApplication(packageName, processName)` and `handleBindApplication()` create and bind the virtualized app Application inside that virtual process.
+- The pinned engine includes `top.niunaijun.blackbox.fake.frameworks.BLocationManager`. Its `setPattern(userId, packageName, pattern)` and `setLocation(userId, packageName, location)` methods explicitly accept both virtual user ID and package name.
+- The pinned source tree does not contain the previously reflected `BDeviceManager` or `BDeviceConfig` classes. The old reflective device-profile branch therefore could not be confirmed as a supported API in this engine revision.
 
-`VirtualHookManager.applyDeviceProperties()` writes static fields on `android.os.Build` before it attempts the BlackBox `BDeviceManager.setDeviceConfig(userId, config)` call. The static Build writes are process-wide and do not carry a package or virtual-user scope. The engine configuration call is explicitly passed a virtual user ID, but its effective behavior still requires runtime verification.
+## Confirmed problems in the app integration
 
-This means the host-side Build mutation must not be described as per-clone isolation. It can affect other code executing in the same process and can be overwritten by subsequent clone configuration calls.
+### 1. Host-global location override was not clone-scoped
 
-### 3. Clone launch bookkeeping now records only successful launches
+The old `VirtualHookManager` stored one mock-GPS state in static fields and replaced the host app's `LocationManager.mService`. Since virtual apps run in BlackBox-managed `host:pN` processes, this host-side proxy is not a reliable way to configure the target virtual app. Iterating clones also repeatedly overwrote the same static location values.
 
-Previously, `Engine.launchClone()` wrote the last-active-clone marker before invoking the engine launch method. A failed or exceptional launch could therefore replace the marker even though the app did not start.
+### 2. Host Build mutation was not a virtual-device API
 
-The method now:
-1. Confirms the package is installed for the requested virtual user (or installs it successfully).
-2. Applies the requested clone's engine configuration.
-3. Calls the pinned engine's `launchApk(packageName, userId)`.
-4. Requires an explicit boolean `true`.
-5. Only then writes `CloneStore.recordActiveLaunch()`.
+The old `applyDeviceProperties()` directly rewrote static fields on `android.os.Build` in the host process, then attempted reflection against device manager/configuration classes absent from the pinned engine source. This was neither a supported per-clone engine contract nor a safe host integration.
 
-A failed launch leaves the previous last-successful-launch marker unchanged. Clone IDs, clone records, session data, and install state are not rewritten by this adjustment.
+### 3. UI overstated device/SIM profile support
 
-## What is not yet proven
+The global and per-clone screens previously described saved brand/model/country/operator metadata as applied hardware or region overrides. The pinned engine source does not expose the reflected device API used by the app. Those values must therefore be presented as saved metadata only, not as applied device state or a way to bypass third-party regional controls.
 
-- Whether each virtual app runs in a dedicated process, a shared virtual process, or a process selected dynamically by BlackBox.
-- Whether the pinned engine's location and device hooks are applied inside the target virtual process and consistently isolated by both package name and virtual user ID.
-- Whether any virtualized app reads host-process `Build` or host `LocationManager` directly rather than through the engine's fake framework.
-- Whether the startup-time host proxy is required by a supported engine path. It must not be removed until the pinned engine process lifecycle and device behavior are verified.
+## Changes in this stage
 
-## Next engineering steps
+- Remove process-global static mock-location state and the host `LocationManager.mService` proxy.
+- Remove host-process writes to `android.os.Build` and unsupported `BDeviceManager/BDeviceConfig` reflection.
+- Keep location configuration through the pinned engine's package/user-scoped `BLocationManager` methods.
+- Keep existing device/SIM profile fields and clone records intact for compatibility, but do not claim they are applied. No stored values are deleted or migrated.
+- Update Persian and English UI wording so global/per-clone device values are explicitly identified as saved metadata only.
+- Keep `CloneStore.syncAllHooks()` focused on per-clone engine location settings.
+- Add `scripts/test_hook_isolation_contract.py` and a CI step to prevent host-global hook mutations and verify package/user-scoped location calls.
+- Separately, `Engine.launchClone()` now persists the last-active marker only after an explicit successful engine launch.
 
-1. Trace the pinned BlackBox process startup, process selection, application binding, and fake-framework initialization against the exact vendored revision.
-2. Add runtime diagnostics that report process name and hook installation outcome without collecting app content or session data.
-3. Prefer engine APIs explicitly scoped by `(packageName, userId)`; isolate or remove process-global host mutations only after compatibility tests demonstrate the replacement behavior.
-4. Add device tests with at least two clones configured with distinct locations and device profiles, launch them in alternating order, and verify that one clone's configuration does not leak into another or the host app.
-5. Keep all persistence changes additive and separately tested. No Room migration is included in this stage.
+## What remains unverified
+
+- Physical-device behavior of location results across two or more concurrently running clones.
+- OEM and Android-version differences in BlackBox's location hook behavior.
+- Whether other virtualized framework APIs require additional compatibility work.
+- Device/SIM profile application: currently not implemented by the pinned engine integration. Do not re-enable host Build mutation as a substitute.
 
 ## Validation
 
-- `scripts/test_engine_contract.py` now checks that the active-launch marker is written only after an explicit successful engine launch.
-- GitHub Actions must pass the engine contract test, profile/security tests, workspace preparation, source audit, release compilation, and APK binary audit.
-- This remains a static/source-and-CI validation until physical-device tests are performed. It is not a certification of cross-clone isolation.
+CI must pass the profile resolver, security credential, engine launch, hook-isolation, workspace preparation, source audit, unsigned APK compilation, and compiled APK audit steps.
+
+This is source-level and CI validation. It is not a physical-device certification of clone isolation. The generated PR artifact is unsigned and is not a production-installable release.
