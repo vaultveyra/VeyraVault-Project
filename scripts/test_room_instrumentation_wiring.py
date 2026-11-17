@@ -21,6 +21,10 @@ for marker in (
 ):
     assert marker in source, f"Missing instrumentation scenario: {marker}"
 
+dao = (ROOT / "app/src/main/java/com/veyravault/space/core/persistence/LegacyMigrationMetadataDao.java").read_text(encoding="utf-8")
+assert '@Query("SELECT COUNT(*) FROM legacy_migration_metadata")' in dao
+assert "int count();" in dao
+
 assert debug_manifest.is_file() and debug_app.is_file()
 assert "RoomTestApplication" in debug_manifest.read_text(encoding="utf-8")
 assert "Engine.doOnCreate" not in debug_app.read_text(encoding="utf-8")
