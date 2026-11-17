@@ -236,7 +236,12 @@ public class AddAppActivity extends BaseActivity {
         e.packageName = app.pkg;
         e.userId = nextUid;
         e.displayName = app.label;
-        Engine.installPackageAsUser(e.packageName, e.userId);
+        if (!Engine.installPackageAsUser(e.packageName, e.userId)) {
+            Toast.makeText(this,
+                    fa ? "نصب کلون ناموفق بود؛ فضای جدید ثبت نشد." : "Clone installation failed; no space entry was saved.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         CloneStore.upsertClone(this, e);
         Toast.makeText(this,
                 fa ? (app.label + " به فضای " + e.getSpaceNumber() + " اضافه شد")
