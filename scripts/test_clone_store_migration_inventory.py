@@ -55,7 +55,7 @@ for method in (
 
 # This stage must remain a plan: no Room cutover or legacy deletion.
 for phrase in (
-    "does not add Room",
+    "migration plan only",
     "sole source of truth",
     "virtual-app storage",
     "Malformed JSON",
