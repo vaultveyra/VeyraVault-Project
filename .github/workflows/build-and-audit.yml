@@ -71,10 +71,13 @@ jobs:
       - name: Run Room Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           target: default
           arch: x86_64
           profile: pixel_2
+          cores: 4
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           working-directory: build_workspace
           script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
