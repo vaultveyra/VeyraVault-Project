@@ -75,3 +75,16 @@ The stabilization workflow change keeps the existing checked-in app as the build
 ## Release gate
 
 Do not merge a build change until the unsigned APK build, source audit, APK audit, and (on a protected non-PR release run) keystore signature verification all pass. Do not claim a feature is complete until its behavior is tested, not merely because a screen or class exists.
+
+
+## Feature branch updates — Stage 3 (2026-11-17)
+
+A first read-only in-app compatibility report has been added on the feature branch:
+- `CompatibilityManager` reports host Android/API, supported ABI, native library count, WebView provider (where supported), declared host permission count, and BlackBox core discoverability.
+- `CompatibilityReportActivity` presents these values and states the limits of host-only diagnostics.
+- The activity is non-exported and reachable from About.
+- CI run 44146546804 completed successfully; APK compilation and binary audit passed, and the known remote log-upload endpoint count in the APK was zero.
+
+This is an initial diagnostics foundation, not a full compatibility certification. No physical-device test has been performed. The report does not verify permission grants, per-clone runtime behavior, or remote service observations. See `STAGE_3_COMPATIBILITY_DIAGNOSTICS.md`.
+
+Outstanding high-priority reliability findings remain: `Engine.installPackageAsUser` currently returns success from its exception path, and process-wide hooks require cross-clone isolation review. These must be addressed with targeted tests before modifying the virtualization runtime.
