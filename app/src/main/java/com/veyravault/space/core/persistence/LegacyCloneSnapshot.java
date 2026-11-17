@@ -57,7 +57,7 @@ public final class LegacyCloneSnapshot {
             customDeviceEnabled = optionalBoolean(source, "devOn", false);
             deviceBrand = optionalString(source, "devBrand", "");
             deviceModel = optionalString(source, "devModel", "");
-            deniedPermissions = Collections.unmodifiableSet(readStringSet(source.optJSONArray("denied")));
+            deniedPermissions = Collections.unmodifiableSet(readPermissions(source));
             legacyJson = source.toString();
         }
     }
@@ -255,6 +255,13 @@ public final class LegacyCloneSnapshot {
             result.add((String) item);
         }
         return result;
+    }
+
+    private static Set<String> readPermissions(JSONObject source) throws Exception {
+        if (!source.has("denied") || source.isNull("denied")) return new TreeSet<>();
+        Object raw = source.get("denied");
+        if (!(raw instanceof JSONArray)) throw new IllegalStateException("Denied permissions field is not a JSON array");
+        return readStringSet((JSONArray) raw);
     }
 
     private static Set<String> readStringSet(JSONArray array) throws Exception {
