@@ -80,7 +80,171 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           working-directory: build_workspace
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+            echo "=== DEBUG APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.*\\.so
+
+      - name: Run source audit
+        run: python3 scripts/audit_source.py > source_audit_report.txt
+
+      - name: Compile unsigned release APK
+        working-directory: ./build_workspace
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Package and audit APK
+        run: python3 scripts/prepare_workspace.py --post-build
+
+      - name: Upload unsigned APK and audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: output_artifacts/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-release:
+    name: Sign APK in isolated job
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download unsigned build
+        uses: actions/download-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: unsigned
+
+      - name: Sign APK using private repository secrets
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_B64:-}" || -z "${KS_PASS:-}" || -z "${KEY_ALIAS:-}" || -z "${KEY_PASS:-}" ]]; then
+            echo "ERROR: Required signing secrets are missing. Refusing to report a successful release without a signed APK."
+            exit 1
+          fi
+
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          test -x "$APKSIGNER"
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/veyravault-release.keystore"
+          chmod 600 "$RUNNER_TEMP/veyravault-release.keystore"
+          test -s "$RUNNER_TEMP/veyravault-release.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/veyravault-release.keystore" -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null
+
+          mkdir -p signed
+          cp unsigned/VeyraVault-release.apk signed/VeyraVault-release.apk
+          "$APKSIGNER" sign \
+            --ks "$RUNNER_TEMP/veyravault-release.keystore" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS \
+            --key-pass env:KEY_PASS \
+            signed/VeyraVault-release.apk
+          "$APKSIGNER" verify --verbose signed/VeyraVault-release.apk
+          cp unsigned/source_audit_report.txt signed/ 2>/dev/null || true
+          cp unsigned/apk_audit_report.txt signed/ 2>/dev/null || true
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release APK
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-Signed-Release
+          path: signed/
+          if-no-files-found: error
+          retention-days: 7
+ || true
+            echo "=== ANDROID TEST APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk | grep -E 'lib/.*\\.so
+
+      - name: Run source audit
+        run: python3 scripts/audit_source.py > source_audit_report.txt
+
+      - name: Compile unsigned release APK
+        working-directory: ./build_workspace
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Package and audit APK
+        run: python3 scripts/prepare_workspace.py --post-build
+
+      - name: Upload unsigned APK and audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: output_artifacts/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-release:
+    name: Sign APK in isolated job
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download unsigned build
+        uses: actions/download-artifact@v4
+        with:
+          name: VeyraVault-unsigned-build
+          path: unsigned
+
+      - name: Sign APK using private repository secrets
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_B64:-}" || -z "${KS_PASS:-}" || -z "${KEY_ALIAS:-}" || -z "${KEY_PASS:-}" ]]; then
+            echo "ERROR: Required signing secrets are missing. Refusing to report a successful release without a signed APK."
+            exit 1
+          fi
+
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          test -x "$APKSIGNER"
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/veyravault-release.keystore"
+          chmod 600 "$RUNNER_TEMP/veyravault-release.keystore"
+          test -s "$RUNNER_TEMP/veyravault-release.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/veyravault-release.keystore" -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null
+
+          mkdir -p signed
+          cp unsigned/VeyraVault-release.apk signed/VeyraVault-release.apk
+          "$APKSIGNER" sign \
+            --ks "$RUNNER_TEMP/veyravault-release.keystore" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS \
+            --key-pass env:KEY_PASS \
+            signed/VeyraVault-release.apk
+          "$APKSIGNER" verify --verbose signed/VeyraVault-release.apk
+          cp unsigned/source_audit_report.txt signed/ 2>/dev/null || true
+          cp unsigned/apk_audit_report.txt signed/ 2>/dev/null || true
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release APK
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraVault-Signed-Release
+          path: signed/
+          if-no-files-found: error
+          retention-days: 7
+ || true
+            echo "=== MERGED DEBUG NATIVE LIBRARY INPUTS ==="
+            find app/build/intermediates/merged_native_libs/debug -type f -name '*.so' -print 2>/dev/null || true
+            echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
