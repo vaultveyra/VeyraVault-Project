@@ -77,3 +77,29 @@ The checked-in app's Gradle file is a source template: `scripts/prepare_workspac
 ## Stage 7 result
 
 Migration inventory and regression guard are added to CI. Runtime persistence is unchanged. Room dependency selection, database classes, data import, read/write cutover, and legacy-key retirement remain intentionally deferred to separately testable stages.
+
+
+## Stage 7.1 — Inactive Room schema foundation
+
+The pinned engine build configuration was inspected directly at commit `89b59836c66f173756a4ae258cf379a957649820`:
+
+- Gradle Wrapper: 8.14.5
+- Android Gradle Plugin: 8.13.2
+- Engine Bcore compile options: Java 21
+- Generated app module compile options: Java 8
+- compileSdk: 35; minSdk: 21; generated targetSdk: 28
+
+Room 2.6.1 was selected as a conservative Java annotation-processor/runtime line compatible with the app's Java 8 source target and legacy minSdk 21. The dependency is added to the generated app Gradle block in `scripts/prepare_workspace.py`; adding it only to the checked-in app Gradle template would have no effect on the actual CI build.
+
+An inactive schema foundation now exists under `app/src/main/java/com/veyravault/space/core/persistence/`:
+
+- `CloneEntity` uses the composite primary key (`packageName`, `userId`).
+- `DeniedPermissionEntity` stores each permission separately and has a cascading composite foreign key to its clone.
+- `CollapsedSpaceEntity` retains the original string key exactly instead of converting it to an integer.
+- Singleton entities represent global device metadata, master GPS state, and the last-active marker.
+- DAOs and `ClonePersistenceDatabase` define the first Room schema.
+- `ClonePersistenceDatabaseProvider` creates the database without destructive fallback and is not called from `VaultApp`, `CloneStore`, or current runtime flows.
+
+The CI contract test verifies the generated Gradle dependency, presence of all schema/DAO types, the inactive runtime boundary, absence of destructive fallback/main-thread query opt-ins, and preservation of legacy collapsed-key and stale-active-marker semantics.
+
+**Important:** this is schema scaffolding only. No data is imported, no Room query is invoked by the app, no legacy preference is modified, and `CloneStore` remains the only active persistence implementation. The next stage must add deterministic legacy snapshot parsing, backup verification, transactional import, and round-trip comparison tests before any runtime cutover is considered.
