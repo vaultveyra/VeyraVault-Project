@@ -147,3 +147,18 @@ A CI source-contract test checks the read-only boundary, strict-validation marke
 3. Add semantic round-trip parity tests covering every clone field, permissions, collapsed groups, global profile, master GPS and stale active marker.
 4. Exercise idempotence and crash/restart recovery before considering any repository cutover.
 5. Keep the SharedPreferences implementation authoritative until a separate, reviewed migration/cutover stage is approved.
+
+
+### Atomic backup implementation
+
+`LegacyCloneSnapshotBackup.java` now provides an explicit, opt-in backup operation:
+
+- Writes only beneath the app-private `filesDir/migration-backups/` directory.
+- Uses Android `AtomicFile` with `startWrite`, file-descriptor `sync`, `finishWrite`, and `failWrite` handling.
+- Stores a versioned envelope containing the canonical snapshot payload and SHA-256 digest.
+- Reads the file back after commit and verifies byte-for-byte equality, envelope version, payload digest, and equality with the captured snapshot digest.
+- Returns a small receipt containing the verified digest and byte count.
+
+The backup writer is not invoked by startup or any current user flow. It does not enumerate, copy, or modify BlackBox data, virtual package directories, account/session state, or the legacy preferences. A dedicated CI source-contract test guards the app-private path, atomic write/sync/read-back sequence, checksum checks, and inactive runtime boundary.
+
+**Stage 7.2 remains preparation only:** no Room import or read/write cutover has been added. The next gate is transactional import plus exact semantic parity and restart/idempotence tests, all behind an opt-in test path.
