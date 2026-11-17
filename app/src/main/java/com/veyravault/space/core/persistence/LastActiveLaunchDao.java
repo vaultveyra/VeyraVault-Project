@@ -10,6 +10,9 @@ public interface LastActiveLaunchDao {
     @Query("SELECT * FROM last_active_launch WHERE id = 1 LIMIT 1")
     LastActiveLaunchEntity get();
 
+    @Query("SELECT COUNT(*) FROM last_active_launch")
+    int count();
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void save(LastActiveLaunchEntity marker);
 
