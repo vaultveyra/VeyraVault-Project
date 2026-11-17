@@ -167,14 +167,14 @@ public class MainActivity extends BaseActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bottomLp.setMargins(28, 8, 28, 24);
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_clones), true, new View.OnClickListener() {
-            @Override public void onClick(View v) { refreshSpaces(); }
+        bottomBar.addView(makeNavButton(fa ? "خانه" : "Dashboard", false, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, DashboardActivity.class));
+            }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_global_env), false, new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, GlobalEnvironmentActivity.class));
-            }
+        bottomBar.addView(makeNavButton(fa ? "فضاها" : "Spaces", true, new View.OnClickListener() {
+            @Override public void onClick(View v) { refreshSpaces(); }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView fabPlus = new TextView(this);
@@ -193,15 +193,15 @@ public class MainActivity extends BaseActivity {
         });
         bottomBar.addView(fabPlus, fabLp);
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_security), false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton("VPN", false, new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, SecuritySettingsActivity.class));
+                startActivity(new Intent(MainActivity.this, VpnStatusActivity.class));
             }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_about), false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "تنظیمات" : "Settings", false, new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, AboutActivity.class));
+                startActivity(new Intent(MainActivity.this, SettingsHubActivity.class));
             }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
