@@ -112,8 +112,11 @@ public class SecuritySettingsActivity extends BaseActivity {
         btnDisableLock.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                SecurityManager.setLockCredential(SecuritySettingsActivity.this, SecurityManager.MODE_NONE, "");
-                Toast.makeText(SecuritySettingsActivity.this, fa ? "قفل برنامه غیرفعال شد" : "App lock disabled", Toast.LENGTH_SHORT).show();
+                if (SecurityManager.setLockCredential(SecuritySettingsActivity.this, SecurityManager.MODE_NONE, "")) {
+                    Toast.makeText(SecuritySettingsActivity.this, fa ? "قفل برنامه غیرفعال شد" : "App lock disabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(SecuritySettingsActivity.this, fa ? "ذخیره تغییرات ناموفق بود." : "Could not save the change.", Toast.LENGTH_LONG).show();
+                }
             }
         });
         cardLock.addView(btnDisableLock);
