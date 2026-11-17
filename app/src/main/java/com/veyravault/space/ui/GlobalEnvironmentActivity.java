@@ -31,7 +31,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         sv.addView(root);
 
         TextView title = new TextView(this);
-        title.setText(fa ? "تغییر کلی مدل گوشی، منطقه کشور و گوگل‌پلی" : "Global Phone Model, Region & Google Play");
+        title.setText(fa ? "پروفایل سراسری دستگاه (اطلاعات ذخیره‌شده)" : "Global Device Profile (Saved Metadata)");
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(Color.parseColor("#111827"));
@@ -42,12 +42,12 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         desc.setTextColor(Color.parseColor("#4B5563"));
         desc.setPadding(0, 12, 0, 28);
         desc.setText(fa
-                ? "با فعال کردن این بخش، تمام برنامه‌های داخل تمام فضاها و فروشگاه گوگل‌پلی به جای تشخیص گوشی هوآوی یا سیم‌کارت ایران، گوشی پرچمدار و کشور انتخابی شما را می‌بینند (رفع خطای عدم سازگاری گوشی یا تحریم کشور)."
-                : "Overrides the host device model and SIM country across all spaces so apps and Google Play do not detect Huawei hardware or regional restrictions.");
+                ? "توجه: مدل دستگاه، کشور و اپراتور در این نسخه فقط به‌عنوان اطلاعات پروفایل ذخیره می‌شوند و توسط موتور فعلی روی کلون‌ها اعمال نمی‌شوند. موقعیت مکانی هر کلون جداگانه از طریق API محدود به بسته و کاربر مجازی موتور تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
+                : "Note: device model, country and operator values are saved as profile metadata only. The pinned engine version does not expose a verified package/user-scoped API to apply these values to clones. Clone locations are configured separately through the engine's package- and virtual-user-scoped location API. This setting does not bypass third-party regional restrictions.");
         root.addView(desc);
 
         final CheckBox enableGlobal = new CheckBox(this);
-        enableGlobal.setText(fa ? "فعال‌سازی تغییر سراسری مدل گوشی و کشور" : "Enable Global Device & Region Spoofing");
+        enableGlobal.setText(fa ? "ذخیره پروفایل سراسری دستگاه (فقط اطلاعات)" : "Save Global Device Profile (Metadata Only)");
         enableGlobal.setChecked(cfg.enabled);
         root.addView(enableGlobal);
 
@@ -108,7 +108,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         Button saveBtn = new Button(this);
         saveBtn.setBackgroundResource(R.drawable.bg_pill_blue);
         saveBtn.setTextColor(Color.WHITE);
-        saveBtn.setText(fa ? "ذخیره و اعمال روی کل فضاها" : "Save & Apply to All Spaces");
+        saveBtn.setText(fa ? "ذخیره پروفایل و همگام‌سازی موقعیت کلون‌ها" : "Save Profile & Sync Clone Locations");
         saveBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -122,7 +122,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 CloneStore.setMasterMockGpsEnabled(GlobalEnvironmentActivity.this, masterGps.isChecked());
                 CloneStore.syncAllHooks(GlobalEnvironmentActivity.this);
                 Toast.makeText(GlobalEnvironmentActivity.this,
-                        fa ? "پروفایل سراسری گوشی و منطقه با موفقیت اعمال شد!" : "Global hardware & region profile applied!",
+                        fa ? "پروفایل ذخیره شد؛ موقعیت کلون‌ها همگام‌سازی شد. مشخصات دستگاه/سیم‌کارت فقط ذخیره شده‌اند و اعمال نمی‌شوند." : "Profile saved and clone locations synced. Device/SIM values are stored only, not applied.",
                         Toast.LENGTH_SHORT).show();
                 finish();
             }
