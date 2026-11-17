@@ -17,6 +17,9 @@ public interface DeniedPermissionDao {
     @Query("DELETE FROM clone_denied_permissions WHERE packageName = :packageName AND userId = :userId")
     void deleteForClone(String packageName, int userId);
 
+    @Query("SELECT COUNT(*) FROM clone_denied_permissions")
+    int count();
+
     @Query("DELETE FROM clone_denied_permissions")
     void deleteAll();
 }
