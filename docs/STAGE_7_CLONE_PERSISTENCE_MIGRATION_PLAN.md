@@ -103,3 +103,47 @@ An inactive schema foundation now exists under `app/src/main/java/com/veyravault
 The CI contract test verifies the generated Gradle dependency, presence of all schema/DAO types, the inactive runtime boundary, absence of destructive fallback/main-thread query opt-ins, and preservation of legacy collapsed-key and stale-active-marker semantics. Room schema export is enabled and directed to the version-controlled `app/schemas` directory so future schema versions can be reviewed and migration-tested.
 
 **Important:** this is schema scaffolding only. No data is imported, no Room query is invoked by the app, no legacy preference is modified, and `CloneStore` remains the only active persistence implementation. The next stage must add deterministic legacy snapshot parsing, backup verification, transactional import, and round-trip comparison tests before any runtime cutover is considered.
+
+
+## Stage 7.2 — Read-only legacy snapshot and validation foundation
+
+A first implementation of the pre-migration snapshot boundary is now present in
+`core/persistence/LegacyCloneSnapshot.java`.
+
+### Exact caller inventory
+
+The existing runtime callers were inspected across the checked-in Java source:
+
+- `VaultApp` invokes `CloneStore.syncAllHooks`; `VirtualHookManager` reads the last-active marker and master GPS setting.
+- `AddAppActivity` allocates a package-scoped virtual user and writes a clone after engine installation succeeds.
+- `MainActivity` reads and updates clone entries, collapsed Spaces, clone duplication/removal, rename, per-clone metadata, and active launch flows.
+- `DashboardActivity` reads the clone registry for counts.
+- `GlobalEnvironmentActivity` reads/writes global profile metadata and master GPS.
+- `SetLocationActivity` reads and updates a clone's location values.
+
+The existing `CloneStore` remains the active runtime API and the only authoritative store. No caller was redirected.
+
+### Snapshot behavior
+
+- Reads the exact `veyravault_clones_v2` SharedPreferences file and all five existing keys.
+- Captures the original presence/absence of each key, preserving the distinction between a missing key and an explicitly stored default.
+- Applies the legacy defaults only when a key/field is absent, matching existing CloneStore behavior.
+- Strictly rejects wrong preference types, malformed JSON, non-object clone entries, invalid scalar types, negative virtual user IDs, duplicate composite identities, malformed permission arrays, and invalid coordinates when per-clone GPS is enabled.
+- Preserves each complete original clone JSON object as a compatibility payload, so unrecognized optional fields are not silently discarded by the snapshot layer.
+- Retains stale last-active markers rather than requiring a matching clone row.
+- Produces a deterministic canonical envelope and SHA-256 digest; clone identities, collapsed-space values and permission sets are ordered deterministically.
+- Exposes immutable snapshot collections.
+
+### Safety boundary
+
+This is still a read-only preparation stage. The snapshot class does not write SharedPreferences, create a backup file, open Room, import rows, change startup behavior, or access BlackBox/virtual-app/session storage. Any parse or validation ambiguity aborts capture with an explicit exception; it is never treated as an empty registry. The original preferences are therefore left untouched.
+
+A CI source-contract test checks the read-only boundary, strict-validation markers, lossless raw JSON retention, deterministic digest implementation, and that startup has not been wired to the snapshot class.
+
+### Remaining before any import
+
+1. Add an atomic app-private backup writer and read-back checksum verifier, with interruption/failure tests.
+2. Add snapshot-to-Room conversion and one-transaction import, still behind an explicit opt-in test entry point.
+3. Add semantic round-trip parity tests covering every clone field, permissions, collapsed groups, global profile, master GPS and stale active marker.
+4. Exercise idempotence and crash/restart recovery before considering any repository cutover.
+5. Keep the SharedPreferences implementation authoritative until a separate, reviewed migration/cutover stage is approved.
