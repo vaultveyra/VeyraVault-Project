@@ -29,7 +29,9 @@ public final class ProfileSettings {
     public boolean isValid() {
         if (localeTag != null && localeTag.trim().isEmpty()) return false;
         if (timeZoneId != null && timeZoneId.trim().isEmpty()) return false;
-        if (latitude != null && (latitude < -90.0 || latitude > 90.0)) return false;
-        return longitude == null || (longitude >= -180.0 && longitude <= 180.0);
+        if (latitude != null && (Double.isNaN(latitude) || Double.isInfinite(latitude)
+                || latitude < -90.0 || latitude > 90.0)) return false;
+        return longitude == null || (!Double.isNaN(longitude) && !Double.isInfinite(longitude)
+                && longitude >= -180.0 && longitude <= 180.0);
     }
 }
