@@ -33,9 +33,13 @@ public final class LegacyCloneRoomImporter {
             @Override public void run() {
                 LegacyMigrationMetadataEntity prior = database.migrationMetadata().get();
                 if (prior != null) {
-                    if (prior.sourceSnapshotSha256.equals(snapshot.sha256())) {
+                    if (prior.sourceSnapshotSha256.equals(snapshot.sha256())
+                            && LegacyCloneRoomVerifier.matches(database, snapshot)) {
                         result[0] = Result.ALREADY_IMPORTED;
                         return;
+                    }
+                    if (prior.sourceSnapshotSha256.equals(snapshot.sha256())) {
+                        throw new IllegalStateException("Stored Room rows no longer match the previously imported snapshot");
                     }
                     throw new IllegalStateException("Room already contains a different legacy migration snapshot");
                 }
