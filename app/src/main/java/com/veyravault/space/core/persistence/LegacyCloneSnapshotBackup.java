@@ -61,7 +61,8 @@ public final class LegacyCloneSnapshotBackup {
 
         // A verified pre-migration backup is immutable. Reuse it only for the exact
         // same snapshot; never silently replace it with a later/different state.
-        if (baseFile.exists()) {
+        File interruptedBackup = new File(baseFile.getPath() + ".bak");
+        if (baseFile.exists() || interruptedBackup.exists()) {
             byte[] existingBytes;
             try (FileInputStream input = atomicFile.openRead()) {
                 existingBytes = readFully(input);
