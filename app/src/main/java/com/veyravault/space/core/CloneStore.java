@@ -43,7 +43,7 @@ public class CloneStore {
         public boolean enabled = true;
         public String brand = "samsung";
         public String manufacturer = "samsung";
-        public String model = "SM-S928B"; // Galaxy S24 Ultra (Masks Huawei/old device)
+        public String model = "SM-S928B"; // Saved profile metadata; not applied by the pinned engine.
         public String device = "e3q";
         public String countryIso = "us";
         public String simOperator = "310260";
@@ -241,11 +241,8 @@ public class CloneStore {
     }
 
     public static void syncAllHooks(Context c) {
-        GlobalEnvConfig g = getGlobalEnv(c);
-        if (g.enabled) {
-            VirtualHookManager.applyDeviceProperties(0, g.brand, g.manufacturer, g.model, g.device,
-                    g.countryIso, g.simOperator, g.simOperatorName);
-        }
+        // Location settings are applied through engine APIs scoped to each package and virtual user.
+        // Device/SIM profile fields remain stored as metadata until a supported scoped engine API exists.
         for (CloneEntry e : getAll(c)) {
             VirtualHookManager.syncCloneHooks(c, e);
         }
