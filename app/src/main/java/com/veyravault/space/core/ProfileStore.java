@@ -69,6 +69,8 @@ public final class ProfileStore {
 
     public static synchronized ProfileSettings getCloneOverride(Context context,
                                                                  String packageName, int userId) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0)
+            return new ProfileSettings();
         JSONObject clones = readRoot(context).optJSONObject("clones");
         return fromJson(clones == null ? null : clones.optJSONObject(cloneKey(packageName, userId)));
     }
@@ -192,7 +194,10 @@ public final class ProfileStore {
                 if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
                         || entry.userId < 0 || !entry.mockGpsEnabled) continue;
                 String key = cloneKey(entry.packageName, entry.userId);
-                JSONObject existing = clones.optJSONObject(key);
+                Object existingValue = clones.opt(key);
+                if (existingValue != null && !(existingValue instanceof JSONObject)) return false;
+                JSONObject existing = existingValue instanceof JSONObject
+                        ? (JSONObject) existingValue : null;
                 JSONObject imported = existing == null ? new JSONObject() : new JSONObject(existing.toString());
                 boolean entryChanged = false;
                 if (!imported.has("locationEnabled")) {
