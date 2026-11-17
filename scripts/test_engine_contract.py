@@ -32,4 +32,6 @@ launch = method_body("public static boolean launchClone(")
 assert "if (!isInstalledAsUser(entry.packageName, entry.userId)" in launch
 assert "&& !installPackageAsUser(entry.packageName, entry.userId))" in launch
 assert "return false;" in launch
+assert launch.index("installPackageAsUser(entry.packageName, entry.userId)") < launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
+assert launch.index("CloneStore.recordActiveLaunch(ctx, entry)") < launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")
 print("Engine install/launch failure contract: PASS")
