@@ -32,11 +32,14 @@ launch = method_body("public static boolean launchClone(")
 assert "if (!isInstalledAsUser(entry.packageName, entry.userId)" in launch
 assert "&& !installPackageAsUser(entry.packageName, entry.userId))" in launch
 assert "return false;" in launch
-assert "return Boolean.TRUE.equals(r);" in launch
+assert "boolean launched = Boolean.TRUE.equals(r);" in launch
+assert "if (!launched) return false;" in launch
+assert launch.index("installPackageAsUser(entry.packageName, entry.userId)") < launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")
+assert launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)") < launch.index('getMethod("launchApk", String.class, int.class)')
+assert launch.index("if (!launched) return false;") < launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
 assert "r == null || Boolean.TRUE.equals(r)" not in launch
-assert launch.index("installPackageAsUser(entry.packageName, entry.userId)") < launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
-assert launch.index("CloneStore.recordActiveLaunch(ctx, entry)") < launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")
 print("Engine install/launch failure contract: PASS")
+print("Active-launch marker is written only after confirmed engine launch: PASS")
 
 # UI must not persist a clone registry entry after a failed engine install.
 main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
