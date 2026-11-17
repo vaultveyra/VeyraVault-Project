@@ -157,6 +157,7 @@ A CI source-contract test checks the read-only boundary, strict-validation marke
 - Uses Android `AtomicFile` with `startWrite`, file-descriptor `sync`, `finishWrite`, and `failWrite` handling.
 - Stores a versioned envelope containing the canonical snapshot payload and SHA-256 digest.
 - Reads the file back after commit and verifies byte-for-byte equality, envelope version, payload digest, and equality with the captured snapshot digest.
+- Treats an existing verified backup as immutable: an identical snapshot reuses it; a different snapshot or corrupt existing file is rejected rather than silently overwriting the pre-migration copy.
 - Returns a small receipt containing the verified digest and byte count.
 
 The backup writer is not invoked by startup or any current user flow. It does not enumerate, copy, or modify BlackBox data, virtual package directories, account/session state, or the legacy preferences. A dedicated CI source-contract test guards the app-private path, atomic write/sync/read-back sequence, checksum checks, and inactive runtime boundary.
