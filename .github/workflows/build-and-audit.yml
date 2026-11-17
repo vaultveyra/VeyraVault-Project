@@ -62,6 +62,9 @@ jobs:
       - name: Test opt-in legacy Room import contract
         run: python3 scripts/test_legacy_room_import_contract.py
 
+      - name: Test Android Room instrumentation wiring
+        run: python3 scripts/test_room_instrumentation_wiring.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
