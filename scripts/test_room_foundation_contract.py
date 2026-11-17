@@ -16,9 +16,9 @@ assert '"room.schemaLocation": "$projectDir/schemas".toString()' in prepare
 expected = {
     "CloneEntity.java", "DeniedPermissionEntity.java", "CollapsedSpaceEntity.java",
     "GlobalDeviceProfileEntity.java", "PersistenceSettingsEntity.java",
-    "LastActiveLaunchEntity.java", "CloneDao.java", "DeniedPermissionDao.java",
+    "LastActiveLaunchEntity.java", "LegacyMigrationMetadataEntity.java", "CloneDao.java", "DeniedPermissionDao.java",
     "CollapsedSpaceDao.java", "GlobalDeviceProfileDao.java",
-    "PersistenceSettingsDao.java", "LastActiveLaunchDao.java",
+    "PersistenceSettingsDao.java", "LastActiveLaunchDao.java", "LegacyMigrationMetadataDao.java",
     "ClonePersistenceDatabase.java", "ClonePersistenceDatabaseProvider.java",
 }
 present = {p.name for p in room_root.glob("*.java")}
@@ -51,6 +51,7 @@ assert "no FK" in active
 
 database = (room_root / "ClonePersistenceDatabase.java").read_text(encoding="utf-8")
 assert "exportSchema = true" in database
+assert "LegacyMigrationMetadataEntity.class" in database
 assert (root / "app/schemas/README.md").is_file()
 
 print("Room 2.6.1 generated Gradle dependency contract: PASS")
