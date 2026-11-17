@@ -2,7 +2,6 @@ package com.veyravault.space.core;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.util.List;
@@ -38,7 +37,10 @@ public final class ProfileStore {
             }
             return root;
         } catch (Exception ignored) {
-            return new JSONObject();
+            // A malformed existing payload is quarantined in memory; never overwrite it.
+            JSONObject invalid = new JSONObject();
+            try { invalid.put("schemaVersion", -1); } catch (JSONException impossible) { }
+            return invalid;
         }
     }
 
