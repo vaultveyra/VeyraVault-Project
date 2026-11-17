@@ -47,12 +47,45 @@ public final class ProfileResolverContractTest {
         check(unset.locationEnabled == null, "unset must not be coerced to false");
 
         check(!newInvalidSettings().isValid(), "out-of-range coordinates must be rejected");
+        check(!newNaNLatitude().isValid(), "NaN latitude must be rejected");
+        check(!newInfiniteLongitude().isValid(), "infinite longitude must be rejected");
+
+        // Clearing one clone's override (represented by null) must reveal the
+        // global/system value without changing another clone's profile.
+        ProfileSettings cloneA = new ProfileSettings();
+        cloneA.timeZoneId = "Asia/Tehran";
+        ProfileSettings cloneB = new ProfileSettings();
+        cloneB.timeZoneId = "Europe/London";
+        ProfileResolver.ResolvedProfile aBefore = ProfileResolver.resolve(cloneA, global, system);
+        ProfileResolver.ResolvedProfile bBefore = ProfileResolver.resolve(cloneB, global, system);
+        check("Asia/Tehran".equals(aBefore.timeZoneId), "clone A must keep its own timezone");
+        check("Europe/London".equals(bBefore.timeZoneId), "clone B must keep its own timezone");
+        ProfileResolver.ResolvedProfile aAfterClear = ProfileResolver.resolve(
+                new ProfileSettings(), global, system);
+        check("America/New_York".equals(aAfterClear.timeZoneId),
+                "clearing clone override must reveal system fallback");
+
+        ProfileSettings copied = cloneA.copy();
+        copied.timeZoneId = "UTC";
+        check("Asia/Tehran".equals(cloneA.timeZoneId), "copy must not mutate original settings");
         System.out.println("ProfileResolver contract tests: PASS");
     }
 
     private static ProfileSettings newInvalidSettings() {
         ProfileSettings value = new ProfileSettings();
         value.latitude = 91.0;
+        return value;
+    }
+
+    private static ProfileSettings newNaNLatitude() {
+        ProfileSettings value = new ProfileSettings();
+        value.latitude = Double.NaN;
+        return value;
+    }
+
+    private static ProfileSettings newInfiniteLongitude() {
+        ProfileSettings value = new ProfileSettings();
+        value.longitude = Double.POSITIVE_INFINITY;
         return value;
     }
 }
