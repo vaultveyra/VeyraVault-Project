@@ -237,6 +237,7 @@ android {{
             }}
         }}
         targetSdk 28
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         versionCode 200
         versionName "2.0.0-Enterprise"
 
@@ -250,6 +251,14 @@ android {{
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }}
+        // Debug instrumentation exercises Room without starting the virtual engine.
+        debug {{
+            packaging {{
+                jniLibs {{
+                    excludes += ["**/*.so"]
+                }}
+            }}
         }}
     }}
 
@@ -285,6 +294,9 @@ dependencies {{
     implementation 'org.osmdroid:osmdroid-android:6.1.14'
     implementation 'androidx.room:room-runtime:2.6.1'
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
 }}
 """
     with open(os.path.join(ws_app, "build.gradle"), "w", encoding="utf-8") as f:
