@@ -10,7 +10,7 @@ for token in (
     'private static final String DIRECTORY = "migration-backups"',
     'private static final String FILE_NAME = "clone-store-snapshot-v1.json"',
     "new AtomicFile(baseFile)",
-    "if (baseFile.exists())",
+    "if (baseFile.exists() || interruptedBackup.exists())",
     "refusing to overwrite it",
     "verifyBackupBytes(expectedBytes, existingBytes, digest)",
     "atomicFile.startWrite()",
