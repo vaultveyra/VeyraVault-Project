@@ -197,3 +197,22 @@ A dedicated CI source-contract test checks the transactional boundary, worker-th
 ### Important test limitation and next gate
 
 The CI contract test is a source-level regression guard; it is not a physical-device or Android instrumentation round-trip test. The APK build validates Java/Room annotation-processor compilation. Before any cutover, run actual Room database tests on Android (including forced exception rollback, process death/restart, repeat import, and row corruption detection), then retain the legacy store and verified backup through an upgrade cycle. No production persistence switch is authorized by this stage.
+
+
+## Stage 7.4 — Android Room instrumentation test harness
+
+An AndroidX instrumentation suite is now added under `app/src/androidTest`. It uses the actual Room-generated database and SQLite implementation rather than source-text assertions.
+
+### Covered runtime scenarios
+
+- Import a populated snapshot and verify all modeled rows and migration provenance.
+- Repeat the same import and require `ALREADY_IMPORTED`; then mutate a persisted row and require parity verification to fail and re-import to be rejected.
+- Inject a SQLite trigger failure during denied-permission insertion after clone insertion, then verify the Room transaction leaves every table empty.
+- Close and reopen an on-disk Room database and verify the imported snapshot, including a stale active marker.
+- Import an empty snapshot with no active marker and verify singleton defaults and absence of an active row.
+
+The test APK uses a debug-only `RoomTestApplication` so the instrumentation process does not start the virtual-app engine. Debug packaging excludes native shared libraries because these tests exercise persistence only; the production `VaultApp`, release manifest, release ABI filters and release APK packaging remain unchanged. The test suite runs on an x86_64 Android API 35 emulator through GitHub Actions.
+
+### Boundary and remaining validation
+
+These are automated emulator tests, not physical-device upgrade tests. They do not invoke the importer from startup and do not change the production persistence provider. Before any production cutover, still require an upgrade test against a real legacy installation, a verified backup/restore drill, app-process death during an import, and device-level clone/session regression checks. SharedPreferences remains authoritative.
