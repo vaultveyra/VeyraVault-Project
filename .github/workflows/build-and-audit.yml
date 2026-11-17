@@ -2,7 +2,7 @@ name: Build and audit VeyraVault APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feat/veyra-vault-product-foundation" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
