@@ -100,6 +100,6 @@ An inactive schema foundation now exists under `app/src/main/java/com/veyravault
 - DAOs and `ClonePersistenceDatabase` define the first Room schema.
 - `ClonePersistenceDatabaseProvider` creates the database without destructive fallback and is not called from `VaultApp`, `CloneStore`, or current runtime flows.
 
-The CI contract test verifies the generated Gradle dependency, presence of all schema/DAO types, the inactive runtime boundary, absence of destructive fallback/main-thread query opt-ins, and preservation of legacy collapsed-key and stale-active-marker semantics.
+The CI contract test verifies the generated Gradle dependency, presence of all schema/DAO types, the inactive runtime boundary, absence of destructive fallback/main-thread query opt-ins, and preservation of legacy collapsed-key and stale-active-marker semantics. Room schema export is enabled and directed to the version-controlled `app/schemas` directory so future schema versions can be reviewed and migration-tested.
 
 **Important:** this is schema scaffolding only. No data is imported, no Room query is invoked by the app, no legacy preference is modified, and `CloneStore` remains the only active persistence implementation. The next stage must add deterministic legacy snapshot parsing, backup verification, transactional import, and round-trip comparison tests before any runtime cutover is considered.
