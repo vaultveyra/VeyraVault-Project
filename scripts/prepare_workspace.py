@@ -104,7 +104,7 @@ def disable_remote_log_upload(workspace):
         stub = (
             "package top.niunaijun.blackbox.utils;\n\n"
             "import java.io.File;\n\n"
-            "/** Remote log transmission is intentionally disabled in VeyraVault builds. */\n"
+            "/** VEYRAVAULT_REMOTE_LOG_UPLOAD_DISABLED: remote log transmission is disabled. */\n"
             "public final class LogSender {\n"
             "    private LogSender() { }\n"
             "    public static String send(String chatId, File logFile, String caption) {\n"
