@@ -114,7 +114,7 @@ public class Engine {
             if (core == null) return false;
             Method m = core.getClass().getMethod("launchApk", String.class, int.class);
             Object r = m.invoke(core, entry.packageName, entry.userId);
-            return r == null || Boolean.TRUE.equals(r);
+            return Boolean.TRUE.equals(r);
         } catch (Throwable t) {
             return false;
         }
