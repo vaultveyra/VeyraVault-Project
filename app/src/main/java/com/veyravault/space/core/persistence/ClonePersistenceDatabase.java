@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase;
         LastActiveLaunchEntity.class
     },
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 public abstract class ClonePersistenceDatabase extends RoomDatabase {
     public abstract CloneDao clones();
