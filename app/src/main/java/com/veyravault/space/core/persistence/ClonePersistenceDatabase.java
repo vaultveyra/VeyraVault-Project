@@ -10,7 +10,8 @@ import androidx.room.RoomDatabase;
         CollapsedSpaceEntity.class,
         GlobalDeviceProfileEntity.class,
         PersistenceSettingsEntity.class,
-        LastActiveLaunchEntity.class
+        LastActiveLaunchEntity.class,
+        LegacyMigrationMetadataEntity.class
     },
     version = 1,
     exportSchema = true
@@ -22,4 +23,5 @@ public abstract class ClonePersistenceDatabase extends RoomDatabase {
     public abstract GlobalDeviceProfileDao globalDeviceProfile();
     public abstract PersistenceSettingsDao persistenceSettings();
     public abstract LastActiveLaunchDao lastActiveLaunch();
+    public abstract LegacyMigrationMetadataDao migrationMetadata();
 }
