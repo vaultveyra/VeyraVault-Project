@@ -29,6 +29,8 @@ for token in (
     "non-String value",
     "Legacy CloneStore snapshot rejected",
     "legacyJson = source.toString()",
+    "Denied permissions field is not a JSON array",
+    "readPermissions(source)",
 ):
     assert token in source, "Snapshot contract missing: " + token
 
