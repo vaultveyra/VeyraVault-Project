@@ -163,3 +163,37 @@ A CI source-contract test checks the read-only boundary, strict-validation marke
 The backup writer is not invoked by startup or any current user flow. It does not enumerate, copy, or modify BlackBox data, virtual package directories, account/session state, or the legacy preferences. A dedicated CI source-contract test guards the app-private path, atomic write/sync/read-back sequence, checksum checks, and inactive runtime boundary.
 
 **Stage 7.2 remains preparation only:** no Room import or read/write cutover has been added. The next gate is transactional import plus exact semantic parity and restart/idempotence tests, all behind an opt-in test path.
+
+
+## Stage 7.3 — Opt-in transactional import and semantic parity
+
+The Room foundation now includes a migration-provenance singleton table. It stores the source snapshot SHA-256 and complete canonical source payload, including the original JSON strings and key-presence flags. Each imported clone row also retains its exact legacy JSON object in `legacyJson`, so fields not yet modeled as columns are not discarded.
+
+### Import boundary
+
+`LegacyCloneRoomImporter.importIntoEmptyDatabase(...)` is an explicit worker-thread-only operation. It is not called by `VaultApp`, `CloneStore`, any Activity, or normal runtime flows.
+
+- Rejects calls from the Android main thread.
+- Runs the entire import inside `RoomDatabase.runInTransaction`.
+- Refuses a database containing any clone, permission, collapsed-space, profile, settings, or active-marker rows unless matching migration provenance already exists.
+- Inserts clone rows before dependent denied-permission rows, then collapsed keys, global profile, master GPS setting, optional active-launch marker and migration provenance.
+- Does not delete or overwrite existing Room data.
+- Preserves stale active-launch markers without introducing a foreign key to clone rows.
+- A repeated import returns `ALREADY_IMPORTED` only when the source digest matches and the verifier confirms every persisted field still matches. Same digest with altered/missing Room rows is an error, not a silent success.
+
+### Semantic parity verifier
+
+`LegacyCloneRoomVerifier.matches(...)` compares:
+- Composite clone identities and all modeled clone fields, including exact original per-clone JSON.
+- Every denied permission keyed by package/user/permission.
+- Exact collapsed-space string keys.
+- All global device profile metadata fields.
+- Master GPS enabled state.
+- Optional/stale last-active marker.
+- Migration metadata digest and full canonical source payload, which retains source key-presence semantics and raw global/active/clones JSON.
+
+A dedicated CI source-contract test checks the transactional boundary, worker-thread guard, empty-database protection, all field mappings, parity checks, and the fact that no runtime caller invokes the importer.
+
+### Important test limitation and next gate
+
+The CI contract test is a source-level regression guard; it is not a physical-device or Android instrumentation round-trip test. The APK build validates Java/Room annotation-processor compilation. Before any cutover, run actual Room database tests on Android (including forced exception rollback, process death/restart, repeat import, and row corruption detection), then retain the legacy store and verified backup through an upgrade cycle. No production persistence switch is authorized by this stage.
