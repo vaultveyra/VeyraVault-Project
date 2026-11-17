@@ -78,7 +78,9 @@ public final class ProfileStore {
         JSONObject root = readRoot(context);
         if (!isCompatibleRoot(root)) return false;
         try {
-            root.put("global", toJson(settings, root.optJSONObject("global")));
+            JSONObject global = toJson(settings, root.optJSONObject("global"));
+            if (global.length() == 0) root.remove("global");
+            else root.put("global", global);
             return writeRoot(context, root);
         } catch (Exception ignored) {
             return false;
@@ -139,8 +141,10 @@ public final class ProfileStore {
         try {
             JSONObject clones = root.optJSONObject("clones");
             if (clones == null) clones = new JSONObject();
-            clones.put(cloneKey(packageName, userId),
-                    toJson(settings, clones.optJSONObject(cloneKey(packageName, userId))));
+            String key = cloneKey(packageName, userId);
+            JSONObject profile = toJson(settings, clones.optJSONObject(key));
+            if (profile.length() == 0) clones.remove(key);
+            else clones.put(key, profile);
             root.put("clones", clones);
             return writeRoot(context, root);
         } catch (Exception ignored) {
@@ -228,17 +232,14 @@ public final class ProfileStore {
 
     private static JSONObject toJson(ProfileSettings settings, JSONObject existing) throws JSONException {
         JSONObject out = existing == null ? new JSONObject() : new JSONObject(existing.toString());
-        putNullable(out, "localeTag", settings.localeTag);
-        putNullable(out, "timeZoneId", settings.timeZoneId);
-        putNullable(out, "locationEnabled", settings.locationEnabled);
-        putNullable(out, "latitude", settings.latitude);
-        putNullable(out, "longitude", settings.longitude);
+        // Null means "not supplied" during save, so a partial update cannot erase
+        // sibling overrides. Explicit clear methods remove one selected field.
+        if (settings.localeTag != null) out.put("localeTag", settings.localeTag);
+        if (settings.timeZoneId != null) out.put("timeZoneId", settings.timeZoneId);
+        if (settings.locationEnabled != null) out.put("locationEnabled", settings.locationEnabled);
+        if (settings.latitude != null) out.put("latitude", settings.latitude);
+        if (settings.longitude != null) out.put("longitude", settings.longitude);
         return out;
-    }
-
-    private static void putNullable(JSONObject out, String key, Object value) throws JSONException {
-        if (value == null) out.remove(key);
-        else out.put(key, value);
     }
 
     private static ProfileSettings fromJson(JSONObject json) {
