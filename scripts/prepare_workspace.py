@@ -278,6 +278,8 @@ dependencies {{
     implementation 'androidx.recyclerview:recyclerview:1.3.1'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'org.osmdroid:osmdroid-android:6.1.14'
+    implementation 'androidx.room:room-runtime:2.6.1'
+    annotationProcessor 'androidx.room:room-compiler:2.6.1'
 }}
 """
     with open(os.path.join(ws_app, "build.gradle"), "w", encoding="utf-8") as f:
