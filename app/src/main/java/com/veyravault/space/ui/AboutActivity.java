@@ -61,6 +61,17 @@ public class AboutActivity extends BaseActivity {
         });
         root.addView(tgBtn);
 
+        Button diagnosticsBtn = new Button(this);
+        diagnosticsBtn.setAllCaps(false);
+        diagnosticsBtn.setText(fa ? "گزارش سازگاری" : "Compatibility report");
+        diagnosticsBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(AboutActivity.this, CompatibilityReportActivity.class));
+            }
+        });
+        root.addView(diagnosticsBtn);
+
         setContentView(sv);
     }
 }
