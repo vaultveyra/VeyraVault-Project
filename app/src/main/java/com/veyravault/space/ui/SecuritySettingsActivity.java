@@ -57,7 +57,7 @@ public class SecuritySettingsActivity extends BaseActivity {
         cardAnti.addView(antiDesc);
 
         antiUninstallSwitch = new CheckBox(this);
-        antiUninstallSwitch.setText(fa ? "قفل کردن حذف برنامه (غیرقابل حذف شدن)" : "Prevent App Uninstall (Active Protection)");
+        antiUninstallSwitch.setText(fa ? "فعال‌سازی دسترسی مدیر دستگاه اندروید" : "Enable Android Device Admin");
         antiUninstallSwitch.setChecked(VaultDeviceAdminReceiver.isAntiUninstallActive(this));
         antiUninstallSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
