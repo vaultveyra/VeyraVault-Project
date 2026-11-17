@@ -53,6 +53,9 @@ jobs:
       - name: Test inactive Room foundation contract
         run: python3 scripts/test_room_foundation_contract.py
 
+      - name: Test read-only legacy CloneStore snapshot contract
+        run: python3 scripts/test_legacy_clone_snapshot_contract.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
