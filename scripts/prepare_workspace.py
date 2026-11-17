@@ -290,7 +290,10 @@ android {{
 }}
 
 dependencies {{
-    implementation project(':Bcore')
+    // The Room-only debug harness needs Bcore types at compile time, but must not package
+    // the ARM-only virtual engine or its native libraries into the x86_64 emulator APK.
+    releaseImplementation project(':Bcore')
+    debugCompileOnly project(':Bcore')
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.1'
