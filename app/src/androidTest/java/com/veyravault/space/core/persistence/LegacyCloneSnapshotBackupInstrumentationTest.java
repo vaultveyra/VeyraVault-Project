@@ -60,6 +60,26 @@ public class LegacyCloneSnapshotBackupInstrumentationTest {
         assertArrayEquals(original, readFile(backupFile));
     }
 
+    @Test public void interruptedAtomicFileSidecarIsRecoveredAndVerified() throws Exception {
+        LegacyCloneSnapshot snapshot = LegacyCloneSnapshot.capture(context);
+        LegacyCloneSnapshotBackup.writeAndVerify(context, snapshot);
+        byte[] original = readFile(backupFile);
+
+        assertTrue("Test must remove the base file to model an interrupted AtomicFile write",
+                backupFile.delete());
+        try (FileOutputStream output = new FileOutputStream(backupSidecar, false)) {
+            output.write(original);
+            output.getFD().sync();
+        }
+
+        LegacyCloneSnapshotBackup.Receipt recovered =
+                LegacyCloneSnapshotBackup.writeAndVerify(context, snapshot);
+        assertEquals(snapshot.sha256(), recovered.sha256);
+        assertTrue(backupFile.isFile());
+        assertFalse(backupSidecar.exists());
+        assertArrayEquals(original, readFile(backupFile));
+    }
+
     @Test public void immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal() throws Exception {
         LegacyCloneSnapshot firstSnapshot = LegacyCloneSnapshot.capture(context);
         LegacyCloneSnapshotBackup.writeAndVerify(context, firstSnapshot);
