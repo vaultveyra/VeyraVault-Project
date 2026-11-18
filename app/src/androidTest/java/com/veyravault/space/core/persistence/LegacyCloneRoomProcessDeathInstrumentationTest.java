@@ -78,13 +78,19 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
         assertTrue("Verification must run in a fresh OS process", restartedPid > 0
                 && restartedPid != killedServicePid);
 
-        assertEquals(0, parseCount(verified, "clones"));
-        assertEquals(0, parseCount(verified, "permissions"));
-        assertEquals(0, parseCount(verified, "collapsed"));
-        assertEquals(0, parseCount(verified, "profile"));
-        assertEquals(0, parseCount(verified, "settings"));
-        assertEquals(0, parseCount(verified, "active"));
-        assertEquals(0, parseCount(verified, "metadata"));
+        assertEquals("Clone rows must roll back after OS process death", 0, parseCount(verified, "clones"));
+        assertEquals("Denied-permission rows must roll back after OS process death", 0,
+                parseCount(verified, "permissions"));
+        assertEquals("Collapsed-space rows must roll back after OS process death", 0,
+                parseCount(verified, "collapsed"));
+        assertEquals("Global-profile rows must roll back after OS process death", 0,
+                parseCount(verified, "profile"));
+        assertEquals("Persistence-settings rows must roll back after OS process death", 0,
+                parseCount(verified, "settings"));
+        assertEquals("Last-active rows must roll back after OS process death", 0,
+                parseCount(verified, "active"));
+        assertEquals("Migration-provenance rows must roll back after OS process death", 0,
+                parseCount(verified, "metadata"));
     }
 
     private void seedLegacySnapshot() {
@@ -112,7 +118,10 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
         long deadline = SystemClock.elapsedRealtime() + timeoutMillis;
         while (SystemClock.elapsedRealtime() < deadline) {
             if (error.isFile()) throw new AssertionError("Crash-test service error: " + readText(error));
-            if (marker.isFile()) return readText(marker);
+            if (marker.isFile() && marker.length() > 0L) {
+                String contents = readText(marker);
+                if (!contents.trim().isEmpty()) return contents;
+            }
             Thread.sleep(100L);
         }
         throw new AssertionError("Timed out waiting for " + name);
