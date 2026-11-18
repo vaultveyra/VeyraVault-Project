@@ -617,37 +617,43 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("⊞+", getString(R.string.duplicate), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                int nextUid = CloneStore.nextFreeUserIdForPackage(MainActivity.this, item.packageName);
-                if (nextUid < 0) {
-                    Toast.makeText(MainActivity.this,
-                            fa ? "فهرست کلون‌ها قابل اعتبارسنجی نیست؛ تکثیر متوقف شد."
-                               : "Clone registry could not be validated; duplication was stopped.",
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
-                copy.packageName = item.packageName;
-                copy.userId = nextUid;
-                copy.displayName = item.displayName;
-                if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
-                    Toast.makeText(MainActivity.this,
-                            fa ? "ساخت کلون ناموفق بود؛ اطلاعات فضا ثبت نشد." : "Clone installation failed; no space entry was saved.",
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                if (!CloneStore.upsertClone(MainActivity.this, copy)) {
-                    boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
-                    Toast.makeText(MainActivity.this,
-                            fa ? (cleanupConfirmed
-                                    ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
-                                    : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
-                               : (cleanupConfirmed
-                                    ? "Clone registry save failed; the new installation was removed."
-                                    : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                refreshSpaces();
+                repository.allocateNextUserId(item.packageName, allocation -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!allocation.isSuccess() || allocation.getValue() == null || allocation.getValue() < 0) {
+                        Toast.makeText(MainActivity.this,
+                                (fa ? "شناسهٔ کلون قابل تخصیص نیست: " : "A clone ID could not be allocated: ")
+                                        + allocation.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
+                    copy.packageName = item.packageName;
+                    copy.userId = allocation.getValue();
+                    copy.displayName = item.displayName;
+                    if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
+                        Toast.makeText(MainActivity.this,
+                                fa ? "ساخت کلون ناموفق بود؛ اطلاعات فضا ثبت نشد."
+                                   : "Clone installation failed; no Space entry was saved.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    repository.upsertClone(copy, save -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (!save.isSuccess()) {
+                            boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
+                            Toast.makeText(MainActivity.this,
+                                    fa ? (cleanupConfirmed
+                                            ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
+                                            : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
+                                       : (cleanupConfirmed
+                                            ? "Clone registry save failed; the new installation was removed."
+                                            : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        refreshSpaces();
+                    });
+                });
             }
         }));
 
