@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
 import java.util.HashSet;
@@ -21,9 +22,6 @@ public class DashboardActivity extends BaseActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         final boolean fa = LocaleHelper.isPersian(this);
-        List<CloneStore.CloneEntry> clones = CloneStore.getAll(this);
-        Set<Integer> spaces = new HashSet<Integer>();
-        for (CloneStore.CloneEntry clone : clones) spaces.add(clone.getSpaceNumber());
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -39,11 +37,40 @@ public class DashboardActivity extends BaseActivity {
         subtitle.setPadding(0,dp(6),0,dp(20)); root.addView(subtitle);
         LinearLayout stats = new LinearLayout(this);
         stats.setOrientation(LinearLayout.HORIZONTAL);
-        stats.addView(statCard(fa ? "کلون‌ها" : "Clones", String.valueOf(clones.size())), new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        final TextView cloneCount = (TextView) ((LinearLayout) statCard(fa ? "کلون‌ها" : "Clones", "…")).getChildAt(0);
+        LinearLayout cloneCard = (LinearLayout) cloneCount.getParent();
+        stats.addView(cloneCard, new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        final TextView spaceCount = (TextView) ((LinearLayout) statCard(fa ? "فضاهای استفاده‌شده" : "Spaces used", "…")).getChildAt(0);
+        LinearLayout spaceCard = (LinearLayout) spaceCount.getParent();
         LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1);
         second.setMargins(dp(10),0,0,0);
-        stats.addView(statCard(fa ? "فضاهای استفاده‌شده" : "Spaces used", String.valueOf(spaces.size())), second);
+        stats.addView(spaceCard, second);
         root.addView(stats);
+        final TextView registryStatus = new TextView(this);
+        registryStatus.setTextSize(12);
+        registryStatus.setTextColor(Color.rgb(185,28,28));
+        registryStatus.setPadding(0,dp(8),0,0);
+        registryStatus.setVisibility(View.GONE);
+        root.addView(registryStatus);
+        AsyncCloneRepository.getInstance(getApplicationContext()).loadClones(
+                new AsyncCloneRepository.Callback<List<CloneStore.CloneEntry>>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<List<CloneStore.CloneEntry>> result) {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (!result.isSuccess() || result.getValue() == null) {
+                            cloneCount.setText("—");
+                            spaceCount.setText("—");
+                            registryStatus.setText(fa
+                                    ? "خواندن فهرست فضاها ناموفق بود؛ آمار نمایش‌داده نمی‌شود."
+                                    : "Could not validate the Space registry; counts are unavailable.");
+                            registryStatus.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        Set<Integer> spaces = new HashSet<Integer>();
+                        for (CloneStore.CloneEntry clone : result.getValue()) spaces.add(clone.getSpaceNumber());
+                        cloneCount.setText(String.valueOf(result.getValue().size()));
+                        spaceCount.setText(String.valueOf(spaces.size()));
+                    }
+                });
         addAction(root,fa ? "مدیریت فضاها" : "Manage Spaces",fa ? "مشاهده و اجرای کلون‌های موجود" : "View and launch your existing clones",new View.OnClickListener(){@Override public void onClick(View v){startActivity(new Intent(DashboardActivity.this,MainActivity.class));finish();}});
         addAction(root,fa ? "افزودن برنامه" : "Add an App",fa ? "ساخت کلون جدید در یک فضای مستقل" : "Create a clone in an independent space",new View.OnClickListener(){@Override public void onClick(View v){startActivity(new Intent(DashboardActivity.this,AddAppActivity.class));}});
         addAction(root,"VPN",fa ? "وضعیت VPN سیستم و قابلیت فعلی برنامه" : "System VPN status and current app capability",new View.OnClickListener(){@Override public void onClick(View v){startActivity(new Intent(DashboardActivity.this,VpnStatusActivity.class));}});
