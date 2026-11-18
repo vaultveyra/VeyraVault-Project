@@ -187,6 +187,10 @@ public class CloneStore {
             throw new IllegalArgumentException("Package name is required");
         List<CloneEntry> clones = readAllStrict(c);
         List<CloneReservation> reservations = readReservationsStrict(c);
+        for (CloneEntry clone : clones) {
+            if (containsReservation(reservations, clone.packageName, clone.userId))
+                throw new IllegalStateException("Reservation journal conflicts with the clone registry");
+        }
         Set<Integer> used = new HashSet<Integer>();
         for (CloneEntry entry : clones) if (packageName.equals(entry.packageName)) used.add(entry.userId);
         for (CloneReservation reservation : reservations)
