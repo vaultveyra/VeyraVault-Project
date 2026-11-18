@@ -49,8 +49,10 @@ main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").re
 add_ui = Path("app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
 assert "if (!Engine.installPackageAsUser(copy.packageName, copy.userId))" in main_ui
 assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("repository.upsertClone(copy")
-assert "if (!Engine.installPackageAsUser(e.packageName, e.userId))" in add_ui
-assert add_ui.index("if (!Engine.installPackageAsUser(e.packageName, e.userId))") < add_ui.index("CloneStore.upsertClone(this, e)")
+assert "repository.allocateNextUserId(app.pkg" in add_ui
+assert "if (!Engine.installPackageAsUser(entry.packageName, entry.userId))" in add_ui
+assert add_ui.index("if (!Engine.installPackageAsUser(entry.packageName, entry.userId))") < add_ui.index("repository.upsertClone(entry")
+assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_ui
 assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
 print("Clone creation UI failure handling: PASS")
 
