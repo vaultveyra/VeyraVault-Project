@@ -11,7 +11,6 @@ assert "CloneStore.getGlobalEnv" not in source
 assert "CloneStore.isMasterMockGpsEnabled" not in source
 assert "CloneStore.saveGlobalEnv" not in source
 assert "CloneStore.setMasterMockGpsEnabled" not in source
-assert "CloneStore.syncAllHooks" not in source
 assert "CloneStore.syncAllHooks(getApplicationContext())" in source
 assert "profileLoaded && masterGpsLoaded && !loadFailed" in source
 
@@ -29,3 +28,4 @@ assert "Profile and Master GPS were saved" in source
 assert "setControlsEnabled(false)" in source
 
 print("PASS: GlobalEnvironmentActivity loads and saves settings asynchronously, reports partial commits, and syncs hooks only after both commits succeed.")
+
