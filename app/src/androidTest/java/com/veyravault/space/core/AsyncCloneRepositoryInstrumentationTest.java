@@ -244,14 +244,14 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
     @Test public void unsupportedProfileSchemaIsNotReportedAsEmptySuccess() throws Exception {
-        profilePreferences.edit().putString("profiles_json", "{\\"schemaVersion\\":999}").commit();
+        profilePreferences.edit().putString("profiles_json", "{\"schemaVersion\":999}").commit();
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<AsyncCloneRepository.Result<ProfileSettings>> resultRef = new AtomicReference<>();
         repository.loadGlobalProfile(result -> { resultRef.set(result); done.countDown(); });
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, resultRef.get().getFailure());
-        assertEquals("{\\"schemaVersion\\":999}", profilePreferences.getString("profiles_json", null));
+        assertEquals("{\"schemaVersion\":999}", profilePreferences.getString("profiles_json", null));
         repository.close();
     }
 
