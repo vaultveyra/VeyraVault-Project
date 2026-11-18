@@ -22,7 +22,7 @@ def body(source, signature):
                 return source[brace + 1:index]
     raise AssertionError("Unclosed method: " + signature)
 
-reader = body(store, "private static List<CloneEntry> readAllStrict(")
+reader = body(store, "static List<CloneEntry> readAllStrict(")
 assert "values.containsKey(KEY_CLONES)" in reader
 assert "new JSONArray((String) rawValue)" in reader
 assert "Duplicate clone identity" in reader
