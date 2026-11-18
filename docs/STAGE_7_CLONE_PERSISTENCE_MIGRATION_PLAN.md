@@ -220,4 +220,6 @@ The instrumentation test then:
 
 The crash service is declared only in the debug manifest. The release manifest, `VaultApp`, CloneStore preferences, virtual package data, and account/session directories are not changed. The importer remains opt-in and is not called by startup or normal runtime flows.
 
-**Validation status:** implementation is committed for CI verification; do not treat the process-death test as passed until the Android emulator run completes. Physical-device upgrade and backup/restore drills remain mandatory before any production migration or cutover.
+**CI validation:** PR Run #244 (run ID 44223327104) on commit `39f53dc088a3239bc94326ded5a0ad5dfd077ba3` completed successfully. The Android emulator executed **10/10 instrumentation tests, 0 skipped, 0 failed**; the Gradle connected instrumentation task completed successfully. The same run completed all source-contract checks, source audit, unsigned release APK compilation, and compiled APK audit. The separate signing job also succeeded: `apksigner verify --verbose` reported v1, v2, and v3 signature verification as true, with one signer. Run: https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44223327104
+
+**Remaining boundary:** this is automated emulator evidence, not a physical-device upgrade test or a production migration. A separately reviewed backup restore/read API and physical-device upgrade/backup-restore drills remain mandatory before any production migration or cutover. SharedPreferences remains the sole runtime source of truth.
