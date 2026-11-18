@@ -12,14 +12,14 @@ assert "CloneStore.isMasterMockGpsEnabled" not in source
 assert "CloneStore.saveGlobalEnv" not in source
 assert "CloneStore.setMasterMockGpsEnabled" not in source
 assert "CloneStore.syncAllHooks" not in source
-assert "VirtualHookManager.syncAllHooks(getApplicationContext())" in source
+assert "CloneStore.syncAllHooks(getApplicationContext())" in source
 assert "profileLoaded && masterGpsLoaded && !loadFailed" in source
 
 profile_save = source.index("repository.saveGlobalEnvironment(updated, profileResult ->")
 profile_success = source.index("if (!profileResult.isSuccess())", profile_save)
 gps_save = source.index("repository.setMasterMockGpsEnabled(masterGpsEnabled, gpsResult ->", profile_success)
 gps_failure = source.index("if (!gpsResult.isSuccess())", gps_save)
-sync = source.index("VirtualHookManager.syncAllHooks(getApplicationContext())", gps_failure)
+sync = source.index("CloneStore.syncAllHooks(getApplicationContext())", gps_failure)
 assert profile_save < profile_success < gps_save < gps_failure < sync
 
 partial_failure = source[gps_failure:sync]
