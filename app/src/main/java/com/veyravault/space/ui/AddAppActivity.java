@@ -232,6 +232,13 @@ public class AddAppActivity extends BaseActivity {
 
     private void cloneSingleApp(InstalledApp app) {
         int nextUid = CloneStore.nextFreeUserIdForPackage(this, app.pkg);
+        if (nextUid < 0) {
+            Toast.makeText(this,
+                    fa ? "فهرست کلون‌ها قابل خواندن نیست؛ برای جلوگیری از ثبت اشتباه، نصب انجام نشد."
+                       : "Clone registry could not be validated; installation was stopped to prevent an incorrect Space assignment.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         CloneStore.CloneEntry e = new CloneStore.CloneEntry();
         e.packageName = app.pkg;
         e.userId = nextUid;
@@ -242,7 +249,18 @@ public class AddAppActivity extends BaseActivity {
                     Toast.LENGTH_LONG).show();
             return;
         }
-        CloneStore.upsertClone(this, e);
+        if (!CloneStore.upsertClone(this, e)) {
+            boolean cleanupConfirmed = Engine.uninstallClone(e.packageName, e.userId);
+            Toast.makeText(this,
+                    fa ? (cleanupConfirmed
+                            ? "ثبت فضای جدید ناموفق بود؛ نصب آزمایشی نیز پاک شد."
+                            : "ثبت فضای جدید ناموفق بود و حذف نصب تأیید نشد؛ لطفاً وضعیت کلون را بررسی کن.")
+                       : (cleanupConfirmed
+                            ? "Saving the new Space failed; the just-installed clone was removed."
+                            : "Saving the new Space failed and uninstall could not be confirmed; please inspect this clone."),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         Toast.makeText(this,
                 fa ? (app.label + " به فضای " + e.getSpaceNumber() + " اضافه شد")
                    : (app.label + " cloned into Space " + e.getSpaceNumber()),
