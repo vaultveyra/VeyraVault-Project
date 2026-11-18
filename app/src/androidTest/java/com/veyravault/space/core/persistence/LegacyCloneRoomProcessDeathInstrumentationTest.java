@@ -37,6 +37,8 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
         markerDirectory = new File(context.getFilesDir(), TEST_DIRECTORY);
         deleteRecursively(markerDirectory);
         seedLegacySnapshot();
+        assertEquals("Seeded legacy snapshot must parse before the service starts", 1,
+                LegacyCloneSnapshot.capture(context).clones.size());
     }
 
     @After public void tearDown() {
