@@ -40,7 +40,7 @@ assert 'readLastActiveLaunchStrict' in store
 assert 'return prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();' in store
 assert 'Object denied = o.opt("denied")' in store
 assert 'denied instanceof JSONArray' in store
-assert 'o.put("denied", pArr)' in store
+assert 'o.put("denied", permissions)' in store
 assert 'e.deniedPermissions.add((String) permission)' in store
 assert 'readCollapsedSpaceNumbersStrict' in store
 assert 'readMasterMockGpsEnabledStrict' in store
