@@ -137,3 +137,15 @@ Implementation now also includes:
 - The application-scoped repository singleton is recreated if a caller previously closed it. Unsupported profile-field clear requests are classified as invalid input before storage operations.
 - Added source-contract coverage for location UI persistence ordering and fail-closed behavior.
 - GlobalEnvironmentActivity, other clone mutation screens, startup hooks, Engine lifecycle, and Room runtime wiring remain unchanged in this substage.
+
+
+### Stage 7.9.4 — Global environment settings UI adoption
+
+- GlobalEnvironmentActivity now loads global device/SIM metadata and Master Mock GPS asynchronously through AsyncCloneRepository. Save remains disabled until both reads succeed; a corrupt/unreadable setting is surfaced rather than replaced with defaults.
+- Global profile metadata is saved first, then Master Mock GPS is saved as a second independent commit. The UI does not claim these two writes are one atomic transaction.
+- If the profile save fails, the screen reports failure and does not attempt the Master GPS write or hook synchronization.
+- If the profile save succeeds but Master GPS fails, the UI explicitly reports the partial commit and does not request hook synchronization. The saved profile is not silently rolled back.
+- Hook synchronization is requested only after both commits are confirmed. The message describes a request, not proof that a physical device or virtualized app accepted any location.
+- Device model, country and SIM values remain metadata-only; no unsupported device/SIM identity hooks were introduced.
+- Added a source-contract test and CI step for asynchronous reads/writes, partial-commit reporting and synchronization ordering.
+- No other UI mutation callers, startup hooks, Engine lifecycle, Room runtime wiring, CloneStore migration/cutover, or account/session data are changed by this stage.
