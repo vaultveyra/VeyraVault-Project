@@ -54,6 +54,13 @@ for marker in ("android.app.Service", "ACTION_IMPORT_AND_PAUSE", "ACTION_VERIFY_
                "migration-process-death-test"):
     assert marker in service_source, f"Missing isolated service behavior: {marker}"
 
+# Marker files are published atomically so the instrumentation process cannot observe a
+# zero-length file while the isolated service is still writing its PID/checkpoint payload.
+for marker in ('name + ".tmp"', "output.getFD().sync()", "temporary.renameTo(target)"):
+    assert marker in service_source, f"Missing atomic marker publication: {marker}"
+assert "marker.length() > 0L" in crash_source
+assert 'assertEquals("Clone rows must roll back after OS process death"' in crash_source
+
 importer_source = importer_path.read_text(encoding="utf-8")
 assert "importIntoEmptyDatabaseWithCheckpoint" in importer_source
 assert "checkpoint.afterCloneAndPermissionRowsInserted()" in importer_source
