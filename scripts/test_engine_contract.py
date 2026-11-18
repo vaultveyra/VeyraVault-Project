@@ -48,7 +48,7 @@ print("Active-launch marker is written only after confirmed engine launch: PASS"
 main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 add_ui = Path("app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
 assert "if (!Engine.installPackageAsUser(copy.packageName, copy.userId))" in main_ui
-assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("CloneStore.upsertClone(MainActivity.this, copy)")
+assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("repository.upsertClone(copy")
 assert "if (!Engine.installPackageAsUser(e.packageName, e.userId))" in add_ui
 assert add_ui.index("if (!Engine.installPackageAsUser(e.packageName, e.userId))") < add_ui.index("CloneStore.upsertClone(this, e)")
 assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
@@ -63,6 +63,7 @@ assert "return null;" in query
 assert "result instanceof Boolean ? (Boolean) result : null" in query
 assert "Boolean.FALSE.equals(queryInstalledAsUser" in uninstall
 assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in main_ui
-assert "if (!CloneStore.removeClone(MainActivity.this, item.packageName, item.userId))" in main_ui
+assert "repository.removeClone(item.packageName, item.userId" in main_ui
+assert main_ui.index("if (!Engine.uninstallClone(item.packageName, item.userId))") < main_ui.index("repository.removeClone(item.packageName, item.userId")
 print("Clone uninstall requires explicit engine absence verification: PASS")
-print("Registry records are retained when uninstall is unconfirmed: PASS")
+print("Registry records are retained when uninstall is unconfirmed; removal is async after confirmation: PASS")
