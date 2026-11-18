@@ -1,111 +1,67 @@
-# Stage 7.9.8 — Atomic Clone ID Reservation Design Audit
+# Stage 7.9.8 — Atomic Clone ID Reservation
 
 ## Status
 
-Design/audit only. No runtime code, stored clone record, virtual package, account/session data, or Engine state is changed by this document.
+Runtime implementation is committed on `feat/veyra-vault-product-foundation`. The first fully green CI validation of the reservation implementation was PR run #471 (run ID `44381501446`) on commit `514696379fe03e832c871091b37b1565848123ab`: 36/36 Android Emulator instrumentation tests passed (0 skipped, 0 failed), Source Audit, unsigned release APK compilation, APK packaging/audit, and artifact upload all succeeded.
+
+Follow-up hardening on the current branch distinguishes a failed reservation-journal commit from corrupt persisted data and adds an instrumentation classification test. That follow-up commit is awaiting its own CI validation; do not treat the earlier green run as validation of code committed afterward.
 
 Target branch: `feat/veyra-vault-product-foundation`  
-PR: #4 (must remain Draft, open, and unmerged).
+PR: #4 — keep Draft, open, and unmerged.
 
-## Verified current behavior
+## Pre-implementation race
 
-- `AsyncCloneRepository.allocateNextUserId(packageName)` reads the strict CloneStore registry and returns the first unused package-scoped virtual user ID.
-- The operation is serialized only by the executor belonging to that particular repository instance.
-- The returned ID is not held or reserved while the caller performs Engine installation and later persists the clone.
-- `AddAppActivity` and `MainActivity` now use the async repository for allocation and preserve Engine-install-before-registry-write ordering.
-- `CloneStore.nextFreeUserIdForPackage` remains a synchronous lookup API. It is fail-closed on corrupt registry data but does not reserve an ID.
-- `CloneStore.upsertClone` persists a new or existing record without a reservation token.
-- The public `AsyncCloneRepository(Context)` constructor means more than one repository instance can exist; a single-thread executor per instance is not a process-wide mutual-exclusion guarantee.
-- The current UI operation guard is local to an Activity instance and cannot protect against a second Activity or another repository instance.
+The previous `allocateNextUserId(packageName)` operation performed a lookup only. Its single-thread executor belonged to an individual repository instance, so two independent repository instances could both observe and return the same package-scoped ID before either Engine installation and registry write completed. An Activity-local guard did not close that race.
 
-## Race condition
+## Implemented reservation journal
 
-Two independent operations can both read the same registry snapshot before either persists its new clone:
+- A versioned `pending_clone_reservations_json` key is stored in the existing `veyravault_clones_v2` SharedPreferences file. The legacy clone JSON schema and existing preference keys are preserved.
+- Each reservation contains a UUID token, package name, and virtual user ID. The strict parser validates schema version, field types, non-empty identity/token values, and token/identity uniqueness. Unsupported, malformed, or conflicting journal data fails closed.
+- `CloneStore.reserveNextUserId` reads the strict clone registry and journal, detects any registry/journal identity collision, selects the next unused package-scoped ID, and commits the reservation before returning it.
+- A failed journal commit raises a dedicated persistence exception; `AsyncCloneRepository` maps it to `PERSISTENCE_FAILURE`. Malformed or inconsistent persisted data remains `CORRUPT_DATA`.
+- Reservation acquisition and mutation APIs use static synchronization within the host application process. Separate repository instances in that process cannot reserve the same package/user identity concurrently.
+- `commitReservedClone` verifies the exact token and package/user identity, then writes the clone registry and consumes only that reservation with one SharedPreferences Editor commit.
+- Ordinary `upsertClone` and `saveAll` reject attempts to take a pending reservation's identity. The deprecated lookup-only allocator includes pending reservations but is not used in Engine-backed creation paths.
+- Release requires positive Engine absence confirmation. `Engine.isCloneConfirmedAbsent` returns true only when the pinned Engine's installed-state query explicitly returns Boolean false; unknown/error/reflection-failure results retain the reservation.
 
-1. Operation A allocates package P / user ID N.
-2. Operation B allocates package P / user ID N.
-3. Both ask the Engine to install P / N.
-4. Both attempt to persist the same composite identity.
+## UI provisioning sequence
 
-The current code has no reservation state that spans steps 1–4. A successful CI run does not prove this race is impossible.
+Both `AddAppActivity` and the MainActivity duplicate flow now follow:
 
-## Required invariants for the next implementation
+1. Reserve the next package-scoped user ID and durably record its token.
+2. Ask the Engine to install the virtual package for that identity.
+3. Persist the clone record and consume the matching reservation in one commit.
+4. On installation or registry failure, release only after Engine absence has been explicitly confirmed. If cleanup or Engine state is unknown, keep the reservation blocking reuse.
 
-1. A package/user composite identity can have at most one active creation reservation within the supported coordination scope.
-2. Reservation acquisition must be atomic relative to every other reservation acquisition and every clone-registry mutation that could create the same identity.
-3. A reservation is bound to package name, user ID, and an opaque unique token; callers cannot commit or release another operation's reservation.
-4. Engine installation remains before the committed CloneStore record. Do not create a visible clone record before Engine installation is confirmed.
-5. Successful reserved persistence must consume the reservation as part of the same durable commit that writes the clone record.
-6. Engine install failure releases the reservation.
-7. If persistence fails after Engine install, release is allowed only after Engine uninstall is explicitly confirmed. Unknown/unconfirmed cleanup must retain a blocking reservation or enter an explicit recoverable state.
-8. A process restart must not silently make an identity available if an Engine installation from an interrupted operation may still exist.
-9. Unknown/corrupt reservation data fails closed; it must never be treated as an empty reservation set.
-10. Existing clone records, legacy preference keys, app-private virtual data, accounts and sessions must remain untouched by tests.
+The repository has no Engine side effects; Engine checks remain in the UI/Engine layer. Clone records are not written before Engine installation succeeds.
 
-## Design options and decision gates
+## Validation coverage
 
-### Option A — process-memory reservations
+Reservation-specific instrumentation covers:
+- two independent repository instances racing to reserve IDs for the same package;
+- persistence across repository close/recreation and exact-token consumption;
+- rejection of mismatched package/user/token use;
+- refusal to release without positive Engine absence, followed by safe release and reuse;
+- prevention of an ordinary upsert stealing a pending identity;
+- fail-closed handling of malformed journals and registry/journal identity conflicts;
+- classification of a reservation-journal commit failure as `PERSISTENCE_FAILURE`.
 
-A static process-wide lock and reservation map could coordinate all repository instances in the host app process without adding persisted data. This is simpler, but reservations disappear on process death. If Engine installation completed just before process death and registry persistence did not, the next process could reuse an identity while an orphan virtual installation remains. This option alone is insufficient unless Engine state is also authoritatively checked during recovery/allocation.
+The green PR run #471 validated the preceding implementation with 36/36 Android Emulator tests, 0 skipped and 0 failed. Its unsigned build/audit artifact is [VeyraVault-unsigned-build](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44381501446/artifacts/14464538130), artifact ID `14464538130`, ZIP digest `sha256:3ad62b9bb37ba4d27be4d199e5005d7ff4e9c18d051570a18c1bd754459b44cd`.
 
-### Option B — durable reservation journal
+The current follow-up contains one additional instrumentation test; its test/build/audit result must be taken from CI on the final current branch head, not inferred from run #471.
 
-A versioned reservation journal can preserve pending identities across process death. The design must specify:
-- strict schema/version validation and token ownership;
-- atomic acquisition against clone-registry reads/writes;
-- atomic clone-record commit plus reservation consumption;
-- safe handling of interrupted operations;
-- a recovery path that uses tri-state Engine inspection (installed / absent / unknown);
-- no automatic destructive uninstall when Engine state is unknown;
-- explicit handling of stale reservations without unsafe time-based expiry.
+## Scope and limitations
 
-A time-to-live alone is not a safe recovery mechanism: an operation that is still installing could outlive the lease and collide with a second allocator.
-
-### Option C — Room-backed reservation table
-
-Room is currently inactive and intentionally disconnected from runtime. Activating it only for ID reservation would introduce a second persistence authority and a partial migration dependency. Do not choose this without a separate architecture review and an explicit migration plan.
-
-## Recommended direction
-
-Prefer a durable reservation journal only if its coordination and recovery semantics can be implemented without activating Room or changing the existing CloneStore source of truth. The reservation ledger should be operational metadata, not a replacement for the clone registry.
-
-Before coding, verify whether the reservation journal can be committed atomically with the clone JSON in the same SharedPreferences file/editor while preserving every existing key. If not, do not claim atomic commit across stores; redesign the transaction boundary rather than relying on two independent commits.
-
-The recovery path must be conservative:
-- Engine reports the reserved package/user absent: the reservation may be released.
-- Engine reports it installed while no clone record exists: keep the identity blocked and surface a recoverable orphan state; do not silently reuse it.
-- Engine query fails or returns an unknown result: retain the reservation and report unresolved state.
-- Clone record exists with matching identity: treat the registry as authoritative only after verifying token/journal consistency; repair must be explicit and tested.
-
-## Required API shape (conceptual)
-
-- `reserveNextUserId(packageName, callback)` → opaque reservation object.
-- `commitReservedClone(entry, reservation, callback)` → writes the clone and consumes exactly that reservation.
-- `releaseReservation(reservation, callback)` → only for the matching token and only when Engine state makes release safe.
-- `loadPendingReservations(callback)` and a conservative recovery operation for diagnostics/recovery UI.
-
-The old lookup-only allocator must not remain in any clone-creation caller after adoption. If retained for compatibility, document it as non-reserving and prohibit using it for installation flows.
-
-## Test gates
-
-- Two concurrent reservation requests for the same package from separate repository instances receive distinct IDs.
-- Concurrent requests for different packages retain package-scoped identity semantics.
-- Reservation tokens cannot be reused, forged, or used for another package/user pair.
-- A failed reservation commit returns no usable reservation.
-- A failed clone commit does not consume the reservation.
-- Successful clone commit writes the clone and consumes the reservation in one verified durable commit.
-- Engine install failure releases only its own reservation.
-- Unconfirmed uninstall retains the reservation.
-- Process-death/restart recovery distinguishes absent, installed, and unknown Engine states.
-- Corrupt/unsupported reservation journal data blocks allocation and is never overwritten.
-- Legacy clone records and all existing preference keys remain byte-for-byte unchanged except the intended clone-registry commit for a successful new clone.
-- Run source contracts, Android Emulator instrumentation, Source Audit, release APK compilation and APK Audit.
-- Physical-device concurrency and interrupted-install recovery remain required before production reliance.
+- **Process scope:** static synchronization coordinates callers inside the VeyraVault host app process only. Android SharedPreferences is not a cross-process lock, and this implementation does not claim multi-process writer safety. The clone-provisioning Activities are in the default host process; concurrent multi-process provisioning remains unsupported.
+- **Restart handling:** the journal is durable and survives host-process recreation. Tests close/recreate Repository instances; there is no dedicated OS-kill test for the clone-provisioning sequence itself.
+- **Orphan recovery:** if the host process dies after Engine installation but before registry commit, the journal conservatively keeps the ID blocked. There is no automatic startup reconciler or user-facing orphan-reservation repair UI yet. An unknown Engine state must continue to block reuse.
+- **Device validation:** physical-device concurrency, interrupted-install recovery, Engine reflection compatibility, and third-party app/session regression testing remain outstanding.
+- **No migration/cutover:** Room remains inactive and is not used for this reservation path. SharedPreferences/CloneStore remains the runtime source of truth.
 
 ## Explicit non-goals
 
-- No Room activation or migration/cutover.
-- No change to Engine install/uninstall semantics beyond a narrowly reviewed query adapter if required.
-- No automatic deletion of clone data or virtual app package data.
-- No app account/session backup or restore.
-- No change to `main`, no PR merge, and no broad UI redesign.
+- No Room runtime activation, persistence migration, or cutover.
+- No automatic deletion of virtual packages or clone data.
+- No export, restore, or modification of third-party app data, accounts, or sessions.
+- No startup behavior change or automatic orphan cleanup.
+- No direct modification of `main`; PR #4 remains open and Draft, and must not be merged as part of this stage.
