@@ -63,17 +63,12 @@ public final class AsyncCloneRepository implements AutoCloseable {
 
     private static volatile AsyncCloneRepository instance;
 
-    public static AsyncCloneRepository getInstance(Context context) {
+    public static synchronized AsyncCloneRepository getInstance(Context context) {
         if (context == null) throw new IllegalArgumentException("Context is required");
         AsyncCloneRepository current = instance;
-        if (current == null) {
-            synchronized (AsyncCloneRepository.class) {
-                current = instance;
-                if (current == null) {
-                    current = new AsyncCloneRepository(context);
-                    instance = current;
-                }
-            }
+        if (current == null || current.closed) {
+            current = new AsyncCloneRepository(context);
+            instance = current;
         }
         return current;
     }
@@ -301,7 +296,8 @@ public final class AsyncCloneRepository implements AutoCloseable {
 
     public void clearCloneProfileField(String packageName, int userId, String field,
                                        Callback<Boolean> callback) {
-        if (packageName == null || packageName.trim().isEmpty() || userId < 0 || field == null) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || !isSupportedProfileField(field)) {
             deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile field request is invalid"));
             return;
         }
@@ -314,8 +310,8 @@ public final class AsyncCloneRepository implements AutoCloseable {
     }
 
     public void clearGlobalProfileField(String field, Callback<Boolean> callback) {
-        if (field == null || field.trim().isEmpty()) {
-            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Profile field is required"));
+        if (!isSupportedProfileField(field)) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Profile field is unsupported or missing"));
             return;
         }
         enqueue(() -> {
@@ -380,6 +376,12 @@ public final class AsyncCloneRepository implements AutoCloseable {
                 ? "Persistence operation failed" : message;
     }
 
+    private static boolean isSupportedProfileField(String field) {
+        return "localeTag".equals(field) || "timeZoneId".equals(field)
+                || "locationEnabled".equals(field) || "latitude".equals(field)
+                || "longitude".equals(field);
+    }
+
     private static void validateEntries(List<CloneStore.CloneEntry> entries) {
         Set<String> identities = new HashSet<String>();
         for (CloneStore.CloneEntry entry : entries) {
@@ -442,10 +444,13 @@ public final class AsyncCloneRepository implements AutoCloseable {
     }
 
     @Override
-    public synchronized void close() {
-        if (!closed) {
-            closed = true;
-            worker.shutdown();
+    public void close() {
+        synchronized (AsyncCloneRepository.class) {
+            if (!closed) {
+                closed = true;
+                worker.shutdown();
+                if (instance == this) instance = null;
+            }
         }
     }
 
