@@ -42,8 +42,8 @@ public class CloneStoreSafetyInstrumentationTest {
 
     @Test public void duplicateCompositeIdentityBlocksMutationAndAllocation() {
         String duplicate = "["
-                + "{\\"pkg\\":\\"com.example.duplicate\\",\\"uid\\":4},"
-                + "{\\"pkg\\":\\"com.example.duplicate\\",\\"uid\\":4}"
+                + "{\"pkg\":\"com.example.duplicate\",\"uid\":4},"
+                + "{\"pkg\":\"com.example.duplicate\",\"uid\":4}"
                 + "]";
         assertTrue(prefs.edit().putString(KEY_CLONES, duplicate).commit());
 
