@@ -61,6 +61,8 @@ jobs:
 
       - name: Test MainActivity async clone mutations contract
         run: python3 scripts/test_main_activity_clone_mutations_async_contract.py
+      - name: Test AddApp and Dashboard async persistence contract
+        run: python3 scripts/test_add_app_dashboard_async_persistence_contract.py
 
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
