@@ -170,15 +170,12 @@ public final class ProfileStore {
         // Re-scan on later launches as new clones may be added after the first import.
         // Existing profile fields are never overwritten, so this remains idempotent.
 
-        // Validate the legacy JSON before reading through CloneStore, whose public
-        // accessor intentionally returns an empty list when parsing fails.
+        // Strictly validate the entire legacy registry before importing anything.
+        // This rejects semantic errors (wrong field types, duplicate identities and
+        // invalid enabled coordinates) instead of treating them as an empty registry.
+        final List<CloneStore.CloneEntry> legacy;
         try {
-            String legacyRaw = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE)
-                    .getString("clones_json", "[]");
-            JSONArray legacyArray = new JSONArray(legacyRaw == null ? "[]" : legacyRaw);
-            for (int i = 0; i < legacyArray.length(); i++) {
-                if (!(legacyArray.opt(i) instanceof JSONObject)) return false;
-            }
+            legacy = CloneStore.readAllStrict(context);
         } catch (Exception invalidLegacyData) {
             return false;
         }
@@ -189,7 +186,6 @@ public final class ProfileStore {
             JSONObject clones = root.optJSONObject("clones");
             if (clones == null) clones = new JSONObject();
             boolean changed = false;
-            List<CloneStore.CloneEntry> legacy = CloneStore.getAll(context);
             for (CloneStore.CloneEntry entry : legacy) {
                 if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
                         || entry.userId < 0 || !entry.mockGpsEnabled) continue;
