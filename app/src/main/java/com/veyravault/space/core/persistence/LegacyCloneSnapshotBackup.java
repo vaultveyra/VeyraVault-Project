@@ -96,6 +96,59 @@ public final class LegacyCloneSnapshotBackup {
         return new Receipt(digest, actualBytes.length);
     }
 
+    /**
+     * Reads and validates the immutable app-private migration backup.
+     * The returned snapshot is reconstructed from the backup bytes, not current preferences.
+     */
+    public static LegacyCloneSnapshot readAndVerify(Context context) throws IOException {
+        if (context == null) throw new IllegalArgumentException("Context is required");
+        File directory = new File(context.getFilesDir(), DIRECTORY);
+        File baseFile = new File(directory, FILE_NAME);
+        File sidecar = new File(baseFile.getPath() + ".bak");
+        if (!baseFile.exists() && !sidecar.exists()) {
+            throw new IOException("No migration snapshot backup exists");
+        }
+
+        AtomicFile atomicFile = new AtomicFile(baseFile);
+        byte[] actualBytes;
+        try (FileInputStream input = atomicFile.openRead()) {
+            actualBytes = readFully(input);
+        } catch (Exception error) {
+            throw new IOException("Unable to read migration snapshot backup", error);
+        }
+        try {
+            JSONObject envelope = new JSONObject(new String(actualBytes, StandardCharsets.UTF_8));
+            if (envelope.getInt("formatVersion") != FORMAT_VERSION) {
+                throw new IOException("Unsupported migration backup format version");
+            }
+            String payload = envelope.getString("payload");
+            String storedDigest = envelope.getString("snapshotSha256");
+            String calculatedDigest = sha256(payload);
+            if (!MessageDigest.isEqual(
+                    storedDigest.getBytes(StandardCharsets.US_ASCII),
+                    calculatedDigest.getBytes(StandardCharsets.US_ASCII))) {
+                throw new IOException("Migration backup checksum verification failed");
+            }
+            LegacyCloneSnapshot snapshot;
+            try {
+                snapshot = LegacyCloneSnapshot.fromCanonicalPayload(payload);
+            } catch (RuntimeException invalidPayload) {
+                throw new IOException("Migration backup payload failed strict validation", invalidPayload);
+            }
+            if (!MessageDigest.isEqual(
+                    storedDigest.getBytes(StandardCharsets.US_ASCII),
+                    snapshot.sha256().getBytes(StandardCharsets.US_ASCII))
+                    || !snapshot.canonicalPayload().equals(payload)) {
+                throw new IOException("Migration backup snapshot digest or canonical payload mismatch");
+            }
+            return snapshot;
+        } catch (IOException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new IOException("Migration backup envelope is invalid", error);
+        }
+    }
+
     private static void verifyBackupBytes(byte[] expectedBytes, byte[] actualBytes, String digest) throws IOException {
         if (!MessageDigest.isEqual(expectedBytes, actualBytes)) {
             throw new IOException("Migration backup read-back differs from the written bytes");
