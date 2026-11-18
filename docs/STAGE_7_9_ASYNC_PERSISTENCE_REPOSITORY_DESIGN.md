@@ -124,7 +124,7 @@ Implementation now also includes:
 - No Activity, startup hook, Engine lifecycle or UI caller has been switched to the async API.
 - The facade serializes only calls submitted to its own executor. Existing direct synchronous CloneStore writes are outside that queue; ID allocation is not an atomic reservation.
 - SetLocationActivity and GlobalEnvironmentActivity still need a separate, reviewed caller-adoption step so they stop reporting success after failed persistence.
-- CI for Stage 7.9.2 is pending; do not infer a test pass until the current workflow run completes.
+- Baseline Stage 7.9.2 CI run #44288278229 completed successfully: 28/28 Android instrumentation tests passed (0 skipped, 0 failed), source audit passed, unsigned release APK compiled, and APK audit passed. Follow-up lifecycle hardening and Stage 7.9.3 UI adoption are under CI run #44292220009; that run is still pending.
 - Room remains inactive; no data migration, cutover, session/account data operation or startup behavior change is introduced.
 
 
