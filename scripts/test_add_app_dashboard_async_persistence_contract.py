@@ -15,7 +15,7 @@ assert add_app.index("Engine.installPackageAsUser(entry.packageName, entry.userI
 assert "Engine.isCloneConfirmedAbsent" in add_app
 assert "repository.releaseReservationAfterEngineAbsence" in add_app
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_app
-assert "if (cleanupConfirmed) releaseReservationIfEngineAbsent(reservation)" in add_app
+assert "if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation)" in add_app
 assert "cloneBatchAt(selected, 0, 0, 0)" in add_app
 assert "batchConfirmBtn.setEnabled(false)" in add_app
 assert "if (!batchMode && !isFinishing() && !isDestroyed())" in add_app
