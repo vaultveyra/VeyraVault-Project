@@ -47,12 +47,16 @@ print("Active-launch marker is written only after confirmed engine launch: PASS"
 # UI must not persist a clone registry entry after a failed engine install.
 main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 add_ui = Path("app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
+assert "repository.reserveNextUserId(item.packageName" in main_ui
 assert "if (!Engine.installPackageAsUser(copy.packageName, copy.userId))" in main_ui
-assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("repository.upsertClone(copy")
-assert "repository.allocateNextUserId(app.pkg" in add_ui
+assert main_ui.index("if (!Engine.installPackageAsUser(copy.packageName, copy.userId))") < main_ui.index("repository.commitReservedClone(copy")
+assert "repository.reserveNextUserId(app.pkg" in add_ui
 assert "if (!Engine.installPackageAsUser(entry.packageName, entry.userId))" in add_ui
-assert add_ui.index("if (!Engine.installPackageAsUser(entry.packageName, entry.userId))") < add_ui.index("repository.upsertClone(entry")
+assert add_ui.index("if (!Engine.installPackageAsUser(entry.packageName, entry.userId))") < add_ui.index("repository.commitReservedClone(entry")
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_ui
+assert "Engine.isCloneConfirmedAbsent" in add_ui and "releaseReservationAfterEngineAbsence" in add_ui
+assert "repository.allocateNextUserId" not in main_ui + add_ui
+assert "repository.upsertClone(copy" not in main_ui and "repository.upsertClone(entry" not in add_ui
 assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
 print("Clone creation UI failure handling: PASS")
 

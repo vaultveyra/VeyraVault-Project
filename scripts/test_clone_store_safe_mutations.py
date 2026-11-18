@@ -44,14 +44,15 @@ assert "public static List<CloneEntry> getAll(Context c)" in store
 
 assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
 assert "CloneStore.upsertClone(" not in add_ui
-assert "repository.allocateNextUserId(app.pkg" in add_ui
-assert "repository.upsertClone(entry" in add_ui
+assert "repository.reserveNextUserId(app.pkg" in add_ui
+assert "repository.commitReservedClone(entry, reservation" in add_ui
 assert "if (!Engine.installPackageAsUser(entry.packageName, entry.userId))" in add_ui
-assert add_ui.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < add_ui.index("repository.upsertClone(entry")
-assert "repository.allocateNextUserId(item.packageName" in main_ui
-assert "allocation.getValue() < 0" in main_ui
-assert "repository.upsertClone(copy" in main_ui
-assert main_ui.index("Engine.installPackageAsUser(copy.packageName, copy.userId)") < main_ui.index("repository.upsertClone(copy")
+assert add_ui.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < add_ui.index("repository.commitReservedClone(entry")
+assert "repository.allocateNextUserId" not in add_ui
+assert "repository.reserveNextUserId(item.packageName" in main_ui
+assert "repository.commitReservedClone(copy, reservation" in main_ui
+assert "repository.allocateNextUserId" not in main_ui
+assert main_ui.index("Engine.installPackageAsUser(copy.packageName, copy.userId)") < main_ui.index("repository.commitReservedClone(copy")
 
 uninstall = body(engine, "public static boolean uninstallClone(")
 assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall

@@ -64,6 +64,9 @@ jobs:
       - name: Test AddApp and Dashboard async persistence contract
         run: python3 scripts/test_add_app_dashboard_async_persistence_contract.py
 
+      - name: Test atomic clone ID reservation contract
+        run: python3 scripts/test_clone_id_reservation_contract.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 

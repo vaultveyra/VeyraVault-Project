@@ -19,7 +19,8 @@ assert "Failure.CORRUPT_DATA" in repo
 assert "Failure.PERSISTENCE_FAILURE" in repo
 assert "copyEntries" in repo and "copyEntry" in repo
 for api in (
-    "loadCollapsedSpaces", "setSpaceCollapsed", "loadMasterMockGpsEnabled",
+    "reserveNextUserId", "commitReservedClone", "releaseReservationAfterEngineAbsence",
+    "loadPendingReservations", "loadCollapsedSpaces", "setSpaceCollapsed", "loadMasterMockGpsEnabled",
     "setMasterMockGpsEnabled", "loadGlobalEnvironment", "saveGlobalEnvironment",
     "loadLastActiveLaunch", "recordActiveLaunch", "loadGlobalProfile",
     "saveGlobalProfile", "loadCloneProfile", "saveCloneProfile",
@@ -33,6 +34,7 @@ assert "readLastActiveLaunchStrict" in store
 assert "readGlobalStrict" in profile and "readCloneOverrideStrict" in profile
 assert "ClonePersistenceDatabase" not in repo and "androidx.room" not in repo
 assert "Engine." not in repo and "VirtualHookManager" not in repo
+assert "ENGINE_STATE_UNCONFIRMED" in repo
 assert "static List<CloneEntry> readAllStrict" in store
 assert "CloneStore.readAllStrict(context)" in profile
 assert "CloneStore.getAll(context)" not in profile[profile.index("migrateLegacyLocationSettings"):profile.index("private static boolean validLatitude")]

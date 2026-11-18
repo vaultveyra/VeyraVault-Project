@@ -25,11 +25,13 @@ assert "Engine.launchClone(this, entry)" in shortcut
 duplicate_start = source.index('makeSheetActionBtn("⊞+"')
 duplicate_end = source.index('makeSheetActionBtn("📱"', duplicate_start)
 duplicate = source[duplicate_start:duplicate_end]
-assert "repository.allocateNextUserId" in duplicate
+assert "repository.reserveNextUserId" in duplicate
 assert "Engine.installPackageAsUser" in duplicate
-assert "repository.upsertClone(copy" in duplicate
-assert duplicate.index("Engine.installPackageAsUser") < duplicate.index("repository.upsertClone(copy")
+assert "repository.commitReservedClone(copy, reservation" in duplicate
+assert duplicate.index("Engine.installPackageAsUser") < duplicate.index("repository.commitReservedClone(copy")
 assert "Engine.uninstallClone(copy.packageName, copy.userId)" in duplicate
+assert "releaseReservationIfEngineAbsent(reservation)" in duplicate
+assert "repository.allocateNextUserId" not in source
 assert duplicate.index("if (!save.isSuccess())") < duplicate.index("Engine.uninstallClone(copy.packageName, copy.userId)")
 save_callback = duplicate[duplicate.index("repository.upsertClone(copy"):]
 assert save_callback.index("if (!save.isSuccess())") < save_callback.index("if (isFinishing() || isDestroyed()) return;")
