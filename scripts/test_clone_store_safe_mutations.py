@@ -28,18 +28,21 @@ assert "new JSONArray((String) rawValue)" in reader
 assert "Duplicate clone identity" in reader
 assert "invalid enabled-location coordinates" in reader
 
-save = body(store, "public static boolean saveAll(")
-assert "return prefs(c).edit().putString(KEY_CLONES, arr.toString()).commit();" in save
+save = body(store, "public static synchronized boolean saveAll(")
+assert "serializeEntries(list)" in save
+assert "reserved.contains(identityKey(entry.packageName, entry.userId))" in save
 assert "return false;" in save
 assert "identities.add(" in save
 assert "e.mockGpsEnabled" in save and "e.latitude < -90.0d" in save
 
-upsert = body(store, "public static boolean upsertClone(")
-remove = body(store, "public static boolean removeClone(")
-next_id = body(store, "public static int nextFreeUserIdForPackage(")
+upsert = body(store, "public static synchronized boolean upsertClone(")
+remove = body(store, "public static synchronized boolean removeClone(")
+next_id = body(store, "public static synchronized int nextFreeUserIdForPackage(")
 assert "readAllStrict(c)" in upsert and "return false;" in upsert
 assert "readAllStrict(c)" in remove and "return false;" in remove
-assert "readAllStrict(c)" in next_id and "return -1;" in next_id
+assert "readAllStrict(c)" in next_id and "readReservationsStrict(c)" in next_id and "return -1;" in next_id
+reserve = body(store, "static synchronized CloneReservation reserveNextUserId(")
+assert "KEY_PENDING_RESERVATIONS" in reserve and ".commit()" in reserve
 assert "public static List<CloneEntry> getAll(Context c)" in store
 
 assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
