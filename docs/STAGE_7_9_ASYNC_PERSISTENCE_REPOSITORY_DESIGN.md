@@ -121,9 +121,9 @@ Implementation now also includes:
 
 ### Stage 7.9 implementation scope and validation status
 
-- No Activity, startup hook, Engine lifecycle or UI caller has been switched to the async API.
+- UI adoption is staged separately from the repository foundation. SetLocationActivity, GlobalEnvironmentActivity and the Spaces dashboard are covered by the later sub-stages below; other mutation screens and startup/Engine lifecycle remain pending.
 - The facade serializes only calls submitted to its own executor. Existing direct synchronous CloneStore writes are outside that queue; ID allocation is not an atomic reservation.
-- SetLocationActivity and GlobalEnvironmentActivity still need a separate, reviewed caller-adoption step so they stop reporting success after failed persistence.
+- Remaining MainActivity clone mutations, batch uninstall and shortcut launch reads still require separate review before async adoption.
 - Baseline Stage 7.9.2 CI run #44288278229 completed successfully: 28/28 Android instrumentation tests passed (0 skipped, 0 failed), source audit passed, unsigned release APK compiled, and APK audit passed. Follow-up lifecycle hardening and Stage 7.9.3 UI adoption are under CI run #44292220009; that run is still pending.
 - Room remains inactive; no data migration, cutover, session/account data operation or startup behavior change is introduced.
 
@@ -149,3 +149,16 @@ Implementation now also includes:
 - Device model, country and SIM values remain metadata-only; no unsupported device/SIM identity hooks were introduced.
 - Added a source-contract test and CI step for asynchronous reads/writes, partial-commit reporting and synchronization ordering.
 - No other UI mutation callers, startup hooks, Engine lifecycle, Room runtime wiring, CloneStore migration/cutover, or account/session data are changed by this stage.
+
+
+### Stage 7.9.5 — Spaces dashboard strict asynchronous reads and collapse persistence
+
+- MainActivity now obtains the clone registry through AsyncCloneRepository.loadClones and collapsed Space numbers through loadCollapsedSpaces; grouping is performed from the strict returned snapshot.
+- The dashboard keeps the last rendered Spaces UI intact when either read fails. Corrupt registry data is no longer silently presented as an empty Space list, and corrupt collapsed-state data is not silently interpreted as every Space being expanded.
+- The global profile summary is loaded asynchronously; read failure is displayed as unavailable rather than showing CloneStore fallback defaults.
+- Individual Space collapse/expand changes use setSpaceCollapsed and refresh only after the commit is confirmed. The header is disabled while the write is pending.
+- Collapse/expand all reads the current clone and collapsed-state snapshots, then applies each Space update serially. If a later write fails, the UI reports that earlier Space changes may already have committed and reloads the current state; no false multi-key atomicity claim is made.
+- Refresh generations discard stale asynchronous callbacks so an older request cannot overwrite a newer dashboard render.
+- Added a CI source-contract test for strict async reads, commit-aware collapse behavior, partial batch status and preserved Engine install/uninstall ordering.
+- Shortcut launch, duplicate, rename, clone metadata writes, single/batch uninstall and Engine operations remain unchanged in this sub-stage. No Room runtime wiring, migration/cutover, session/account data or startup behavior changes.
+- Android Emulator, Source Audit, unsigned release build and APK Audit validation for this sub-stage are pending the current CI run.
