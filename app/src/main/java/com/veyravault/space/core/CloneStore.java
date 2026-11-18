@@ -24,6 +24,11 @@ public class CloneStore {
     private static final String KEY_PENDING_RESERVATIONS = "pending_clone_reservations_json";
     private static final int RESERVATION_SCHEMA_VERSION = 1;
 
+    /** Checked signal that SharedPreferences declined a durable commit. */
+    static final class PersistenceException extends Exception {
+        PersistenceException(String message) { super(message); }
+    }
+
     /** Immutable handle for a durable package/user creation reservation. */
     public static final class CloneReservation {
         private final String token;
@@ -203,7 +208,7 @@ public class CloneStore {
         CloneReservation reservation = new CloneReservation(UUID.randomUUID().toString(), packageName, candidate);
         reservations.add(reservation);
         if (!prefs(c).edit().putString(KEY_PENDING_RESERVATIONS, serializeReservations(reservations)).commit())
-            throw new IllegalStateException("Reservation journal commit failed");
+            throw new PersistenceException("Reservation journal commit failed");
         return reservation;
     }
 
