@@ -53,6 +53,9 @@ jobs:
       - name: Test async location persistence UI contract
         run: python3 scripts/test_location_persistence_ui_contract.py
 
+      - name: Test global environment async persistence UI contract
+        run: python3 scripts/test_global_environment_persistence_ui_contract.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 
