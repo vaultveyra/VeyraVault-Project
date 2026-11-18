@@ -26,18 +26,32 @@ import static org.junit.Assert.*;
 public class LegacyCloneRoomInstrumentationTest {
     private static final String TEST_DB = "room_instrumentation_test.db";
     private Context context;
+    private File backupFile;
+    private File backupSidecar;
 
     @Before public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         context.getSharedPreferences(LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().clear().commit();
         context.deleteDatabase(TEST_DB);
+        File backupDirectory = new File(context.getFilesDir(), "migration-backups");
+        backupFile = new File(backupDirectory, "clone-store-snapshot-v1.json");
+        backupSidecar = new File(backupFile.getPath() + ".bak");
+        deleteMigrationBackup();
     }
 
     @After public void tearDown() {
         context.getSharedPreferences(LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().clear().commit();
         context.deleteDatabase(TEST_DB);
+        deleteMigrationBackup();
+    }
+
+    private void deleteMigrationBackup() {
+        if (backupFile != null && backupFile.exists()) backupFile.delete();
+        if (backupSidecar != null && backupSidecar.exists()) backupSidecar.delete();
+        if (backupFile != null && backupFile.getParentFile() != null
+                && backupFile.getParentFile().exists()) backupFile.getParentFile().delete();
     }
 
     @Test public void importsAndVerifiesAllModeledRowsAndProvenance() throws Exception {
