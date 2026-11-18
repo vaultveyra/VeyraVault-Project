@@ -58,7 +58,7 @@ public class CloneStore {
      * Strict registry reader for mutation paths. Unlike getAll(), this never converts
      * malformed or ambiguous persisted data into an empty registry.
      */
-    private static List<CloneEntry> readAllStrict(Context c) throws Exception {
+    static List<CloneEntry> readAllStrict(Context c) throws Exception {
         if (c == null) throw new IllegalArgumentException("Context is required");
         SharedPreferences store = prefs(c);
         Map<String, ?> values = store.getAll();
