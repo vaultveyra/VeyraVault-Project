@@ -80,6 +80,56 @@ public class LegacyCloneSnapshotBackupInstrumentationTest {
         assertArrayEquals(original, readFile(backupFile));
     }
 
+    @Test public void readAndVerifyReconstructsBackupWithoutReadingOrMutatingCurrentPreferences() throws Exception {
+        SharedPreferences prefs = context.getSharedPreferences(
+                LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE);
+        String originalClones = "[{\\"pkg\\":\\"com.example.backup\\",\\"uid\\":2,\\"name\\":\\"Original\\",\\"gpsOn\\":true,\\"lat\\":40.7128,\\"lng\\":-74.0060,\\"denied\\":[\\"android.permission.CAMERA\\"]}]";
+        assertTrue(prefs.edit()
+                .putString(LegacyCloneSnapshot.KEY_CLONES, originalClones)
+                .putBoolean(LegacyCloneSnapshot.KEY_MASTER_GPS, false)
+                .putStringSet(LegacyCloneSnapshot.KEY_COLLAPSED,
+                        new java.util.HashSet<>(java.util.Arrays.asList("3", "7")))
+                .putString(LegacyCloneSnapshot.KEY_GLOBAL_DEVICE,
+                        "{\\"enabled\\":true,\\"brand\\":\\"test-brand\\",\\"model\\":\\"test-model\\"}")
+                .putString(LegacyCloneSnapshot.KEY_ACTIVE_LAUNCH,
+                        "{\\"pkg\\":\\"com.example.backup\\",\\"uid\\":2}")
+                .commit());
+
+        LegacyCloneSnapshot original = LegacyCloneSnapshot.capture(context);
+        LegacyCloneSnapshotBackup.writeAndVerify(context, original);
+
+        assertTrue(prefs.edit()
+                .putString(LegacyCloneSnapshot.KEY_CLONES, "[]")
+                .putBoolean(LegacyCloneSnapshot.KEY_MASTER_GPS, true)
+                .commit());
+        LegacyCloneSnapshot currentBeforeRead = LegacyCloneSnapshot.capture(context);
+        assertNotEquals(original.sha256(), currentBeforeRead.sha256());
+
+        LegacyCloneSnapshot restored = LegacyCloneSnapshotBackup.readAndVerify(context);
+        assertEquals(original.sha256(), restored.sha256());
+        assertEquals(original.canonicalPayload(), restored.canonicalPayload());
+        assertEquals("com.example.backup", restored.clones.get(0).packageName);
+        assertEquals(2, restored.clones.get(0).userId);
+        assertEquals(currentBeforeRead.sha256(), LegacyCloneSnapshot.capture(context).sha256());
+    }
+
+    @Test public void readAndVerifyRejectsUnsupportedEnvelopeVersion() throws Exception {
+        LegacyCloneSnapshot snapshot = LegacyCloneSnapshot.capture(context);
+        LegacyCloneSnapshotBackup.writeAndVerify(context, snapshot);
+        String content = new String(readFile(backupFile), StandardCharsets.UTF_8)
+                .replace("\\"formatVersion\\":1", "\\"formatVersion\\":99");
+        try (FileOutputStream output = new FileOutputStream(backupFile, false)) {
+            output.write(content.getBytes(StandardCharsets.UTF_8));
+            output.getFD().sync();
+        }
+        try {
+            LegacyCloneSnapshotBackup.readAndVerify(context);
+            fail("Unsupported backup envelope version must be rejected");
+        } catch (IOException expected) {
+            assertNotNull(expected.getMessage());
+        }
+    }
+
     @Test public void immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal() throws Exception {
         LegacyCloneSnapshot firstSnapshot = LegacyCloneSnapshot.capture(context);
         LegacyCloneSnapshotBackup.writeAndVerify(context, firstSnapshot);
