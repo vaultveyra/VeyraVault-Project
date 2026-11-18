@@ -12,8 +12,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -26,15 +24,19 @@ import static org.junit.Assert.*;
 public class AsyncCloneRepositoryInstrumentationTest {
     private Context context;
     private SharedPreferences preferences;
+    private SharedPreferences profilePreferences;
 
     @Before public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         preferences = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE);
+        profilePreferences = context.getSharedPreferences("veyravault_profiles_v1", Context.MODE_PRIVATE);
         preferences.edit().clear().commit();
+        profilePreferences.edit().clear().commit();
     }
 
     @After public void tearDown() {
         preferences.edit().clear().commit();
+        profilePreferences.edit().clear().commit();
     }
 
     @Test public void queuedUpsertThenReadPreservesSubmissionOrder() throws Exception {
@@ -116,6 +118,15 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.loadClones(result -> { resultRef.set(result); done.countDown(); });
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertEquals(AsyncCloneRepository.Failure.EXECUTOR_CLOSED, resultRef.get().getFailure());
+    }
+
+
+    @Test public void profileMigrationDoesNotMarkCorruptRegistryAsImported() {
+        preferences.edit().putString("clones_json",
+                "[{\\"pkg\\":\\"com.example.bad\\",\\"uid\\":0,\\"gpsOn\\":\\"true\\"}]").commit();
+        assertFalse(ProfileStore.migrateLegacyLocationSettings(context));
+        assertFalse(profilePreferences.getBoolean("legacy_location_import_v1", false));
+        assertTrue(preferences.getString("clones_json", "").contains("\\"gpsOn\\":\\"true\\""));
     }
 
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
