@@ -50,3 +50,16 @@ assert "if (!Engine.installPackageAsUser(e.packageName, e.userId))" in add_ui
 assert add_ui.index("if (!Engine.installPackageAsUser(e.packageName, e.userId))") < add_ui.index("CloneStore.upsertClone(this, e)")
 assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
 print("Clone creation UI failure handling: PASS")
+
+uninstall = method_body("public static boolean uninstallClone(")
+assert "queryInstalledAsUser(pkg, userId)" in uninstall
+assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
+assert "return false;" in uninstall
+query = method_body("private static Boolean queryInstalledAsUser(")
+assert "return null;" in query
+assert "result instanceof Boolean ? (Boolean) result : null" in query
+assert "Boolean.FALSE.equals(queryInstalledAsUser" in uninstall
+assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in main_ui
+assert "if (!CloneStore.removeClone(MainActivity.this, item.packageName, item.userId))" in main_ui
+print("Clone uninstall requires explicit engine absence verification: PASS")
+print("Registry records are retained when uninstall is unconfirmed: PASS")
