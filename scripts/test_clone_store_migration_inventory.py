@@ -36,9 +36,10 @@ for key, field in fields.items():
 
 assert 'o.optString("pkg")' in store
 assert 'o.optInt("uid", 0)' in store
-assert 'o.optJSONArray("denied")' in store
+assert 'Object denied = o.opt("denied")' in store
+assert 'denied instanceof JSONArray' in store
 assert 'o.put("denied", pArr)' in store
-assert 'e.deniedPermissions.add(pArr.optString(j))' in store
+assert 'e.deniedPermissions.add((String) permission)' in store
 
 # Clone identity is a package + virtual-user pair, not package name alone.
 assert 'cur.packageName.equals(entry.packageName) && cur.userId == entry.userId' in store
