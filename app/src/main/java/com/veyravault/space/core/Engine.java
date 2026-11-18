@@ -7,6 +7,17 @@ import java.lang.reflect.Method;
 
 public class Engine {
 
+    public enum CloneInstallState {
+        INSTALLED,
+        ABSENT,
+        UNKNOWN
+    }
+
+    static CloneInstallState classifyInstalledQueryResult(Boolean installed) {
+        if (installed == null) return CloneInstallState.UNKNOWN;
+        return installed ? CloneInstallState.INSTALLED : CloneInstallState.ABSENT;
+    }
+
     private static final String[] CORE_CLASSES = {
         "top.niunaijun.blackbox.BlackBoxCore",
         "com.vcore.BlackBoxCore"
@@ -106,10 +117,16 @@ public class Engine {
         return Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId));
     }
 
+    /** Returns a tri-state Engine result; reflection/query failures remain UNKNOWN. */
+    public static CloneInstallState getCloneInstallState(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0)
+            return CloneInstallState.UNKNOWN;
+        return classifyInstalledQueryResult(queryInstalledAsUser(pkg, userId));
+    }
+
     /** True only when the engine explicitly reports that this virtual package is absent. */
     public static boolean isCloneConfirmedAbsent(String pkg, int userId) {
-        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
-        return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId));
+        return getCloneInstallState(pkg, userId) == CloneInstallState.ABSENT;
     }
 
     public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
