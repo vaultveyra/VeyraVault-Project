@@ -26,6 +26,7 @@ assert backup_test.is_file(), "Android backup integrity instrumentation test sou
 backup_source = backup_test.read_text(encoding="utf-8")
 for marker in (
     "backupIsWrittenReadBackAndReusedForExactSnapshot",
+    "interruptedAtomicFileSidecarIsRecoveredAndVerified",
     "immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal",
     "corruptExistingBackupIsRejectedAndNeverOverwritten",
     "LegacyCloneSnapshotBackup.writeAndVerify",
