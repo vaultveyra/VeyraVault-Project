@@ -54,34 +54,74 @@ public class CloneStore {
         return c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
 
-    public static List<CloneEntry> getAll(Context c) {
+    /**
+     * Strict registry reader for mutation paths. Unlike getAll(), this never converts
+     * malformed or ambiguous persisted data into an empty registry.
+     */
+    private static List<CloneEntry> readAllStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        SharedPreferences store = prefs(c);
+        Map<String, ?> values = store.getAll();
+        Object rawValue = values.get(KEY_CLONES);
+        if (rawValue == null) {
+            if (values.containsKey(KEY_CLONES)) throw new IllegalStateException("Clone registry value is null");
+            return new ArrayList<CloneEntry>();
+        }
+        if (!(rawValue instanceof String)) throw new IllegalStateException("Clone registry is not a String");
+        JSONArray arr = new JSONArray((String) rawValue);
         List<CloneEntry> out = new ArrayList<CloneEntry>();
-        try {
-            String raw = prefs(c).getString(KEY_CLONES, "[]");
-            JSONArray arr = new JSONArray(raw);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                CloneEntry e = new CloneEntry();
-                e.packageName = o.optString("pkg");
-                e.userId = o.optInt("uid", 0);
-                e.displayName = o.optString("name", e.packageName);
-                e.mockGpsEnabled = o.optBoolean("gpsOn", false);
-                e.latitude = o.optDouble("lat", 0.0);
-                e.longitude = o.optDouble("lng", 0.0);
-                e.locationLabel = o.optString("locLabel", "");
-                e.customDeviceEnabled = o.optBoolean("devOn", false);
-                e.deviceBrand = o.optString("devBrand", "");
-                e.deviceModel = o.optString("devModel", "");
-                JSONArray pArr = o.optJSONArray("denied");
-                if (pArr != null) {
-                    for (int j = 0; j < pArr.length(); j++) e.deniedPermissions.add(pArr.optString(j));
-                }
-                out.add(e);
+        Set<String> identities = new HashSet<String>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) throw new IllegalStateException("Clone registry entry " + i + " is not an object");
+            CloneEntry e = new CloneEntry();
+            Object pkg = o.opt("pkg");
+            Object uid = o.opt("uid");
+            if (!(pkg instanceof String) || ((String) pkg).trim().isEmpty()) {
+                throw new IllegalStateException("Clone registry entry " + i + " has an invalid package name");
             }
-        } catch (Exception ignored) {}
+            if (!(uid instanceof Number) || ((Number) uid).intValue() < 0
+                    || ((Number) uid).doubleValue() != ((Number) uid).intValue()) {
+                throw new IllegalStateException("Clone registry entry " + i + " has an invalid virtual user ID");
+            }
+            e.packageName = (String) pkg;
+            e.userId = ((Number) uid).intValue();
+
+            e.displayName = readOptionalString(o, "name", e.packageName);
+            e.mockGpsEnabled = readOptionalBoolean(o, "gpsOn", false);
+            e.latitude = readOptionalDouble(o, "lat", 0.0d);
+            e.longitude = readOptionalDouble(o, "lng", 0.0d);
+            e.locationLabel = readOptionalString(o, "locLabel", "");
+            e.customDeviceEnabled = readOptionalBoolean(o, "devOn", false);
+            e.deviceBrand = readOptionalString(o, "devBrand", "");
+            e.deviceModel = readOptionalString(o, "devModel", "");
+
+            if (e.mockGpsEnabled && (Double.isNaN(e.latitude) || Double.isInfinite(e.latitude)
+                    || Double.isNaN(e.longitude) || Double.isInfinite(e.longitude)
+                    || e.latitude < -90.0d || e.latitude > 90.0d
+                    || e.longitude < -180.0d || e.longitude > 180.0d)) {
+                throw new IllegalStateException("Clone registry entry " + i + " has invalid enabled-location coordinates");
+            }
+
+            Object denied = o.opt("denied");
+            if (denied != null) {
+                if (!(denied instanceof JSONArray)) throw new IllegalStateException("Denied permissions are not an array");
+                JSONArray permissions = (JSONArray) denied;
+                for (int j = 0; j < permissions.length(); j++) {
+                    Object permission = permissions.get(j);
+                    if (!(permission instanceof String) || ((String) permission).trim().isEmpty()) {
+                        throw new IllegalStateException("Denied permission at entry " + i + " is invalid");
+                    }
+                    e.deniedPermissions.add((String) permission);
+                }
+            }
+
+            String identity = e.packageName + "\\u0000" + e.userId;
+            if (!identities.add(identity)) throw new IllegalStateException("Duplicate clone identity");
+            out.add(e);
+        }
         Collections.sort(out, new Comparator<CloneEntry>() {
-            @Override
-            public int compare(CloneEntry a, CloneEntry b) {
+            @Override public int compare(CloneEntry a, CloneEntry b) {
                 if (a.userId != b.userId) return a.userId - b.userId;
                 return a.displayName.compareToIgnoreCase(b.displayName);
             }
@@ -89,28 +129,73 @@ public class CloneStore {
         return out;
     }
 
-    public static void saveAll(Context c, List<CloneEntry> list) {
+    private static String readOptionalString(JSONObject object, String key, String fallback) throws Exception {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof String)) throw new IllegalStateException("Field " + key + " is not a String");
+        return (String) value;
+    }
+
+    private static boolean readOptionalBoolean(JSONObject object, String key, boolean fallback) {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof Boolean)) throw new IllegalStateException("Field " + key + " is not a Boolean");
+        return (Boolean) value;
+    }
+
+    private static double readOptionalDouble(JSONObject object, String key, double fallback) {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof Number)) throw new IllegalStateException("Field " + key + " is not numeric");
+        return ((Number) value).doubleValue();
+    }
+
+    public static List<CloneEntry> getAll(Context c) {
+        try {
+            return readAllStrict(c);
+        } catch (Exception ignored) {
+            // Legacy UI callers retain their historical empty-list fallback.
+            // All mutation/allocation paths use readAllStrict and fail closed.
+            return new ArrayList<CloneEntry>();
+        }
+    }
+
+    public static boolean saveAll(Context c, List<CloneEntry> list) {
+        if (c == null || list == null) return false;
         try {
             JSONArray arr = new JSONArray();
+            Set<String> identities = new HashSet<String>();
             for (CloneEntry e : list) {
+                if (e == null || e.packageName == null || e.packageName.trim().isEmpty()
+                        || e.userId < 0 || e.deniedPermissions == null) return false;
+                if (e.mockGpsEnabled && (Double.isNaN(e.latitude) || Double.isInfinite(e.latitude)
+                        || Double.isNaN(e.longitude) || Double.isInfinite(e.longitude)
+                        || e.latitude < -90.0d || e.latitude > 90.0d
+                        || e.longitude < -180.0d || e.longitude > 180.0d)) return false;
+                if (!identities.add(e.packageName + "\\u0000" + e.userId)) return false;
                 JSONObject o = new JSONObject();
                 o.put("pkg", e.packageName);
                 o.put("uid", e.userId);
-                o.put("name", e.displayName);
+                o.put("name", e.displayName == null ? e.packageName : e.displayName);
                 o.put("gpsOn", e.mockGpsEnabled);
                 o.put("lat", e.latitude);
                 o.put("lng", e.longitude);
-                o.put("locLabel", e.locationLabel);
+                o.put("locLabel", e.locationLabel == null ? "" : e.locationLabel);
                 o.put("devOn", e.customDeviceEnabled);
-                o.put("devBrand", e.deviceBrand);
-                o.put("devModel", e.deviceModel);
+                o.put("devBrand", e.deviceBrand == null ? "" : e.deviceBrand);
+                o.put("devModel", e.deviceModel == null ? "" : e.deviceModel);
                 JSONArray pArr = new JSONArray();
-                for (String p : e.deniedPermissions) pArr.put(p);
+                for (String permission : e.deniedPermissions) {
+                    if (permission == null || permission.trim().isEmpty()) return false;
+                    pArr.put(permission);
+                }
                 o.put("denied", pArr);
                 arr.put(o);
             }
-            prefs(c).edit().putString(KEY_CLONES, arr.toString()).commit();
-        } catch (Exception ignored) {}
+            return prefs(c).edit().putString(KEY_CLONES, arr.toString()).commit();
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     public static CloneEntry getClone(Context c, String pkg, int userId) {
@@ -120,38 +205,55 @@ public class CloneStore {
         return null;
     }
 
-    public static void upsertClone(Context c, CloneEntry entry) {
-        List<CloneEntry> all = getAll(c);
-        boolean found = false;
-        for (int i = 0; i < all.size(); i++) {
-            CloneEntry cur = all.get(i);
-            if (cur.packageName.equals(entry.packageName) && cur.userId == entry.userId) {
-                all.set(i, entry);
-                found = true;
-                break;
+    public static boolean upsertClone(Context c, CloneEntry entry) {
+        if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
+                || entry.userId < 0) return false;
+        try {
+            List<CloneEntry> all = readAllStrict(c);
+            boolean found = false;
+            for (int i = 0; i < all.size(); i++) {
+                CloneEntry cur = all.get(i);
+                if (cur.packageName.equals(entry.packageName) && cur.userId == entry.userId) {
+                    all.set(i, entry);
+                    found = true;
+                    break;
+                }
             }
+            if (!found) all.add(entry);
+            return saveAll(c, all);
+        } catch (Exception ignored) {
+            return false;
         }
-        if (!found) all.add(entry);
-        saveAll(c, all);
     }
 
-    public static void removeClone(Context c, String pkg, int userId) {
-        List<CloneEntry> all = getAll(c);
-        List<CloneEntry> kept = new ArrayList<CloneEntry>();
-        for (CloneEntry e : all) {
-            if (!(e.packageName.equals(pkg) && e.userId == userId)) kept.add(e);
+    public static boolean removeClone(Context c, String pkg, int userId) {
+        if (c == null || pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
+        try {
+            List<CloneEntry> all = readAllStrict(c);
+            List<CloneEntry> kept = new ArrayList<CloneEntry>();
+            for (CloneEntry e : all) {
+                if (!(e.packageName.equals(pkg) && e.userId == userId)) kept.add(e);
+            }
+            return saveAll(c, kept);
+        } catch (Exception ignored) {
+            return false;
         }
-        saveAll(c, kept);
     }
 
     public static int nextFreeUserIdForPackage(Context c, String pkg) {
-        Set<Integer> used = new HashSet<Integer>();
-        for (CloneEntry e : getAll(c)) {
-            if (e.packageName.equals(pkg)) used.add(e.userId);
+        if (c == null || pkg == null || pkg.trim().isEmpty()) return -1;
+        try {
+            Set<Integer> used = new HashSet<Integer>();
+            for (CloneEntry e : readAllStrict(c)) {
+                if (e.packageName.equals(pkg)) used.add(e.userId);
+            }
+            int uid = 0;
+            while (used.contains(uid)) uid++;
+            return uid;
+        } catch (Exception ignored) {
+            // -1 is an explicit allocation failure; never guess Space 1 on corrupt data.
+            return -1;
         }
-        int uid = 0;
-        while (used.contains(uid)) uid++;
-        return uid;
     }
 
     public static Map<Integer, List<CloneEntry>> getGroupedBySpace(Context c) {
