@@ -77,7 +77,18 @@ public final class CloneMigrationCrashTestService extends Service {
         }
     }
 
-    private String describeFailure(Throwable error) {\n        StringBuilder result = new StringBuilder();\n        Throwable current = error;\n        while (current != null) {\n            if (result.length() > 0) result.append(" <- ");\n            result.append(current.getClass().getName()).append(": ").append(String.valueOf(current.getMessage()));\n            current = current.getCause();\n        }\n        return result.toString();\n    }\n\n    private void writeMarker(String name, String value) throws IOException {
+    private String describeFailure(Throwable error) {
+        StringBuilder result = new StringBuilder();
+        Throwable current = error;
+        while (current != null) {
+            if (result.length() > 0) result.append(" <- ");
+            result.append(current.getClass().getName()).append(": ").append(String.valueOf(current.getMessage()));
+            current = current.getCause();
+        }
+        return result.toString();
+    }
+
+    private void writeMarker(String name, String value) throws IOException {
         File directory = new File(getFilesDir(), TEST_DIRECTORY);
         if (!directory.exists() && !directory.mkdirs()) throw new IOException("Cannot create test marker directory");
         try (FileOutputStream output = new FileOutputStream(new File(directory, name), false)) {
