@@ -56,6 +56,35 @@ public class LegacyCloneRoomInstrumentationTest {
         }
     }
 
+    @Test public void verifiedBackupSnapshotCanBeImportedWithoutOverwritingCurrentPreferences() throws Exception {
+        LegacyCloneSnapshot sourceSnapshot = populatedSnapshot(true);
+        LegacyCloneSnapshotBackup.writeAndVerify(context, sourceSnapshot);
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE);
+        assertTrue(prefs.edit()
+                .putString(LegacyCloneSnapshot.KEY_CLONES, "[]")
+                .putBoolean(LegacyCloneSnapshot.KEY_MASTER_GPS, true)
+                .commit());
+        LegacyCloneSnapshot currentSnapshot = LegacyCloneSnapshot.capture(context);
+
+        LegacyCloneSnapshot backupSnapshot = LegacyCloneSnapshotBackup.readAndVerify(context);
+        assertEquals(sourceSnapshot.sha256(), backupSnapshot.sha256());
+        assertNotEquals(sourceSnapshot.sha256(), currentSnapshot.sha256());
+
+        ClonePersistenceDatabase db = inMemoryDb();
+        try {
+            assertEquals(LegacyCloneRoomImporter.Result.IMPORTED,
+                    importOnWorker(db, backupSnapshot));
+            assertTrue(LegacyCloneRoomVerifier.matches(db, backupSnapshot));
+            assertEquals(1, db.clones().count());
+            assertEquals("com.example.stale", db.lastActiveLaunch().get().packageName);
+            assertEquals(currentSnapshot.sha256(), LegacyCloneSnapshot.capture(context).sha256());
+        } finally {
+            db.close();
+        }
+    }
+
     @Test public void repeatedImportIsIdempotentOnlyWhenParityStillMatches() throws Exception {
         LegacyCloneSnapshot snapshot = populatedSnapshot(false);
         ClonePersistenceDatabase db = inMemoryDb();
