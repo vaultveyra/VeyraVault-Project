@@ -121,6 +121,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
         final List<CloneStore.CloneEntry> snapshot;
         try {
             snapshot = copyEntries(entries);
+            validateEntries(snapshot);
         } catch (RuntimeException invalid) {
             deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, invalid.getMessage()));
             return;
@@ -139,6 +140,12 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         final CloneStore.CloneEntry snapshot = copyEntry(entry);
+        try {
+            validateEntry(snapshot);
+        } catch (RuntimeException invalid) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, invalid.getMessage()));
+            return;
+        }
         enqueue(() -> {
             if (!CloneStore.upsertClone(appContext, copyEntry(snapshot)))
                 throw new PersistenceFailureException("Clone registry upsert was not committed");
@@ -202,6 +209,30 @@ public final class AsyncCloneRepository implements AutoCloseable {
         String message = error == null ? null : error.getMessage();
         return message == null || message.trim().isEmpty()
                 ? "Persistence operation failed" : message;
+    }
+
+    private static void validateEntries(List<CloneStore.CloneEntry> entries) {
+        Set<String> identities = new HashSet<String>();
+        for (CloneStore.CloneEntry entry : entries) {
+            validateEntry(entry);
+            if (!identities.add(entry.packageName + "\\u0000" + entry.userId))
+                throw new IllegalArgumentException("Duplicate clone identity");
+        }
+    }
+
+    private static void validateEntry(CloneStore.CloneEntry entry) {
+        if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
+                || entry.userId < 0 || entry.deniedPermissions == null)
+            throw new IllegalArgumentException("Clone entry is invalid");
+        if (entry.mockGpsEnabled && (Double.isNaN(entry.latitude) || Double.isInfinite(entry.latitude)
+                || Double.isNaN(entry.longitude) || Double.isInfinite(entry.longitude)
+                || entry.latitude < -90.0d || entry.latitude > 90.0d
+                || entry.longitude < -180.0d || entry.longitude > 180.0d))
+            throw new IllegalArgumentException("Enabled clone location is invalid");
+        for (String permission : entry.deniedPermissions) {
+            if (permission == null || permission.trim().isEmpty())
+                throw new IllegalArgumentException("Denied permission is invalid");
+        }
     }
 
     private static List<CloneStore.CloneEntry> copyEntries(List<CloneStore.CloneEntry> entries) {
