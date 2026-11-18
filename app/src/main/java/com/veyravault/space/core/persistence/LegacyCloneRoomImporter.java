@@ -17,11 +17,31 @@ public final class LegacyCloneRoomImporter {
         ALREADY_IMPORTED
     }
 
+    interface TransactionCheckpoint {
+        void afterCloneAndPermissionRowsInserted();
+    }
+
     private LegacyCloneRoomImporter() { }
 
     public static Result importIntoEmptyDatabase(
             @NonNull final ClonePersistenceDatabase database,
             @NonNull final LegacyCloneSnapshot snapshot) {
+        return importInternal(database, snapshot, null);
+    }
+
+    // Package-private crash-test seam; used only by the debug-only secondary-process test service.
+    static Result importIntoEmptyDatabaseWithCheckpoint(
+            @NonNull final ClonePersistenceDatabase database,
+            @NonNull final LegacyCloneSnapshot snapshot,
+            final TransactionCheckpoint checkpoint) {
+        if (checkpoint == null) throw new IllegalArgumentException("Transaction checkpoint is required");
+        return importInternal(database, snapshot, checkpoint);
+    }
+
+    private static Result importInternal(
+            @NonNull final ClonePersistenceDatabase database,
+            @NonNull final LegacyCloneSnapshot snapshot,
+            final TransactionCheckpoint checkpoint) {
         if (database == null) throw new IllegalArgumentException("Room database is required");
         if (snapshot == null) throw new IllegalArgumentException("Validated legacy snapshot is required");
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -81,6 +101,10 @@ public final class LegacyCloneRoomImporter {
 
                 if (!clones.isEmpty()) database.clones().insertOrReplaceAll(clones);
                 if (!permissions.isEmpty()) database.deniedPermissions().insertOrReplaceAll(permissions);
+
+                // This callback runs inside the active Room transaction. Production callers
+                // never supply it; the debug crash test kills its dedicated process here.
+                if (checkpoint != null) checkpoint.afterCloneAndPermissionRowsInserted();
 
                 List<CollapsedSpaceEntity> collapsed = new ArrayList<>();
                 for (String key : snapshot.collapsedSpaces) {

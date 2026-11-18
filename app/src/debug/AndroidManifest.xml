@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <application
-        android:name=".RoomTestApplication"
-        tools:replace="android:name" />
+    <application android:name=".RoomTestApplication" tools:replace="android:name">
+        <service
+            android:name="com.veyravault.space.core.persistence.CloneMigrationCrashTestService"
+            android:process=":migration_recovery_test"
+            android:exported="false" />
+    </application>
 </manifest>

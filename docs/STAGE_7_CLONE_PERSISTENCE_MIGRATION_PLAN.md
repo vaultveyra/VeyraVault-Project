@@ -192,14 +192,32 @@ These are automated emulator tests, not physical-device upgrade tests. They do n
 
 ## Stage 7.5 — Android backup integrity instrumentation coverage
 
-This follow-up adds Android instrumentation coverage for the existing opt-in `LegacyCloneSnapshotBackup` implementation:
+This follow-up adds Android instrumentation coverage for the opt-in `LegacyCloneSnapshotBackup` implementation:
 
-- A valid snapshot is written, read back through the backup API, and the receipt digest/byte count are checked.
-- Repeating the operation with the exact same snapshot must reuse the immutable backup without changing its bytes.
-- A different snapshot must be rejected and the original backup bytes must remain unchanged.
-- A corrupted existing backup must be rejected and must not be silently replaced.
-- An interrupted AtomicFile state is simulated by moving the last complete bytes to the `.bak` sidecar with the base file absent; the next read must recover the sidecar, validate the digest, and retain the exact bytes.
+- Valid snapshot write/read-back and receipt digest/byte count.
+- Exact-snapshot reuse without changing immutable backup bytes.
+- Rejection of a different snapshot without replacing the original backup.
+- Rejection of corrupt existing backup bytes without overwriting them.
+- Recovery of a complete AtomicFile `.bak` sidecar when the base file is absent.
 
-A separate AndroidX instrumentation class is discovered by the existing `:app:connectedDebugAndroidTest` task. The source-contract wiring test now requires all three backup scenarios to remain present.
+The separate AndroidX backup instrumentation class is discovered by `:app:connectedDebugAndroidTest`. The source-contract test requires all four backup scenarios.
 
-**Explicit limitations:** these tests have been added to the feature branch but are not yet CI-verified. They do not simulate an OS-killed app process, and the current backup class does not yet expose a standalone restore API. The sidecar test exercises AtomicFile's documented recovery path with a controlled filesystem fixture; it is not a substitute for killing the Android process during an actual write. A future recovery stage must test AtomicFile sidecar recovery, define a validated restore/read contract, and exercise abrupt process termination around the Room transaction boundary. No production import, startup wiring, SharedPreferences mutation, database cutover, or virtual-app/session operation is introduced here. SharedPreferences remains the sole runtime source of truth.
+**CI validation:** PR-triggered Run `#230` for commit `8bfbcb1a64a9aacc08c537564e5e72e7750cf784` completed successfully. The emulator reported **9/9 instrumentation tests completed, 0 skipped, 0 failed**; source audit, unsigned release APK compilation, and APK audit also passed. The duplicate Push-triggered Run `#229` failed before test execution because the emulator's Package Manager service was unavailable (`Can't find service: package`); its failed job was submitted for retry. The successful PR-triggered run is the verified Stage 7.5 result.
+
+**Limitations:** the sidecar test uses a controlled filesystem fixture and is not itself an OS process-kill test. The backup class still has no standalone restore API. No production import, startup wiring, SharedPreferences mutation, database cutover, or virtual-app/session operation is introduced. SharedPreferences remains the sole runtime source of truth.
+
+
+## Stage 7.6 — Abrupt process death during a Room import
+
+A debug-only Android service runs in a dedicated OS process (`:migration_recovery_test`) so instrumentation can terminate that process without killing the test runner. The service starts the explicit Room importer and pauses at a package-private checkpoint **inside the Room transaction**, after clone and denied-permission rows have been inserted but before the remaining tables and migration provenance are written.
+
+The instrumentation test then:
+
+1. Waits for an fsynced checkpoint marker and captures the service process ID.
+2. Sends SIGKILL to that dedicated process and waits for Android to report that it has exited.
+3. Starts the service again, causing Android to create a fresh process that reopens the same on-disk Room database.
+4. Verifies that all seven tables are empty: clones, denied permissions, collapsed spaces, global profile, persistence settings, active marker, and migration provenance.
+
+The crash service is declared only in the debug manifest. The release manifest, `VaultApp`, CloneStore preferences, virtual package data, and account/session directories are not changed. The importer remains opt-in and is not called by startup or normal runtime flows.
+
+**Validation status:** implementation is committed for CI verification; do not treat the process-death test as passed until the Android emulator run completes. Physical-device upgrade and backup/restore drills remain mandatory before any production migration or cutover.
