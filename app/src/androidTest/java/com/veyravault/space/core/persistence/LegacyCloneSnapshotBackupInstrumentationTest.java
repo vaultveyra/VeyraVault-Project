@@ -83,16 +83,16 @@ public class LegacyCloneSnapshotBackupInstrumentationTest {
     @Test public void readAndVerifyReconstructsBackupWithoutReadingOrMutatingCurrentPreferences() throws Exception {
         SharedPreferences prefs = context.getSharedPreferences(
                 LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE);
-        String originalClones = "[{\\"pkg\\":\\"com.example.backup\\",\\"uid\\":2,\\"name\\":\\"Original\\",\\"gpsOn\\":true,\\"lat\\":40.7128,\\"lng\\":-74.0060,\\"denied\\":[\\"android.permission.CAMERA\\"]}]";
+        String originalClones = "[{\"pkg\":\"com.example.backup\",\"uid\":2,\"name\":\"Original\",\"gpsOn\":true,\"lat\":40.7128,\"lng\":-74.0060,\"denied\":[\"android.permission.CAMERA\"]}]";
         assertTrue(prefs.edit()
                 .putString(LegacyCloneSnapshot.KEY_CLONES, originalClones)
                 .putBoolean(LegacyCloneSnapshot.KEY_MASTER_GPS, false)
                 .putStringSet(LegacyCloneSnapshot.KEY_COLLAPSED,
                         new java.util.HashSet<>(java.util.Arrays.asList("3", "7")))
                 .putString(LegacyCloneSnapshot.KEY_GLOBAL_DEVICE,
-                        "{\\"enabled\\":true,\\"brand\\":\\"test-brand\\",\\"model\\":\\"test-model\\"}")
+                        "{\"enabled\":true,\"brand\":\"test-brand\",\"model\":\"test-model\"}")
                 .putString(LegacyCloneSnapshot.KEY_ACTIVE_LAUNCH,
-                        "{\\"pkg\\":\\"com.example.backup\\",\\"uid\\":2}")
+                        "{\"pkg\":\"com.example.backup\",\"uid\":2}")
                 .commit());
 
         LegacyCloneSnapshot original = LegacyCloneSnapshot.capture(context);
@@ -117,7 +117,7 @@ public class LegacyCloneSnapshotBackupInstrumentationTest {
         LegacyCloneSnapshot snapshot = LegacyCloneSnapshot.capture(context);
         LegacyCloneSnapshotBackup.writeAndVerify(context, snapshot);
         String content = new String(readFile(backupFile), StandardCharsets.UTF_8)
-                .replace("\\"formatVersion\\":1", "\\"formatVersion\\":99");
+                .replace("\"formatVersion\":1", "\"formatVersion\":99");
         try (FileOutputStream output = new FileOutputStream(backupFile, false)) {
             output.write(content.getBytes(StandardCharsets.UTF_8));
             output.getFD().sync();
