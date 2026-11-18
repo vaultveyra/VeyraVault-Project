@@ -144,6 +144,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            CloneStore.readAllStrict(appContext);
             if (!CloneStore.saveAll(appContext, copyEntries(snapshot)))
                 throw new PersistenceFailureException("Clone registry commit failed");
             return Boolean.TRUE;
@@ -164,6 +165,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            CloneStore.readAllStrict(appContext);
             if (!CloneStore.upsertClone(appContext, copyEntry(snapshot)))
                 throw new PersistenceFailureException("Clone registry upsert was not committed");
             return Boolean.TRUE;
@@ -176,6 +178,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            CloneStore.readAllStrict(appContext);
             if (!CloneStore.removeClone(appContext, packageName, userId))
                 throw new PersistenceFailureException("Clone registry removal was not committed");
             return Boolean.TRUE;
@@ -192,6 +195,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            CloneStore.readCollapsedSpaceNumbersStrict(appContext);
             if (!CloneStore.setSpaceCollapsed(appContext, spaceNumber, collapsed))
                 throw new PersistenceFailureException("Collapsed Spaces update was not committed");
             return Boolean.TRUE;
@@ -204,6 +208,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
 
     public void setMasterMockGpsEnabled(boolean enabled, Callback<Boolean> callback) {
         enqueue(() -> {
+            CloneStore.readMasterMockGpsEnabledStrict(appContext);
             if (!CloneStore.setMasterMockGpsEnabled(appContext, enabled))
                 throw new PersistenceFailureException("Master GPS update was not committed");
             return Boolean.TRUE;
@@ -223,6 +228,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final CloneStore.GlobalEnvConfig snapshot = copyGlobalEnvironment(config);
         enqueue(() -> {
+            CloneStore.readGlobalEnvStrict(appContext);
             if (!CloneStore.saveGlobalEnv(appContext, snapshot))
                 throw new PersistenceFailureException("Global environment profile was not committed");
             return Boolean.TRUE;
@@ -244,6 +250,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final CloneStore.CloneEntry snapshot = copyEntry(entry);
         enqueue(() -> {
+            CloneStore.readAllStrict(appContext);
             if (!CloneStore.recordActiveLaunch(appContext, snapshot))
                 throw new PersistenceFailureException("Active launch marker was not committed");
             return Boolean.TRUE;
@@ -261,6 +268,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final ProfileSettings snapshot = settings.copy();
         enqueue(() -> {
+            ProfileStore.readGlobalStrict(appContext);
             if (!ProfileStore.saveGlobal(appContext, snapshot))
                 throw new PersistenceFailureException("Global profile was not committed");
             return Boolean.TRUE;
@@ -284,6 +292,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final ProfileSettings snapshot = settings.copy();
         enqueue(() -> {
+            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
             if (!ProfileStore.saveCloneOverride(appContext, packageName, userId, snapshot))
                 throw new PersistenceFailureException("Clone profile was not committed");
             return Boolean.TRUE;
@@ -297,6 +306,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
             if (!ProfileStore.clearCloneOverrideField(appContext, packageName, userId, field))
                 throw new PersistenceFailureException("Clone profile field clear was not committed");
             return Boolean.TRUE;
@@ -309,6 +319,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
+            ProfileStore.readGlobalStrict(appContext);
             if (!ProfileStore.clearGlobalField(appContext, field))
                 throw new PersistenceFailureException("Global profile field clear was not committed");
             return Boolean.TRUE;
