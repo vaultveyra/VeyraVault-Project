@@ -123,10 +123,10 @@ public class AsyncCloneRepositoryInstrumentationTest {
 
     @Test public void profileMigrationDoesNotMarkCorruptRegistryAsImported() {
         preferences.edit().putString("clones_json",
-                "[{\\"pkg\\":\\"com.example.bad\\",\\"uid\\":0,\\"gpsOn\\":\\"true\\"}]").commit();
+                "[{\"pkg\":\"com.example.bad\",\"uid\":0,\"gpsOn\":\"true\"}]").commit();
         assertFalse(ProfileStore.migrateLegacyLocationSettings(context));
         assertFalse(profilePreferences.getBoolean("legacy_location_import_v1", false));
-        assertTrue(preferences.getString("clones_json", "").contains("\\"gpsOn\\":\\"true\\""));
+        assertTrue(preferences.getString("clones_json", "").contains("\"gpsOn\":\"true\""));
     }
 
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
