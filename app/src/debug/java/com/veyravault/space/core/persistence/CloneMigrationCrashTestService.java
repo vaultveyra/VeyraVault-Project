@@ -91,10 +91,22 @@ public final class CloneMigrationCrashTestService extends Service {
     private void writeMarker(String name, String value) throws IOException {
         File directory = new File(getFilesDir(), TEST_DIRECTORY);
         if (!directory.exists() && !directory.mkdirs()) throw new IOException("Cannot create test marker directory");
-        try (FileOutputStream output = new FileOutputStream(new File(directory, name), false)) {
+
+        // Publish marker files only after the complete payload is flushed to disk.
+        // waitForMarker() must never observe an empty/partially-written marker.
+        File target = new File(directory, name);
+        File temporary = new File(directory, name + ".tmp");
+        try (FileOutputStream output = new FileOutputStream(temporary, false)) {
             output.write(value.getBytes(StandardCharsets.UTF_8));
             output.flush();
             output.getFD().sync();
+        }
+        if (target.exists() && !target.delete()) {
+            throw new IOException("Cannot replace existing marker: " + target.getName());
+        }
+        if (!temporary.renameTo(target)) {
+            temporary.delete();
+            throw new IOException("Cannot publish completed marker: " + target.getName());
         }
     }
 
