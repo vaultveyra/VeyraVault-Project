@@ -424,6 +424,42 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
 
+    @Test public void engineInstallStateMappingPreservesInstalledAbsentAndUnknown() {
+        assertEquals(Engine.CloneInstallState.INSTALLED,
+                Engine.classifyInstalledQueryResult(Boolean.TRUE));
+        assertEquals(Engine.CloneInstallState.ABSENT,
+                Engine.classifyInstalledQueryResult(Boolean.FALSE));
+        assertEquals(Engine.CloneInstallState.UNKNOWN,
+                Engine.classifyInstalledQueryResult(null));
+    }
+
+    @Test public void pendingReservationDiagnosticsAreStrictAndReadOnly() throws Exception {
+        String clones = "[{\\\"pkg\\\":\\\"com.example.existing\\\",\\\"uid\\\":0}]";
+        String journal = "{\\\"schemaVersion\\\":1,\\\"reservations\\\":[{\\\"token\\\":\\\"read-only-token\\\",\\\"pkg\\\":\\\"com.example.pending\\\",\\\"uid\\\":1}]}";
+        assertTrue(preferences.edit().putString("clones_json", clones)
+                .putString("pending_clone_reservations_json", journal).commit());
+
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<List<CloneStore.CloneReservation>>> loaded =
+                new AtomicReference<>();
+        repository.loadPendingReservations(result -> {
+            loaded.set(result);
+            done.countDown();
+        });
+
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertTrue(loaded.get().isSuccess());
+        assertEquals(1, loaded.get().getValue().size());
+        CloneStore.CloneReservation reservation = loaded.get().getValue().get(0);
+        assertEquals("com.example.pending", reservation.getPackageName());
+        assertEquals(1, reservation.getUserId());
+        assertEquals("read-only-token", reservation.getToken());
+        assertEquals(clones, preferences.getString("clones_json", null));
+        assertEquals(journal, preferences.getString("pending_clone_reservations_json", null));
+        repository.close();
+    }
+
     @Test public void reservationJournalCommitFailureIsClassifiedAsPersistenceFailure() {
         assertEquals(AsyncCloneRepository.Failure.PERSISTENCE_FAILURE,
                 AsyncCloneRepository.classify(
