@@ -423,6 +423,42 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+
+    @Test public void malformedReservationJournalBlocksAllocationWithoutOverwritingIt() throws Exception {
+        String malformed = "{\\"schemaVersion\\":999,\\"reservations\\":[]}";
+        assertTrue(preferences.edit().putString("pending_clone_reservations_json", malformed).commit());
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> result = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.badjournal", value -> {
+            result.set(value);
+            done.countDown();
+        });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, result.get().getFailure());
+        assertEquals(malformed, preferences.getString("pending_clone_reservations_json", null));
+        repository.close();
+    }
+
+    @Test public void reservationJournalConflictWithExistingCloneBlocksAllocation() throws Exception {
+        String clones = "[{\\"pkg\\":\\"com.example.conflict\\",\\"uid\\":0}]";
+        String journal = "{\\"schemaVersion\\":1,\\"reservations\\":[{\\"token\\":\\"fixture-token\\",\\"pkg\\":\\"com.example.conflict\\",\\"uid\\":0}]}";
+        assertTrue(preferences.edit().putString("clones_json", clones)
+                .putString("pending_clone_reservations_json", journal).commit());
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> result = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.conflict", value -> {
+            result.set(value);
+            done.countDown();
+        });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, result.get().getFailure());
+        assertEquals(clones, preferences.getString("clones_json", null));
+        assertEquals(journal, preferences.getString("pending_clone_reservations_json", null));
+        repository.close();
+    }
+
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
