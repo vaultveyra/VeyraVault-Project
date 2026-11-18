@@ -488,6 +488,13 @@ public class MainActivity extends BaseActivity {
             @Override public void onClick(View v) {
                 sheet.dismiss();
                 int nextUid = CloneStore.nextFreeUserIdForPackage(MainActivity.this, item.packageName);
+                if (nextUid < 0) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "فهرست کلون‌ها قابل اعتبارسنجی نیست؛ تکثیر متوقف شد."
+                               : "Clone registry could not be validated; duplication was stopped.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
                 CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
                 copy.packageName = item.packageName;
                 copy.userId = nextUid;
@@ -498,7 +505,18 @@ public class MainActivity extends BaseActivity {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                CloneStore.upsertClone(MainActivity.this, copy);
+                if (!CloneStore.upsertClone(MainActivity.this, copy)) {
+                    boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
+                    Toast.makeText(MainActivity.this,
+                            fa ? (cleanupConfirmed
+                                    ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
+                                    : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
+                               : (cleanupConfirmed
+                                    ? "Clone registry save failed; the new installation was removed."
+                                    : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
                 refreshSpaces();
             }
         }));
@@ -539,8 +557,19 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("🗑️", getString(R.string.uninstall), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                Engine.uninstallClone(item.packageName, item.userId);
-                CloneStore.removeClone(MainActivity.this, item.packageName, item.userId);
+                if (!Engine.uninstallClone(item.packageName, item.userId)) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
+                               : "The engine did not confirm uninstall; the Space record was preserved.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (!CloneStore.removeClone(MainActivity.this, item.packageName, item.userId)) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "برنامه حذف شد، اما به‌روزرسانی فهرست فضاها ناموفق بود."
+                               : "The virtual app was uninstalled, but the Space registry could not be updated.",
+                            Toast.LENGTH_LONG).show();
+                }
                 refreshSpaces();
             }
         }));
