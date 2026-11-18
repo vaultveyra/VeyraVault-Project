@@ -67,6 +67,9 @@ jobs:
       - name: Test atomic clone ID reservation contract
         run: python3 scripts/test_clone_id_reservation_contract.py
 
+      - name: Test pending reservation recovery contract
+        run: python3 scripts/test_pending_reservation_recovery_contract.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 
