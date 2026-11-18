@@ -2,9 +2,7 @@
 
 ## Status
 
-Runtime implementation is committed on `feat/veyra-vault-product-foundation`. The first fully green CI validation of the reservation implementation was PR run #471 (run ID `44381501446`) on commit `514696379fe03e832c871091b37b1565848123ab`: 36/36 Android Emulator instrumentation tests passed (0 skipped, 0 failed), Source Audit, unsigned release APK compilation, APK packaging/audit, and artifact upload all succeeded.
-
-Follow-up hardening on the current branch distinguishes a failed reservation-journal commit from corrupt persisted data and adds an instrumentation classification test. That follow-up commit is awaiting its own CI validation; do not treat the earlier green run as validation of code committed afterward.
+Runtime implementation is committed on `feat/veyra-vault-product-foundation`. The final Stage 7.9.8 implementation and follow-up hardening were validated by PR run #478 (run ID `44384660038`) on commit `ff51482949a80b004cda65ab3c517cd3ef5c0708`: 37/37 Android Emulator instrumentation tests passed (0 skipped, 0 failed), Source Audit, unsigned release APK compilation, APK packaging/audit, artifact upload, and isolated signing all succeeded.
 
 Target branch: `feat/veyra-vault-product-foundation`  
 PR: #4 — keep Draft, open, and unmerged.
@@ -46,9 +44,9 @@ Reservation-specific instrumentation covers:
 - fail-closed handling of malformed journals and registry/journal identity conflicts;
 - classification of a reservation-journal commit failure as `PERSISTENCE_FAILURE`.
 
-The green PR run #471 validated the preceding implementation with 36/36 Android Emulator tests, 0 skipped and 0 failed. Its unsigned build/audit artifact is [VeyraVault-unsigned-build](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44381501446/artifacts/14464538130), artifact ID `14464538130`, ZIP digest `sha256:3ad62b9bb37ba4d27be4d199e5005d7ff4e9c18d051570a18c1bd754459b44cd`.
-
-The current follow-up contains one additional instrumentation test; its test/build/audit result must be taken from CI on the final current branch head, not inferred from run #471.
+Run #478 on the final Stage 7.9.8 commit validated 37/37 Android Emulator tests, 0 skipped and 0 failed, Source Audit, unsigned Release build, APK package/audit and artifact upload. Artifacts:
+- [Signed release](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44384660038/artifacts/14466347687), ID `14466347687`, ZIP digest `sha256:385d61069c6cf0ec1892fdf7ab25e4d8a081e6a6c658b586decf5121fef92190`.
+- [Unsigned build and audit reports](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44384660038/artifacts/14466017924), ID `14466017924`, ZIP digest `sha256:87b77ca84d16b19cde01dccf823b299086d4b24d0d2d5de29c4552b6365e8e97`.
 
 ## Scope and limitations
 
