@@ -126,3 +126,14 @@ Implementation now also includes:
 - SetLocationActivity and GlobalEnvironmentActivity still need a separate, reviewed caller-adoption step so they stop reporting success after failed persistence.
 - CI for Stage 7.9.2 is pending; do not infer a test pass until the current workflow run completes.
 - Room remains inactive; no data migration, cutover, session/account data operation or startup behavior change is introduced.
+
+
+### Stage 7.9.3 — First UI caller adoption: per-clone location settings
+
+- SetLocationActivity now requires an explicit valid clone identity and refuses to present a missing/corrupt clone as a global GPS target.
+- Save and disable operations use AsyncCloneRepository.upsertClone; the UI disables the action while the write is pending and only requests package/user-scoped hook synchronization after confirmed persistence success.
+- A failed write remains on-screen, re-enables the action, and displays the repository failure instead of showing success or closing the screen.
+- Hook synchronization remains a separate engine side effect and is not represented as proof that a physical device or third-party app accepted the simulated location.
+- The application-scoped repository singleton is recreated if a caller previously closed it. Unsupported profile-field clear requests are classified as invalid input before storage operations.
+- Added source-contract coverage for location UI persistence ordering and fail-closed behavior.
+- GlobalEnvironmentActivity, other clone mutation screens, startup hooks, Engine lifecycle, and Room runtime wiring remain unchanged in this substage.
