@@ -269,46 +269,94 @@ public class CloneStore {
         return map;
     }
 
-    public static boolean isSpaceCollapsed(Context c, int spaceNum) {
-        return prefs(c).getStringSet(KEY_COLLAPSED, new HashSet<String>()).contains(String.valueOf(spaceNum));
+    static Set<Integer> readCollapsedSpaceNumbersStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_COLLAPSED)) return new HashSet<Integer>();
+        Object raw = values.get(KEY_COLLAPSED);
+        if (!(raw instanceof Set)) throw new IllegalStateException("Collapsed Spaces value is not a String set");
+        Set<Integer> result = new HashSet<Integer>();
+        for (Object item : (Set<?>) raw) {
+            if (!(item instanceof String)) throw new IllegalStateException("Collapsed Space key is not a String");
+            int number;
+            try { number = Integer.parseInt((String) item); }
+            catch (NumberFormatException invalid) { throw new IllegalStateException("Collapsed Space key is invalid"); }
+            if (number < 1 || !result.add(number)) throw new IllegalStateException("Collapsed Space key is out of range or duplicated");
+        }
+        return result;
     }
 
-    public static void setSpaceCollapsed(Context c, int spaceNum, boolean collapsed) {
-        Set<String> set = new HashSet<String>(prefs(c).getStringSet(KEY_COLLAPSED, new HashSet<String>()));
-        if (collapsed) set.add(String.valueOf(spaceNum));
-        else set.remove(String.valueOf(spaceNum));
-        prefs(c).edit().putStringSet(KEY_COLLAPSED, set).apply();
+    public static boolean isSpaceCollapsed(Context c, int spaceNum) {
+        if (spaceNum < 1) return false;
+        try { return readCollapsedSpaceNumbersStrict(c).contains(spaceNum); }
+        catch (Exception invalid) { return false; }
+    }
+
+    public static boolean setSpaceCollapsed(Context c, int spaceNum, boolean collapsed) {
+        if (c == null || spaceNum < 1) return false;
+        try {
+            Set<String> values = new HashSet<String>();
+            for (Integer number : readCollapsedSpaceNumbersStrict(c)) values.add(String.valueOf(number));
+            if (collapsed) values.add(String.valueOf(spaceNum));
+            else values.remove(String.valueOf(spaceNum));
+            return prefs(c).edit().putStringSet(KEY_COLLAPSED, values).commit();
+        } catch (Exception invalid) { return false; }
+    }
+
+    static boolean readMasterMockGpsEnabledStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_MASTER_GPS)) return true;
+        Object raw = values.get(KEY_MASTER_GPS);
+        if (!(raw instanceof Boolean)) throw new IllegalStateException("Master GPS value is not Boolean");
+        return (Boolean) raw;
     }
 
     public static boolean isMasterMockGpsEnabled(Context c) {
-        return prefs(c).getBoolean(KEY_MASTER_GPS, true);
+        try { return readMasterMockGpsEnabledStrict(c); }
+        catch (Exception invalid) { return true; }
     }
 
-    public static void setMasterMockGpsEnabled(Context c, boolean enabled) {
-        prefs(c).edit().putBoolean(KEY_MASTER_GPS, enabled).commit();
-    }
-
-    public static GlobalEnvConfig getGlobalEnv(Context c) {
-        GlobalEnvConfig cfg = new GlobalEnvConfig();
+    public static boolean setMasterMockGpsEnabled(Context c, boolean enabled) {
+        if (c == null) return false;
         try {
-            String raw = prefs(c).getString(KEY_GLOBAL_DEV, "");
-            if (!raw.isEmpty()) {
-                JSONObject o = new JSONObject(raw);
-                cfg.enabled = o.optBoolean("enabled", true);
-                cfg.brand = o.optString("brand", "samsung");
-                cfg.manufacturer = o.optString("manufacturer", "samsung");
-                cfg.model = o.optString("model", "SM-S928B");
-                cfg.device = o.optString("device", "e3q");
-                cfg.countryIso = o.optString("countryIso", "us");
-                cfg.simOperator = o.optString("simOperator", "310260");
-                cfg.simOperatorName = o.optString("simOperatorName", "T-Mobile");
-            }
-        } catch (Exception ignored) {}
+            readMasterMockGpsEnabledStrict(c);
+            return prefs(c).edit().putBoolean(KEY_MASTER_GPS, enabled).commit();
+        } catch (Exception invalid) { return false; }
+    }
+
+    static GlobalEnvConfig readGlobalEnvStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        GlobalEnvConfig cfg = new GlobalEnvConfig();
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_GLOBAL_DEV)) return cfg;
+        Object raw = values.get(KEY_GLOBAL_DEV);
+        if (!(raw instanceof String)) throw new IllegalStateException("Global device profile is not a String");
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return cfg;
+        JSONObject o = new JSONObject(json);
+        cfg.enabled = readOptionalBoolean(o, "enabled", cfg.enabled);
+        cfg.brand = readOptionalString(o, "brand", cfg.brand);
+        cfg.manufacturer = readOptionalString(o, "manufacturer", cfg.manufacturer);
+        cfg.model = readOptionalString(o, "model", cfg.model);
+        cfg.device = readOptionalString(o, "device", cfg.device);
+        cfg.countryIso = readOptionalString(o, "countryIso", cfg.countryIso);
+        cfg.simOperator = readOptionalString(o, "simOperator", cfg.simOperator);
+        cfg.simOperatorName = readOptionalString(o, "simOperatorName", cfg.simOperatorName);
         return cfg;
     }
 
-    public static void saveGlobalEnv(Context c, GlobalEnvConfig cfg) {
+    public static GlobalEnvConfig getGlobalEnv(Context c) {
+        try { return readGlobalEnvStrict(c); }
+        catch (Exception ignored) { return new GlobalEnvConfig(); }
+    }
+
+    public static boolean saveGlobalEnv(Context c, GlobalEnvConfig cfg) {
+        if (c == null || cfg == null || cfg.brand == null || cfg.manufacturer == null
+                || cfg.model == null || cfg.device == null || cfg.countryIso == null
+                || cfg.simOperator == null || cfg.simOperatorName == null) return false;
         try {
+            readGlobalEnvStrict(c);
             JSONObject o = new JSONObject();
             o.put("enabled", cfg.enabled);
             o.put("brand", cfg.brand);
@@ -318,28 +366,52 @@ public class CloneStore {
             o.put("countryIso", cfg.countryIso);
             o.put("simOperator", cfg.simOperator);
             o.put("simOperatorName", cfg.simOperatorName);
-            prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();
-        } catch (Exception ignored) {}
+            return prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();
+        } catch (Exception ignored) { return false; }
     }
 
-    public static void recordActiveLaunch(Context c, CloneEntry entry) {
+    static CloneEntry readLastActiveLaunchStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_ACTIVE_LAUNCH)) return null;
+        Object raw = values.get(KEY_ACTIVE_LAUNCH);
+        if (!(raw instanceof String)) throw new IllegalStateException("Active launch marker is not a String");
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return null;
+        JSONObject marker = new JSONObject(json);
+        Object pkg = marker.opt("pkg");
+        Object uid = marker.opt("uid");
+        if (!(pkg instanceof String) || ((String) pkg).trim().isEmpty()
+                || !(uid instanceof Number) || ((Number) uid).intValue() < 0
+                || ((Number) uid).doubleValue() != ((Number) uid).intValue())
+            throw new IllegalStateException("Active launch marker identity is invalid");
+        for (CloneEntry entry : readAllStrict(c)) {
+            if (entry.packageName.equals(pkg) && entry.userId == ((Number) uid).intValue()) return entry;
+        }
+        return null;
+    }
+
+    public static boolean recordActiveLaunch(Context c, CloneEntry entry) {
+        if (c == null || entry == null || entry.packageName == null
+                || entry.packageName.trim().isEmpty() || entry.userId < 0) return false;
         try {
+            boolean exists = false;
+            for (CloneEntry current : readAllStrict(c)) {
+                if (current.packageName.equals(entry.packageName) && current.userId == entry.userId) {
+                    exists = true; break;
+                }
+            }
+            if (!exists) return false;
             JSONObject o = new JSONObject();
             o.put("pkg", entry.packageName);
             o.put("uid", entry.userId);
-            prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();
-        } catch (Exception ignored) {}
+            return prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();
+        } catch (Exception ignored) { return false; }
     }
 
     public static CloneEntry getLastActiveLaunch(Context c) {
-        try {
-            String raw = prefs(c).getString(KEY_ACTIVE_LAUNCH, "");
-            if (!raw.isEmpty()) {
-                JSONObject o = new JSONObject(raw);
-                return getClone(c, o.optString("pkg"), o.optInt("uid", 0));
-            }
-        } catch (Exception ignored) {}
-        return null;
+        try { return readLastActiveLaunchStrict(c); }
+        catch (Exception ignored) { return null; }
     }
 
     public static void syncAllHooks(Context c) {
