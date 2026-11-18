@@ -21,6 +21,7 @@ public class SettingsHubActivity extends BaseActivity {
         addRow(root,fa?"امنیت و قفل برنامه":"Security & App Lock",fa?"مدیریت قفل و گزینه‌های امنیتی":"Manage app lock and security options",SecuritySettingsActivity.class);
         addRow(root,fa?"مجوزها و شفافیت":"Permissions & Transparency",fa?"مشاهده وضعیت مجوزهای برنامه":"Review app permission status",PermissionsActivity.class);
         addRow(root,fa?"درباره برنامه و گزارش سازگاری":"About & Compatibility",fa?"اطلاعات نسخه و عیب‌یابی خواندنی":"Version information and read-only diagnostics",AboutActivity.class);
+        addRow(root,fa?"بررسی رزروهای معلق":"Pending Clone ID reservations",fa?"بررسی وضعیت موتور و آزادسازی دستی شناسه‌های امن":"Inspect Engine state and manually release only confirmed-absent reservations",PendingReservationsActivity.class);
         LinearLayout language=new LinearLayout(this); language.setOrientation(LinearLayout.VERTICAL); language.setPadding(28,24,28,24); language.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT); lp.topMargin=20;
         TextView label=new TextView(this); label.setText(fa?"زبان برنامه":"App Language"); label.setTextSize(16); label.setTypeface(Typeface.DEFAULT_BOLD); label.setTextColor(Color.rgb(31,41,55)); language.addView(label);
