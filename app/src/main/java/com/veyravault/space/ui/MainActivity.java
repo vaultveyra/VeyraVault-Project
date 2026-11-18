@@ -643,19 +643,22 @@ public class MainActivity extends BaseActivity {
                         return;
                     }
                     repository.upsertClone(copy, save -> {
-                        if (isFinishing() || isDestroyed()) return;
                         if (!save.isSuccess()) {
+                            // Cleanup is required even if the Activity was closed while the async commit was pending.
                             boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
-                            Toast.makeText(MainActivity.this,
-                                    fa ? (cleanupConfirmed
-                                            ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
-                                            : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
-                                       : (cleanupConfirmed
-                                            ? "Clone registry save failed; the new installation was removed."
-                                            : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
-                                    Toast.LENGTH_LONG).show();
+                            if (!isFinishing() && !isDestroyed()) {
+                                Toast.makeText(MainActivity.this,
+                                        fa ? (cleanupConfirmed
+                                                ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
+                                                : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
+                                           : (cleanupConfirmed
+                                                ? "Clone registry save failed; the new installation was removed."
+                                                : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
+                                        Toast.LENGTH_LONG).show();
+                            }
                             return;
                         }
+                        if (isFinishing() || isDestroyed()) return;
                         refreshSpaces();
                     });
                 });
