@@ -424,6 +424,12 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
 
+    @Test public void reservationJournalCommitFailureIsClassifiedAsPersistenceFailure() {
+        assertEquals(AsyncCloneRepository.Failure.PERSISTENCE_FAILURE,
+                AsyncCloneRepository.classify(
+                        new CloneStore.PersistenceException("Reservation journal commit failed")));
+    }
+
     @Test public void malformedReservationJournalBlocksAllocationWithoutOverwritingIt() throws Exception {
         String malformed = "{\"schemaVersion\":999,\"reservations\":[]}";
         assertTrue(preferences.edit().putString("pending_clone_reservations_json", malformed).commit());
