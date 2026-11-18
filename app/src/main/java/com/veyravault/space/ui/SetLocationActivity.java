@@ -45,9 +45,21 @@ public class SetLocationActivity extends BaseActivity {
         Configuration.getInstance().setUserAgentValue(getPackageName());
 
         String pkg = getIntent().getStringExtra("pkg");
-        int uid = getIntent().getIntExtra("uid", 0);
+        int uid = getIntent().getIntExtra("uid", -1);
+        if (pkg == null || pkg.trim().isEmpty() || uid < 0) {
+            Toast.makeText(this, fa ? "کلون مقصد معتبر نیست." : "A valid target clone is required.",
+                    Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         cloneEntry = CloneStore.getClone(this, pkg, uid);
-        if (cloneEntry != null && (cloneEntry.latitude != 0 || cloneEntry.longitude != 0)) {
+        if (cloneEntry == null) {
+            Toast.makeText(this, fa ? "کلون پیدا نشد یا اطلاعات ذخیره‌شده قابل خواندن نیست." :
+                    "Clone not found or stored data is unreadable.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        if (cloneEntry.latitude != 0 || cloneEntry.longitude != 0) {
             selectedLat = cloneEntry.latitude;
             selectedLng = cloneEntry.longitude;
         }
@@ -147,9 +159,7 @@ public class SetLocationActivity extends BaseActivity {
         TextView targetTv = new TextView(this);
         targetTv.setTextSize(13f);
         targetTv.setTextColor(Color.parseColor("#6B7280"));
-        targetTv.setText(cloneEntry != null
-                ? (cloneEntry.displayName + " (Space " + cloneEntry.getSpaceNumber() + ")")
-                : "Global Mock GPS");
+        targetTv.setText(cloneEntry.displayName + " (Space " + cloneEntry.getSpaceNumber() + ")");
         coordBox.addView(targetTv);
         bottomCard.addView(coordBox, cblp);
 
@@ -162,17 +172,28 @@ public class SetLocationActivity extends BaseActivity {
         btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (cloneEntry != null) {
-                    cloneEntry.mockGpsEnabled = true;
-                    cloneEntry.latitude = selectedLat;
-                    cloneEntry.longitude = selectedLng;
-                    CloneStore.upsertClone(SetLocationActivity.this, cloneEntry);
-                    VirtualHookManager.syncCloneHooks(SetLocationActivity.this, cloneEntry);
-                }
-                Toast.makeText(SetLocationActivity.this,
-                        fa ? "موقعیت مکانی مجازی ثبت و فعال شد!" : "Mock location set and activated!",
-                        Toast.LENGTH_SHORT).show();
-                finish();
+                btnSave.setEnabled(false);
+                cloneEntry.mockGpsEnabled = true;
+                cloneEntry.latitude = selectedLat;
+                cloneEntry.longitude = selectedLng;
+                com.veyravault.space.core.AsyncCloneRepository.getInstance(getApplicationContext())
+                        .upsertClone(cloneEntry, result -> {
+                            if (result.isSuccess()) {
+                                VirtualHookManager.syncCloneHooks(getApplicationContext(), cloneEntry);
+                                if (isFinishing() || isDestroyed()) return;
+                                Toast.makeText(SetLocationActivity.this,
+                                        fa ? "تنظیمات ذخیره شد؛ همگام‌سازی موقعیت کلون درخواست شد." :
+                                                "Settings saved; clone location hook sync was requested.",
+                                        Toast.LENGTH_SHORT).show();
+                                finish();
+                            } else if (!isFinishing() && !isDestroyed()) {
+                                btnSave.setEnabled(true);
+                                Toast.makeText(SetLocationActivity.this,
+                                        (fa ? "ذخیره موقعیت ناموفق بود: " : "Location was not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
             }
         });
         bottomCard.addView(btnSave);
@@ -185,12 +206,26 @@ public class SetLocationActivity extends BaseActivity {
         btnReset.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (cloneEntry != null) {
-                    cloneEntry.mockGpsEnabled = false;
-                    CloneStore.upsertClone(SetLocationActivity.this, cloneEntry);
-                    VirtualHookManager.syncCloneHooks(SetLocationActivity.this, cloneEntry);
-                }
-                finish();
+                btnReset.setEnabled(false);
+                cloneEntry.mockGpsEnabled = false;
+                com.veyravault.space.core.AsyncCloneRepository.getInstance(getApplicationContext())
+                        .upsertClone(cloneEntry, result -> {
+                            if (result.isSuccess()) {
+                                VirtualHookManager.syncCloneHooks(getApplicationContext(), cloneEntry);
+                                if (isFinishing() || isDestroyed()) return;
+                                Toast.makeText(SetLocationActivity.this,
+                                        fa ? "غیرفعال‌سازی ذخیره شد؛ همگام‌سازی کلون درخواست شد." :
+                                                "Disable setting saved; clone hook sync was requested.",
+                                        Toast.LENGTH_SHORT).show();
+                                finish();
+                            } else if (!isFinishing() && !isDestroyed()) {
+                                btnReset.setEnabled(true);
+                                Toast.makeText(SetLocationActivity.this,
+                                        (fa ? "ذخیره تغییر ناموفق بود: " : "Change was not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
             }
         });
         bottomCard.addView(btnReset);
