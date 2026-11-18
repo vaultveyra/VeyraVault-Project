@@ -32,8 +32,8 @@ save = body(store, "public static synchronized boolean saveAll(")
 assert "serializeEntries(list)" in save
 assert "reserved.contains(identityKey(entry.packageName, entry.userId))" in save
 assert "return false;" in save
-assert "identities.add(" in save
 serializer = body(store, "private static String serializeEntries(")
+assert "identities.add(" in serializer
 assert "e.mockGpsEnabled" in serializer and "e.latitude < -90.0d" in serializer
 
 upsert = body(store, "public static synchronized boolean upsertClone(")
