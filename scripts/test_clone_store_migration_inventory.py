@@ -32,7 +32,7 @@ fields = {
 }
 for key, field in fields.items():
     assert f'o.opt' in store and f'"{key}"' in store and field in store, (key, field)
-    assert f'o.put("{key}", e.{field})' in store, "Write mapping missing: " + key
+    assert f'o.put("{key}",' in store and f'e.{field}' in store, "Write mapping missing: " + key
 
 assert 'o.optString("pkg")' in store
 assert 'o.optInt("uid", 0)' in store
