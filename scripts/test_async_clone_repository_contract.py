@@ -18,6 +18,19 @@ assert "CloneStore.readAllStrict(appContext)" in repo
 assert "Failure.CORRUPT_DATA" in repo
 assert "Failure.PERSISTENCE_FAILURE" in repo
 assert "copyEntries" in repo and "copyEntry" in repo
+for api in (
+    "loadCollapsedSpaces", "setSpaceCollapsed", "loadMasterMockGpsEnabled",
+    "setMasterMockGpsEnabled", "loadGlobalEnvironment", "saveGlobalEnvironment",
+    "loadLastActiveLaunch", "recordActiveLaunch", "loadGlobalProfile",
+    "saveGlobalProfile", "loadCloneProfile", "saveCloneProfile",
+    "clearCloneProfileField", "clearGlobalProfileField", "migrateLegacyLocationProfiles",
+):
+    assert api in repo, api
+assert "readCollapsedSpaceNumbersStrict" in store
+assert "readMasterMockGpsEnabledStrict" in store
+assert "readGlobalEnvStrict" in store
+assert "readLastActiveLaunchStrict" in store
+assert "readGlobalStrict" in profile and "readCloneOverrideStrict" in profile
 assert "ClonePersistenceDatabase" not in repo and "androidx.room" not in repo
 assert "Engine." not in repo and "VirtualHookManager" not in repo
 assert "static List<CloneEntry> readAllStrict" in store
@@ -30,6 +43,11 @@ for case in (
     "corruptRegistryIsReturnedAsTypedFailure",
     "closedRepositoryRejectsNewWorkExplicitly",
     "profileMigrationDoesNotMarkCorruptRegistryAsImported",
+    "collapsedSpacesAndMasterGpsRoundTripThroughRepository",
+    "globalEnvironmentAndProfilesRoundTrip",
+    "activeLaunchMarkerRequiresAndReturnsExistingClone",
+    "malformedSettingsAreReportedAsCorruptData",
+    "unsupportedProfileSchemaIsNotReportedAsEmptySuccess",
 ):
     assert case in test, case
 
