@@ -63,6 +63,11 @@ public class MainActivity extends BaseActivity {
         if (intent != null && intent.hasExtra("shortcut_pkg")) {
             String pkg = intent.getStringExtra("shortcut_pkg");
             int uid = intent.getIntExtra("shortcut_uid", 0);
+            if (pkg == null || pkg.trim().isEmpty() || uid < 0) {
+                Toast.makeText(this, fa ? "اطلاعات میانبر معتبر نیست." : "Shortcut identity is invalid.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
             repository.loadClones(result -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (!result.isSuccess() || result.getValue() == null) {
@@ -916,30 +921,34 @@ public class MainActivity extends BaseActivity {
                                    int index, int[] counts) {
         if (isFinishing() || isDestroyed()) return;
         int next = index;
-        while (next < all.size() && !checked[next]) next++;
-        if (next >= all.size()) {
-            String summary = fa
-                    ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
-                            + "، خطای ثبت فهرست: " + counts[2])
-                    : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
-                            + ", registry failures: " + counts[2]);
-            Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
-            refreshSpaces();
-            return;
+        while (next < all.size()) {
+            if (!checked[next]) {
+                next++;
+                continue;
+            }
+            CloneStore.CloneEntry entry = all.get(next);
+            final int nextIndex = next + 1;
+            if (!Engine.uninstallClone(entry.packageName, entry.userId)) {
+                counts[1]++;
+                next++;
+                continue;
+            }
+            repository.removeClone(entry.packageName, entry.userId, result -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result.isSuccess()) counts[0]++;
+                else counts[2]++;
+                runBatchUninstall(all, checked, nextIndex, counts);
+            });
+            return; // Wait for the registry commit before uninstalling the next selected clone.
         }
-        CloneStore.CloneEntry entry = all.get(next);
-        final int nextIndex = next + 1;
-        if (!Engine.uninstallClone(entry.packageName, entry.userId)) {
-            counts[1]++;
-            runBatchUninstall(all, checked, nextIndex, counts);
-            return;
-        }
-        repository.removeClone(entry.packageName, entry.userId, result -> {
-            if (isFinishing() || isDestroyed()) return;
-            if (result.isSuccess()) counts[0]++;
-            else counts[2]++;
-            runBatchUninstall(all, checked, nextIndex, counts);
-        });
+
+        String summary = fa
+                ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
+                        + "، خطای ثبت فهرست: " + counts[2])
+                : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
+                        + ", registry failures: " + counts[2]);
+        Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+        refreshSpaces();
     }
 
     private Drawable loadAppIcon(String pkg) {
