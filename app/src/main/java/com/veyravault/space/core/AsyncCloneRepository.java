@@ -175,16 +175,9 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
-            Set<Integer> used = new HashSet<Integer>();
-            for (CloneStore.CloneEntry entry : CloneStore.readAllStrict(appContext)) {
-                if (packageName.equals(entry.packageName)) used.add(entry.userId);
-            }
-            int candidate = 0;
-            while (used.contains(candidate)) {
-                if (candidate == Integer.MAX_VALUE)
-                    throw new IllegalStateException("No virtual user ID is available");
-                candidate++;
-            }
+            int candidate = CloneStore.nextFreeUserIdForPackage(appContext, packageName);
+            if (candidate < 0) throw new IllegalStateException(
+                    "Clone registry or reservation journal could not be validated");
             return candidate;
         }, callback);
     }

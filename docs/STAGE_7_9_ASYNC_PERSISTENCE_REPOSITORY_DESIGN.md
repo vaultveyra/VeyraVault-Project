@@ -190,3 +190,40 @@ Implementation now also includes:
 - Unsigned build/audit artifact: [VeyraVault-unsigned-build](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44357241095/artifacts/14453109885) (artifact ZIP SHA-256: `aeb07594efc675039b5c4efcd39d0c7f8bce44c5a8840df92457805945ae6bd2`).
 - Allocation remains a lookup rather than a durable reservation; simultaneous allocator calls may still race between ID allocation and final upsert. No atomic reservation guarantee is claimed.
 - No Room runtime wiring, migration/cutover, startup behavior, Engine internals, clone app-private data, sessions/accounts or main branch changes.
+
+
+## Stage 7.9.8 — Durable atomic clone ID reservations
+
+### Implementation
+
+- Added a versioned pending-reservation journal under the existing `veyravault_clones_v2` SharedPreferences file. Existing preference keys and clone record JSON schema are retained.
+- Reservation entries contain an opaque UUID token plus package name and virtual user ID. The journal parser validates its schema version, field types, token uniqueness and composite-identity uniqueness. Unsupported or malformed journals fail closed.
+- Added a process-wide synchronized reservation allocator. Independent `AsyncCloneRepository` instances in the same host app process cannot reserve the same package/user identity concurrently.
+- Reservation acquisition is persisted with `commit()` before Engine installation begins. Allocation now considers both committed clone records and outstanding reservations.
+- Added token-bound `commitReservedClone`: the new clone JSON and removal of exactly the matching reservation are written using one SharedPreferences Editor and one `commit()`. A clone record cannot consume a different operation's token or mismatch package/user identity.
+- Ordinary `upsertClone` and `saveAll` cannot take an identity currently held by a pending reservation. This prevents a competing registry write from stealing an ID during the install gap.
+- Added fail-closed release API. A reservation is released only when the caller passes a positive Engine-absence confirmation. Engine unknown/error is treated as not confirmed and leaves the durable reservation intact.
+- Added `Engine.isCloneConfirmedAbsent`, which returns true only when the pinned Engine's installed-state query explicitly returns Boolean false. Reflection failure, missing core or unexpected result is not treated as absence.
+- Updated AddAppActivity and MainActivity duplicate flow to reserve before install, commit through the reservation token, and release only after confirmed Engine absence. Install-before-registry-write order is preserved.
+- Updated the deprecated lookup-only allocator to take outstanding reservations into account; it is not used by Engine-backed creation paths.
+- Added async APIs for reservation, token-bound commit, safe release and pending-reservation diagnostics.
+
+### Validation coverage added
+
+- Two separate repository instances concurrently reserve different user IDs for the same package.
+- A pending reservation remains present when a repository instance is closed and recreated; the next allocation skips its ID.
+- A mismatched package/user cannot commit another reservation's token.
+- Committing a matching reservation inserts the clone and consumes only its own token, leaving other reservations intact.
+- A release request without confirmed Engine absence returns `ENGINE_STATE_UNCONFIRMED` and preserves the journal.
+- A positively confirmed absence releases the token and permits safe reuse.
+- Ordinary upsert cannot steal a pending identity.
+
+### Scope and limitations
+
+- The coordination lock is process-wide within the VeyraVault host application process. Android SharedPreferences is not a cross-process coordination primitive; this stage does not claim safe multi-process writers. All production clone-provisioning Activities run in the host app process. The debug-only Room crash-test service does not participate in clone provisioning.
+- The reservation journal survives host-process restarts because it is committed to the existing private preferences file. The current tests recreate Repository instances and validate persisted journal behavior; they do not yet perform a dedicated OS-kill test for clone provisioning.
+- If the process dies after Engine installation but before registry commit, the reservation remains and blocks reuse. This is intentionally conservative. There is no automatic startup reconciler or user-facing orphan-reservation repair UI in this stage; pending entries are available through the diagnostics API. Engine-installed orphan recovery is a separate reviewed task.
+- A true Engine absence result is required before release. Unknown Engine state leaves the ID blocked, which can consume an ID until an explicit recovery procedure resolves it.
+- No Room runtime activation, migration/cutover, startup behavior change, clone data clearing, app-private package data modification, account/session export or restore, or main-branch modification was performed.
+- Android Emulator validation, Source Audit, release APK build and APK Audit must pass on the final reservation implementation commit. Physical-device concurrency and interrupted-install regression tests remain required before any production cutover.
+
