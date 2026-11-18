@@ -50,7 +50,6 @@ public class MainActivity extends BaseActivity {
         fa = LocaleHelper.isPersian(this);
         repository = AsyncCloneRepository.getInstance(getApplicationContext());
         buildDashboardUi();
-        loadGlobalProfileSummary();
         handleShortcutLaunch(getIntent());
     }
 
@@ -72,6 +71,7 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        loadGlobalProfileSummary();
         refreshSpaces();
     }
 
