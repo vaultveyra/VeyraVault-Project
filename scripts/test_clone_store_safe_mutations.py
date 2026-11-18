@@ -44,14 +44,17 @@ assert "public static List<CloneEntry> getAll(Context c)" in store
 
 assert "if (nextUid < 0)" in add_ui
 assert "if (!CloneStore.upsertClone(this, e))" in add_ui
-assert "if (nextUid < 0)" in main_ui
-assert "if (!CloneStore.upsertClone(MainActivity.this, copy))" in main_ui
+assert "repository.allocateNextUserId(item.packageName" in main_ui
+assert "allocation.getValue() < 0" in main_ui
+assert "repository.upsertClone(copy" in main_ui
+assert main_ui.index("Engine.installPackageAsUser(copy.packageName, copy.userId)") < main_ui.index("repository.upsertClone(copy")
 
 uninstall = body(engine, "public static boolean uninstallClone(")
 assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
 assert "return false;" in uninstall
 assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in main_ui
-assert "if (!CloneStore.removeClone(MainActivity.this, item.packageName, item.userId))" in main_ui
+assert "repository.removeClone(item.packageName, item.userId" in main_ui
+assert main_ui.index("if (!Engine.uninstallClone(item.packageName, item.userId))") < main_ui.index("repository.removeClone(item.packageName, item.userId")
 
 for marker in (
     "malformedRegistryBlocksMutationAndUserIdAllocationWithoutChangingBytes",
