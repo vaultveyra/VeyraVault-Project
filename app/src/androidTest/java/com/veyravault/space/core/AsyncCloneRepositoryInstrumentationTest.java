@@ -434,8 +434,8 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
     @Test public void pendingReservationDiagnosticsAreStrictAndReadOnly() throws Exception {
-        String clones = "[{\\\"pkg\\\":\\\"com.example.existing\\\",\\\"uid\\\":0}]";
-        String journal = "{\\\"schemaVersion\\\":1,\\\"reservations\\\":[{\\\"token\\\":\\\"read-only-token\\\",\\\"pkg\\\":\\\"com.example.pending\\\",\\\"uid\\\":1}]}";
+        String clones = "[{\"pkg\":\"com.example.existing\",\"uid\":0}]";
+        String journal = "{\"schemaVersion\":1,\"reservations\":[{\"token\":\"read-only-token\",\"pkg\":\"com.example.pending\",\"uid\":1}]}";
         assertTrue(preferences.edit().putString("clones_json", clones)
                 .putString("pending_clone_reservations_json", journal).commit());
 
