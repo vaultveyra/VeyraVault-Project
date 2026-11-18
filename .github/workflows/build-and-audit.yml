@@ -50,6 +50,9 @@ jobs:
       - name: Test async CloneStore repository contract
         run: python3 scripts/test_async_clone_repository_contract.py
 
+      - name: Test async location persistence UI contract
+        run: python3 scripts/test_location_persistence_ui_contract.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 
