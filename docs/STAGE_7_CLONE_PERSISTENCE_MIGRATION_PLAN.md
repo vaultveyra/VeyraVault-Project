@@ -223,3 +223,19 @@ The crash service is declared only in the debug manifest. The release manifest, 
 **CI validation:** PR Run #244 (run ID 44223327104) on commit `39f53dc088a3239bc94326ded5a0ad5dfd077ba3` completed successfully. The Android emulator executed **10/10 instrumentation tests, 0 skipped, 0 failed**; the Gradle connected instrumentation task completed successfully. The same run completed all source-contract checks, source audit, unsigned release APK compilation, and compiled APK audit. The separate signing job also succeeded: `apksigner verify --verbose` reported v1, v2, and v3 signature verification as true, with one signer. Run: https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44223327104
 
 **Remaining boundary:** this is automated emulator evidence, not a physical-device upgrade test or a production migration. A separately reviewed backup restore/read API and physical-device upgrade/backup-restore drills remain mandatory before any production migration or cutover. SharedPreferences remains the sole runtime source of truth.
+
+
+## Stage 7.7 — Verified read/restore API for the migration snapshot
+
+`LegacyCloneSnapshot.fromCanonicalPayload(...)` reconstructs a strict snapshot from the backup's canonical payload without consulting or mutating the device's current SharedPreferences. It repeats validation of clone JSON types, composite identities, GPS coordinate ranges, denied-permission values, collapsed-space values, global profile metadata, and the optional/stale active-launch marker; the reconstructed canonical payload must exactly equal the supplied payload.
+
+`LegacyCloneSnapshotBackup.readAndVerify(...)` is an explicit read-only restore API for the existing app-private migration backup. It uses AtomicFile recovery semantics, validates the envelope version and SHA-256, reconstructs the snapshot, and verifies both the reconstructed digest and canonical payload before returning it. Missing, malformed, unsupported-version, or checksum-mismatched backups fail closed. The method does not write SharedPreferences, open Room, invoke BlackBox, or touch virtual-app/session files.
+
+The returned validated snapshot can be passed explicitly to the existing worker-thread-only `LegacyCloneRoomImporter.importIntoEmptyDatabase(...)`. This enables a tested backup-to- Room import path without silently replacing the active legacy store.
+
+Instrumentation now covers:
+- Read a backup after current SharedPreferences have changed; recover the original snapshot while proving current preferences remain unchanged.
+- Reject an unsupported backup envelope version.
+- Import a snapshot returned by the verified backup reader into an empty Room database and compare all rows/provenance, while confirming the current legacy preferences remain untouched.
+
+**Scope boundary:** this is a restore/read API for the small internal CloneStore migration snapshot only. It is not the future user-facing Complete Backup & Restore feature and does not include virtual app package data, account/session state, media, or app-internal settings. Room remains inactive and SharedPreferences remains the sole runtime source of truth. Physical-device upgrade and backup/restore drills remain outstanding.
