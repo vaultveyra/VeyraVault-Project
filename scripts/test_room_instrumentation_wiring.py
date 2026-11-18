@@ -82,4 +82,13 @@ assert ":app:connectedDebugAndroidTest" in workflow
 assert ":app:assembleDebug :app:assembleDebugAndroidTest" in workflow
 assert "DEBUG APK NATIVE LIBRARIES" in workflow and "ANDROID TEST APK NATIVE LIBRARIES" in workflow
 assert "MERGED DEBUG NATIVE LIBRARY INPUTS" in workflow
+clone_safety_test = ROOT / "app/src/androidTest/java/com/veyravault/space/core/CloneStoreSafetyInstrumentationTest.java"
+assert clone_safety_test.is_file(), "CloneStore safety instrumentation test source is missing"
+clone_safety_source = clone_safety_test.read_text(encoding="utf-8")
+for marker in ("malformedRegistryBlocksMutationAndUserIdAllocationWithoutChangingBytes",
+               "duplicateCompositeIdentityBlocksMutationAndAllocation",
+               "invalidEnabledCoordinatesAreNotPersisted",
+               "validRegistryMutationsReturnCommitStatusAndPreserveCompositeIdentity"):
+    assert marker in clone_safety_source, f"Missing CloneStore safety instrumentation scenario: {marker}"
+
 print("PASS: Room, backup-integrity, and OS process-death instrumentation harness wiring is present.")
