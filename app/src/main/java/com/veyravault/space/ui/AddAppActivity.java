@@ -270,43 +270,58 @@ public class AddAppActivity extends BaseActivity {
     }
 
     private void cloneSingleApp(final InstalledApp app, final CloneCallback callback) {
-        repository.allocateNextUserId(app.pkg, new AsyncCloneRepository.Callback<Integer>() {
-            @Override public void onComplete(AsyncCloneRepository.Result<Integer> allocation) {
-                if (!allocation.isSuccess()) {
+        repository.reserveNextUserId(app.pkg,
+                new AsyncCloneRepository.Callback<CloneStore.CloneReservation>() {
+            @Override public void onComplete(
+                    AsyncCloneRepository.Result<CloneStore.CloneReservation> allocation) {
+                if (!allocation.isSuccess() || allocation.getValue() == null) {
                     showCloneError(fa
-                            ? "فهرست کلون‌ها قابل خواندن نیست؛ نصب برای جلوگیری از ثبت اشتباه متوقف شد."
-                            : "Clone registry could not be validated; installation was stopped.");
+                            ? "رزرو امن شناسهٔ فضا ناموفق بود؛ نصب شروع نشد."
+                            : "Could not reserve a safe Space ID; installation was not started.");
                     callback.onComplete(false);
                     return;
                 }
+                final CloneStore.CloneReservation reservation = allocation.getValue();
                 if (isFinishing() || isDestroyed()) {
+                    releaseReservationIfEngineAbsent(reservation);
                     callback.onComplete(false);
                     return;
                 }
+
                 final CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
                 entry.packageName = app.pkg;
-                entry.userId = allocation.getValue();
+                entry.userId = reservation.getUserId();
                 entry.displayName = app.label;
+
                 if (!Engine.installPackageAsUser(entry.packageName, entry.userId)) {
+                    boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
+                    if (absent) releaseReservationIfEngineAbsent(reservation);
                     showCloneError(fa
-                            ? "نصب کلون ناموفق بود؛ فضای جدید ثبت نشد."
-                            : "Clone installation failed; no Space entry was saved.");
+                            ? (absent
+                                ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
+                                : "نصب کلون ناموفق بود؛ وضعیت موتور نامشخص است و شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
+                            : (absent
+                                ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
+                                : "Clone installation failed and Engine absence is unconfirmed; the ID remains reserved to prevent collision."));
                     callback.onComplete(false);
                     return;
                 }
-                repository.upsertClone(entry, new AsyncCloneRepository.Callback<Boolean>() {
+
+                repository.commitReservedClone(entry, reservation,
+                        new AsyncCloneRepository.Callback<Boolean>() {
                     @Override public void onComplete(AsyncCloneRepository.Result<Boolean> save) {
                         if (!save.isSuccess()) {
-                            // Engine cleanup is mandatory even if the Activity has already been destroyed.
+                            // The durable reservation remains until Engine confirms cleanup.
                             boolean cleanupConfirmed = Engine.uninstallClone(entry.packageName, entry.userId);
+                            if (cleanupConfirmed) releaseReservationIfEngineAbsent(reservation);
                             if (!isFinishing() && !isDestroyed()) {
                                 showCloneError(fa
                                         ? (cleanupConfirmed
-                                            ? "ثبت فضای جدید ناموفق بود؛ نصب کلون نیز پاک شد."
-                                            : "ثبت فضا ناموفق بود و حذف کلون تأیید نشد؛ وضعیت آن را بررسی کن.")
+                                            ? "ثبت فضای جدید ناموفق بود؛ حذف نصب تأیید شد و رزرو آزاد می‌شود."
+                                            : "ثبت فضا ناموفق بود و حذف نصب تأیید نشد؛ شناسه رزرو باقی می‌ماند.")
                                         : (cleanupConfirmed
-                                            ? "Saving the new Space failed; the installed clone was removed."
-                                            : "Saving the new Space failed and clone removal was not confirmed; please inspect it."));
+                                            ? "Saving the new Space failed; uninstall was confirmed and the reservation is being released."
+                                            : "Saving the new Space failed and uninstall was not confirmed; the reservation remains blocked."));
                             }
                             callback.onComplete(false);
                             return;
@@ -322,6 +337,17 @@ public class AddAppActivity extends BaseActivity {
                 });
             }
         });
+    }
+
+    private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
+        boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
+                reservation.getPackageName(), reservation.getUserId());
+        repository.releaseReservationAfterEngineAbsence(reservation, confirmedAbsent,
+                new AsyncCloneRepository.Callback<Boolean>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
+                        // The reservation API is fail-closed; an unconfirmed Engine state leaves it blocked.
+                    }
+                });
     }
 
     private void showCloneError(String message) {
