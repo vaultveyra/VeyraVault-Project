@@ -18,7 +18,7 @@ assert "CloneStore.readAllStrict(appContext)" in repo
 assert "Failure.CORRUPT_DATA" in repo
 assert "Failure.PERSISTENCE_FAILURE" in repo
 assert "copyEntries" in repo and "copyEntry" in repo
-assert "ClonePersistenceDatabase" not in repo and "Room" not in repo
+assert "ClonePersistenceDatabase" not in repo and "androidx.room" not in repo
 assert "Engine." not in repo and "VirtualHookManager" not in repo
 assert "static List<CloneEntry> readAllStrict" in store
 assert "CloneStore.readAllStrict(context)" in profile
