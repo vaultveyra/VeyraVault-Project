@@ -99,13 +99,13 @@ Only after all gates pass should a separate reviewed stage migrate a small numbe
 
 Implementation added on the feature branch after the design-only audit:
 
-- Add `AsyncCloneRepository`, an application-context-backed facade with one dedicated single-thread executor and main-looper callback dispatch.
+- Add `AsyncCloneRepository`, an application-scoped accessor over an application-context-backed facade with one dedicated single-thread executor and main-looper callback dispatch.
 - Add typed results and failure categories: invalid input, corrupt/unsupported stored data, persistence commit failure, closed/rejected executor, and unexpected internal failure.
 - Add asynchronous strict clone-list read, next-user-ID lookup, save-all, upsert and remove operations. The allocator reports an available ID but does not reserve it.
 - Copy clone records and permission sets on submission and before returning loaded lists. Validate clone identities, denied permissions and enabled GPS coordinates before queuing writes.
 - Expose the package-private strict CloneStore reader to other classes in the same persistence package. Existing public UI fallback behavior remains unchanged.
 - Correct the legacy ProfileStore location import to consume the strict CloneStore reader directly. Any malformed or semantically invalid registry now aborts the import before profile writes or the migration marker; the legacy CloneStore preferences remain untouched.
-- Add Android instrumentation coverage for queue ordering, main-thread callbacks, returned-record isolation, corrupt-registry failure propagation and closed-repository rejection.
+- Add Android instrumentation coverage for queue ordering, main-thread callbacks, returned-record isolation, corrupt-registry failure propagation, closed-repository rejection and strict ProfileStore migration-marker protection.
 - Add a CI source-contract check for the repository's executor, callback, strict-read, defensive-copy and no-Room/no-Engine boundaries.
 
 ### Stage 7.9.1 scope and validation status
