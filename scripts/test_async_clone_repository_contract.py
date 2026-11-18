@@ -29,6 +29,7 @@ for case in (
     "returnedMutableRecordsDoNotMutatePersistedState",
     "corruptRegistryIsReturnedAsTypedFailure",
     "closedRepositoryRejectsNewWorkExplicitly",
+    "profileMigrationDoesNotMarkCorruptRegistryAsImported",
 ):
     assert case in test, case
 
