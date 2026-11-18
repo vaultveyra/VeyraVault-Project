@@ -19,6 +19,8 @@ for marker in ("importsAndVerifiesAllModeledRowsAndProvenance",
                "transactionRollsBackEveryTableWhenPermissionInsertFails",
                "importedRowsSurviveDatabaseCloseAndReopen",
                "emptySnapshotWithoutActiveMarkerImportsAndVerifies",
+               "verifiedBackupSnapshotCanBeImportedWithoutOverwritingCurrentPreferences",
+               "LegacyCloneSnapshotBackup.readAndVerify",
                "CREATE TRIGGER fail_permission_insert",
                "LegacyCloneRoomVerifier.matches"):
     assert marker in source, f"Missing instrumentation scenario: {marker}"
@@ -29,6 +31,9 @@ for marker in ("backupIsWrittenReadBackAndReusedForExactSnapshot",
                "interruptedAtomicFileSidecarIsRecoveredAndVerified",
                "immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal",
                "corruptExistingBackupIsRejectedAndNeverOverwritten",
+               "readAndVerifyReconstructsBackupWithoutReadingOrMutatingCurrentPreferences",
+               "readAndVerifyRejectsUnsupportedEnvelopeVersion",
+               "LegacyCloneSnapshotBackup.readAndVerify",
                "LegacyCloneSnapshotBackup.writeAndVerify",
                "assertArrayEquals(original, readFile(backupFile))"):
     assert marker in backup_source, f"Missing backup instrumentation scenario: {marker}"
