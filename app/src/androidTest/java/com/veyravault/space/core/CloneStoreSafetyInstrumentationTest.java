@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,6 +23,10 @@ public class CloneStoreSafetyInstrumentationTest {
     @Before public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        assertTrue(prefs.edit().clear().commit());
+    }
+
+    @After public void tearDown() {
         assertTrue(prefs.edit().clear().commit());
     }
 
