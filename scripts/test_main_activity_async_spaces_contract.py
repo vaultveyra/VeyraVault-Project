@@ -42,7 +42,7 @@ assert "some earlier changes may already be saved" in source
 # This adoption changes only dashboard persistence reads/collapse writes; Engine install/uninstall flows remain.
 assert "Engine.installPackageAsUser(copy.packageName, copy.userId)" in source
 assert "Engine.uninstallClone(item.packageName, item.userId)" in source
-assert "Engine.uninstallClone(e.packageName, e.userId)" in source
+assert "Engine.uninstallClone(entry.packageName, entry.userId)" in source
 
 print("PASS: MainActivity uses strict asynchronous repository reads for Spaces and global profile summary.")
 print("PASS: Collapse/expand actions are commit-aware and preserve the last rendered UI on read failure.")
