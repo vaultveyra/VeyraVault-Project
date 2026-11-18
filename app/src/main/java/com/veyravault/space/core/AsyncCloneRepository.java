@@ -25,7 +25,8 @@ public final class AsyncCloneRepository implements AutoCloseable {
         CORRUPT_DATA,
         PERSISTENCE_FAILURE,
         EXECUTOR_CLOSED,
-        INTERNAL_ERROR
+        INTERNAL_ERROR,
+        ENGINE_STATE_UNCONFIRMED
     }
 
     public static final class Result<T> {
@@ -105,6 +106,69 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> copyEntries(CloneStore.readAllStrict(appContext)), callback);
     }
 
+
+    /** Durably reserves the next package-scoped virtual user ID before Engine installation. */
+    public void reserveNextUserId(String packageName, Callback<CloneStore.CloneReservation> callback) {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            deliver(callback, Result.<CloneStore.CloneReservation>failure(
+                    Failure.INVALID_INPUT, "Package name is required"));
+            return;
+        }
+        enqueue(() -> CloneStore.reserveNextUserId(appContext, packageName), callback);
+    }
+
+    /** Commits the clone record and consumes its exact reservation in one SharedPreferences commit. */
+    public void commitReservedClone(CloneStore.CloneEntry entry, CloneStore.CloneReservation reservation,
+                                    Callback<Boolean> callback) {
+        if (entry == null || reservation == null) {
+            deliver(callback, Result.<Boolean>failure(
+                    Failure.INVALID_INPUT, "Clone entry and reservation are required"));
+            return;
+        }
+        final CloneStore.CloneEntry snapshot = copyEntry(entry);
+        try {
+            validateEntry(snapshot);
+        } catch (RuntimeException invalid) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, invalid.getMessage()));
+            return;
+        }
+        enqueue(() -> {
+            if (!CloneStore.commitReservedClone(appContext, copyEntry(snapshot), reservation))
+                throw new PersistenceFailureException("Reserved clone commit was not durable");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    /**
+     * Releases a pending reservation only after the caller has positively verified that
+     * Engine reports the corresponding virtual package absent. False/unknown never releases it.
+     */
+    public void releaseReservationAfterEngineAbsence(CloneStore.CloneReservation reservation,
+                                                       boolean engineAbsenceConfirmed,
+                                                       Callback<Boolean> callback) {
+        if (reservation == null) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Reservation is required"));
+            return;
+        }
+        if (!engineAbsenceConfirmed) {
+            deliver(callback, Result.<Boolean>failure(Failure.ENGINE_STATE_UNCONFIRMED,
+                    "Engine absence was not confirmed; reservation remains blocked"));
+            return;
+        }
+        enqueue(() -> {
+            if (!CloneStore.releaseReservationAfterEngineAbsence(appContext, reservation, true))
+                throw new PersistenceFailureException("Reservation release was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadPendingReservations(Callback<List<CloneStore.CloneReservation>> callback) {
+        enqueue(() -> new ArrayList<CloneStore.CloneReservation>(
+                CloneStore.readPendingReservationsStrict(appContext)), callback);
+    }
+
+    /** @deprecated Use reserveNextUserId for every Engine-backed clone creation flow. */
+    @Deprecated
     public void allocateNextUserId(String packageName, Callback<Integer> callback) {
         if (packageName == null || packageName.trim().isEmpty()) {
             deliver(callback, Result.<Integer>failure(Failure.INVALID_INPUT, "Package name is required"));
