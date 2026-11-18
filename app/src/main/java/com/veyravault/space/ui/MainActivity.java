@@ -63,8 +63,22 @@ public class MainActivity extends BaseActivity {
         if (intent != null && intent.hasExtra("shortcut_pkg")) {
             String pkg = intent.getStringExtra("shortcut_pkg");
             int uid = intent.getIntExtra("shortcut_uid", 0);
-            CloneStore.CloneEntry e = CloneStore.getClone(this, pkg, uid);
-            if (e != null) Engine.launchClone(this, e);
+            repository.loadClones(result -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!result.isSuccess() || result.getValue() == null) {
+                    Toast.makeText(this, fa ? "فهرست کلون‌ها قابل خواندن نیست؛ اجرای میانبر متوقف شد."
+                            : "Clone registry could not be read; shortcut launch was stopped.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                for (CloneStore.CloneEntry entry : result.getValue()) {
+                    if (pkg.equals(entry.packageName) && uid == entry.userId) {
+                        Engine.launchClone(this, entry);
+                        return;
+                    }
+                }
+                Toast.makeText(this, fa ? "کلون میانبر در فهرست پیدا نشد." : "Shortcut clone was not found in the registry.",
+                        Toast.LENGTH_LONG).show();
+            });
         }
     }
 
@@ -680,13 +694,16 @@ public class MainActivity extends BaseActivity {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                if (!CloneStore.removeClone(MainActivity.this, item.packageName, item.userId)) {
-                    Toast.makeText(MainActivity.this,
-                            fa ? "برنامه حذف شد، اما به‌روزرسانی فهرست فضاها ناموفق بود."
-                               : "The virtual app was uninstalled, but the Space registry could not be updated.",
-                            Toast.LENGTH_LONG).show();
-                }
-                refreshSpaces();
+                repository.removeClone(item.packageName, item.userId, result -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!result.isSuccess()) {
+                        Toast.makeText(MainActivity.this,
+                                fa ? "برنامه حذف شد، اما ثبت حذف در فهرست ناموفق بود."
+                                   : "The app was uninstalled, but removing its registry entry failed.",
+                                Toast.LENGTH_LONG).show();
+                    }
+                    refreshSpaces();
+                });
             }
         }));
 
@@ -738,17 +755,20 @@ public class MainActivity extends BaseActivity {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         String n = et.getText().toString().trim();
-                        if (!n.isEmpty()) {
-                            item.displayName = n;
-                            if (!CloneStore.upsertClone(MainActivity.this, item)) {
+                        if (n.isEmpty()) return;
+                        final String previousName = item.displayName;
+                        item.displayName = n;
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.displayName = previousName;
                                 Toast.makeText(MainActivity.this,
-                                        fa ? "ذخیره ناموفق بود؛ اطلاعات قبلی حفظ شد."
-                                           : "Save failed; the previous registry data was preserved.",
+                                        (fa ? "ذخیره ناموفق بود: " : "Name was not saved: ") + result.getMessage(),
                                         Toast.LENGTH_LONG).show();
                                 return;
                             }
                             refreshSpaces();
-                        }
+                        });
                     }
                 })
                 .setNegativeButton(fa ? "انصراف" : "Cancel", null)
@@ -804,32 +824,50 @@ public class MainActivity extends BaseActivity {
                 .setPositiveButton(fa ? "ذخیره اطلاعات پروفایل" : "Save Profile Metadata", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        final boolean previousEnabled = item.customDeviceEnabled;
+                        final String previousBrand = item.deviceBrand;
+                        final String previousModel = item.deviceModel;
                         item.customDeviceEnabled = true;
                         item.deviceBrand = brandEt.getText().toString().trim();
                         item.deviceModel = modelEt.getText().toString().trim();
-                        if (!CloneStore.upsertClone(MainActivity.this, item)) {
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.customDeviceEnabled = previousEnabled;
+                                item.deviceBrand = previousBrand;
+                                item.deviceModel = previousModel;
+                                Toast.makeText(MainActivity.this,
+                                        (fa ? "ذخیره پروفایل ناموفق بود: " : "Profile metadata was not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            VirtualHookManager.syncCloneHooks(MainActivity.this, item);
+                            refreshSpaces();
                             Toast.makeText(MainActivity.this,
-                                    fa ? "ذخیره پروفایل ناموفق بود؛ تغییر اعمال نشد."
-                                       : "Profile save failed; the change was not applied.",
-                                    Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        VirtualHookManager.syncCloneHooks(MainActivity.this, item);
-                        Toast.makeText(MainActivity.this,
-                                fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند." : "Profile metadata saved; the current engine does not apply it to this clone.",
-                                Toast.LENGTH_SHORT).show();
+                                    fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند."
+                                       : "Profile metadata saved; the current engine does not apply it to this clone.",
+                                    Toast.LENGTH_SHORT).show();
+                        });
                     }
                 })
                 .setNeutralButton(fa ? "استفاده از پروفایل سراسری ذخیره‌شده" : "Use Saved Global Profile", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        final boolean previousEnabled = item.customDeviceEnabled;
                         item.customDeviceEnabled = false;
-                        if (!CloneStore.upsertClone(MainActivity.this, item)) {
-                            Toast.makeText(MainActivity.this,
-                                    fa ? "ذخیره تنظیمات ناموفق بود؛ اطلاعات قبلی حفظ شد."
-                                       : "Settings save failed; previous data was preserved.",
-                                    Toast.LENGTH_LONG).show();
-                        }
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.customDeviceEnabled = previousEnabled;
+                                Toast.makeText(MainActivity.this,
+                                        (fa ? "ذخیره تنظیمات ناموفق بود: " : "Settings were not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                refreshSpaces();
+                            }
+                        });
                     }
                 })
                 .setNegativeButton(fa ? "بستن" : "Close", null)
@@ -837,48 +875,65 @@ public class MainActivity extends BaseActivity {
     }
 
     private void showBatchUninstallDialog() {
-        final List<CloneStore.CloneEntry> all = CloneStore.getAll(this);
-        if (all.isEmpty()) return;
-        String[] labels = new String[all.size()];
-        final boolean[] checked = new boolean[all.size()];
-        for (int i = 0; i < all.size(); i++) {
-            CloneStore.CloneEntry e = all.get(i);
-            labels[i] = e.displayName + " (" + getString(R.string.space_label) + " " + e.getSpaceNumber() + ")";
+        repository.loadClones(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess() || result.getValue() == null) {
+                Toast.makeText(this, fa ? "فهرست کلون‌ها قابل خواندن نیست؛ حذف گروهی متوقف شد."
+                        : "Clone registry could not be read; batch uninstall was stopped.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            final List<CloneStore.CloneEntry> all = result.getValue();
+            if (all.isEmpty()) return;
+            String[] labels = new String[all.size()];
+            final boolean[] checked = new boolean[all.size()];
+            for (int i = 0; i < all.size(); i++) {
+                CloneStore.CloneEntry e = all.get(i);
+                labels[i] = e.displayName + " (" + getString(R.string.space_label) + " " + e.getSpaceNumber() + ")";
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.batch_uninstall))
+                    .setMultiChoiceItems(labels, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                    .setPositiveButton(getString(R.string.uninstall), (d, w) -> {
+                        int selected = 0;
+                        for (boolean value : checked) if (value) selected++;
+                        if (selected == 0) return;
+                        Toast.makeText(this, fa ? "حذف گروهی آغاز شد..." : "Batch uninstall started...", Toast.LENGTH_SHORT).show();
+                        runBatchUninstall(all, checked, 0, new int[]{0, 0, 0});
+                    })
+                    .setNegativeButton(fa ? "انصراف" : "Cancel", null)
+                    .show();
+        });
+    }
+
+    // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
+    private void runBatchUninstall(List<CloneStore.CloneEntry> all, boolean[] checked,
+                                   int index, int[] counts) {
+        if (isFinishing() || isDestroyed()) return;
+        int next = index;
+        while (next < all.size() && !checked[next]) next++;
+        if (next >= all.size()) {
+            String summary = fa
+                    ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
+                            + "، خطای ثبت فهرست: " + counts[2])
+                    : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
+                            + ", registry failures: " + counts[2]);
+            Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+            refreshSpaces();
+            return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.batch_uninstall))
-                .setMultiChoiceItems(labels, checked, new DialogInterface.OnMultiChoiceClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which, boolean isChecked) {
-                        checked[which] = isChecked;
-                    }
-                })
-                .setPositiveButton(getString(R.string.uninstall), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int w) {
-                        for (int i = 0; i < all.size(); i++) {
-                            if (checked[i]) {
-                                CloneStore.CloneEntry e = all.get(i);
-                                if (Engine.uninstallClone(e.packageName, e.userId)) {
-                                    if (!CloneStore.removeClone(MainActivity.this, e.packageName, e.userId)) {
-                                        Toast.makeText(MainActivity.this,
-                                                fa ? "حذف برنامه انجام شد اما ثبت فهرست به‌روزرسانی نشد."
-                                                   : "App uninstall succeeded, but the Space registry update failed.",
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                } else {
-                                    Toast.makeText(MainActivity.this,
-                                            fa ? "حذف یک کلون تأیید نشد؛ رکورد آن حفظ شد."
-                                               : "One clone uninstall was not confirmed; its registry entry was preserved.",
-                                            Toast.LENGTH_LONG).show();
-                                }
-                            }
-                        }
-                        refreshSpaces();
-                    }
-                })
-                .setNegativeButton(fa ? "انصراف" : "Cancel", null)
-                .show();
+        CloneStore.CloneEntry entry = all.get(next);
+        final int nextIndex = next + 1;
+        if (!Engine.uninstallClone(entry.packageName, entry.userId)) {
+            counts[1]++;
+            runBatchUninstall(all, checked, nextIndex, counts);
+            return;
+        }
+        repository.removeClone(entry.packageName, entry.userId, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (result.isSuccess()) counts[0]++;
+            else counts[2]++;
+            runBatchUninstall(all, checked, nextIndex, counts);
+        });
     }
 
     private Drawable loadAppIcon(String pkg) {
