@@ -255,6 +255,33 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void unsupportedProfileFieldClearIsRejectedAsInvalidInput() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(2);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> global = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> clone = new AtomicReference<>();
+        repository.clearGlobalProfileField("unknownField", result -> { global.set(result); done.countDown(); });
+        repository.clearCloneProfileField("com.example.invalid", 0, "unknownField",
+                result -> { clone.set(result); done.countDown(); });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.INVALID_INPUT, global.get().getFailure());
+        assertEquals(AsyncCloneRepository.Failure.INVALID_INPUT, clone.get().getFailure());
+        repository.close();
+    }
+
+    @Test public void closedSingletonIsRecreatedOnNextAccess() throws Exception {
+        AsyncCloneRepository first = AsyncCloneRepository.getInstance(context);
+        first.close();
+        AsyncCloneRepository second = AsyncCloneRepository.getInstance(context);
+        assertNotSame(first, second);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<List<CloneStore.CloneEntry>>> resultRef = new AtomicReference<>();
+        second.loadClones(result -> { resultRef.set(result); done.countDown(); });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertTrue(resultRef.get().isSuccess());
+        second.close();
+    }
+
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
