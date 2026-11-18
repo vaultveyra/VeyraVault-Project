@@ -84,8 +84,8 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
     private void seedLegacySnapshot() {
         SharedPreferences prefs = context.getSharedPreferences(LegacyCloneSnapshot.PREFS_NAME, Context.MODE_PRIVATE);
         String clones = "[{\"pkg\":\"com.example.crash\",\"uid\":41,\"name\":\"Crash Test\","
-                + "\"gpsOn\":false,\"lat\":0.0,\"lng\":0.0,\"locLabel\":\","
-                + "\"devOn\":false,\"devBrand\":\",\"devModel\":\","
+                + "\"gpsOn\":false,\"lat\":0.0,\"lng\":0.0,\"locLabel\":\"\",
+                + "\"devOn\":false,\"devBrand\":\"\",\"devModel\":\"\",
                 + "\"denied\":[\"android.permission.CAMERA\"]}]";
         assertTrue(prefs.edit()
                 .putString(LegacyCloneSnapshot.KEY_CLONES, clones)
