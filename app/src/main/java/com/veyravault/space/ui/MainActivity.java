@@ -22,24 +22,35 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.veyravault.space.R;
+import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ShortcutHelper;
 import com.veyravault.space.core.VirtualHookManager;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends BaseActivity {
 
     private LinearLayout spacesContainer;
     private boolean fa;
+    private AsyncCloneRepository repository;
+    private long refreshGeneration;
+    private View toggleAllButton;
+    private TextView globalProfileSummary;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
+        repository = AsyncCloneRepository.getInstance(getApplicationContext());
         buildDashboardUi();
+        loadGlobalProfileSummary();
         handleShortcutLaunch(getIntent());
     }
 
@@ -104,16 +115,14 @@ public class MainActivity extends BaseActivity {
         bTitle.setTextColor(Color.WHITE);
         bTitle.setTextSize(16f);
         bTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        CloneStore.GlobalEnvConfig gCfg = CloneStore.getGlobalEnv(this);
         bTitle.setText(fa ? "فضاهای چندگانه و موقعیت مکانی هوشمند" : "Multi-Space & Global Virtual Locations");
         banner.addView(bTitle);
 
         TextView bSub = new TextView(this);
         bSub.setTextColor(Color.parseColor("#DBEAFE"));
         bSub.setTextSize(12f);
-        bSub.setText(fa
-                ? ("پروفایل ذخیره‌شده: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | منطقه: " + gCfg.countryIso.toUpperCase())
-                : ("Saved Profile: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | Region: " + gCfg.countryIso.toUpperCase()));
+        bSub.setText(fa ? "در حال خواندن پروفایل ذخیره‌شده..." : "Loading saved profile...");
+        globalProfileSummary = bSub;
         banner.addView(bSub);
         banner.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -136,18 +145,8 @@ public class MainActivity extends BaseActivity {
         secRow.addView(myClonesTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView btnToggleAll = makePillChip(fa ? "جمع/باز کردن همه ⊞" : "Collapse/Expand All ⊞", "#FFFFFF", "#374151");
-        btnToggleAll.setOnClickListener(new View.OnClickListener() {
-            boolean allCollapsed = false;
-            @Override
-            public void onClick(View v) {
-                allCollapsed = !allCollapsed;
-                Map<Integer, List<CloneStore.CloneEntry>> map = CloneStore.getGroupedBySpace(MainActivity.this);
-                for (Integer s : map.keySet()) {
-                    CloneStore.setSpaceCollapsed(MainActivity.this, s, allCollapsed);
-                }
-                refreshSpaces();
-            }
-        });
+        toggleAllButton = btnToggleAll;
+        btnToggleAll.setOnClickListener(v -> toggleAllSpaces());
         secRow.addView(btnToggleAll);
         root.addView(secRow);
 
@@ -209,17 +208,126 @@ public class MainActivity extends BaseActivity {
         setContentView(root);
     }
 
-    private void refreshSpaces() {
-        if (spacesContainer == null) return;
-        spacesContainer.removeAllViews();
-        Map<Integer, List<CloneStore.CloneEntry>> grouped = CloneStore.getGroupedBySpace(this);
-        for (Map.Entry<Integer, List<CloneStore.CloneEntry>> entry : grouped.entrySet()) {
-            spacesContainer.addView(buildSpaceCard(entry.getKey(), entry.getValue()));
-        }
+    private void loadGlobalProfileSummary() {
+        repository.loadGlobalEnvironment(result -> {
+            if (isFinishing() || isDestroyed() || globalProfileSummary == null) return;
+            if (!result.isSuccess() || result.getValue() == null) {
+                globalProfileSummary.setText(fa ? "پروفایل ذخیره‌شده در دسترس نیست" : "Saved profile is unavailable");
+                return;
+            }
+            CloneStore.GlobalEnvConfig profile = result.getValue();
+            globalProfileSummary.setText(fa
+                    ? ("پروفایل ذخیره‌شده: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
+                            + " " + profile.model + " | منطقه: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT))
+                    : ("Saved Profile: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
+                            + " " + profile.model + " | Region: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT)));
+        });
     }
 
-    private View buildSpaceCard(final int spaceNum, final List<CloneStore.CloneEntry> clones) {
-        final boolean collapsed = CloneStore.isSpaceCollapsed(this, spaceNum);
+    private void refreshSpaces() {
+        if (spacesContainer == null) return;
+        final long request = ++refreshGeneration;
+        repository.loadClones(cloneResult -> {
+            if (!isCurrentRefresh(request)) return;
+            if (!cloneResult.isSuccess()) {
+                showSpaceLoadFailure(cloneResult.getMessage());
+                return; // Preserve the last known UI; never render corrupt data as an empty registry.
+            }
+            repository.loadCollapsedSpaces(collapsedResult -> {
+                if (!isCurrentRefresh(request)) return;
+                if (!collapsedResult.isSuccess() || collapsedResult.getValue() == null) {
+                    showSpaceLoadFailure(collapsedResult.getMessage());
+                    return; // Do not silently expand every Space when collapsed-state data is unreadable.
+                }
+                Map<Integer, List<CloneStore.CloneEntry>> grouped = groupClonesBySpace(cloneResult.getValue());
+                Set<Integer> collapsedSpaces = collapsedResult.getValue();
+                spacesContainer.removeAllViews();
+                for (Map.Entry<Integer, List<CloneStore.CloneEntry>> entry : grouped.entrySet()) {
+                    spacesContainer.addView(buildSpaceCard(entry.getKey(), entry.getValue(),
+                            collapsedSpaces.contains(entry.getKey())));
+                }
+            });
+        });
+    }
+
+    private boolean isCurrentRefresh(long request) {
+        return request == refreshGeneration && !isFinishing() && !isDestroyed();
+    }
+
+    private void showSpaceLoadFailure(String detail) {
+        if (isFinishing() || isDestroyed()) return;
+        String message = fa ? "خواندن فهرست فضاها ناموفق بود؛ اطلاعات قبلی نمایش‌داده‌شده حفظ شد."
+                : "Could not read Spaces; the previously displayed data was preserved.";
+        if (detail != null && !detail.trim().isEmpty()) message += " " + detail;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private Map<Integer, List<CloneStore.CloneEntry>> groupClonesBySpace(List<CloneStore.CloneEntry> clones) {
+        Map<Integer, List<CloneStore.CloneEntry>> grouped = new LinkedHashMap<Integer, List<CloneStore.CloneEntry>>();
+        for (CloneStore.CloneEntry clone : clones) {
+            int spaceNumber = clone.getSpaceNumber();
+            if (!grouped.containsKey(spaceNumber)) grouped.put(spaceNumber, new ArrayList<CloneStore.CloneEntry>());
+            grouped.get(spaceNumber).add(clone);
+        }
+        if (grouped.isEmpty()) grouped.put(1, new ArrayList<CloneStore.CloneEntry>());
+        return grouped;
+    }
+
+    private void toggleAllSpaces() {
+        if (toggleAllButton != null) toggleAllButton.setEnabled(false);
+        repository.loadClones(cloneResult -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!cloneResult.isSuccess()) {
+                finishToggleAllWithFailure(cloneResult.getMessage());
+                return;
+            }
+            repository.loadCollapsedSpaces(collapsedResult -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!collapsedResult.isSuccess() || collapsedResult.getValue() == null) {
+                    finishToggleAllWithFailure(collapsedResult.getMessage());
+                    return;
+                }
+                Map<Integer, List<CloneStore.CloneEntry>> grouped = groupClonesBySpace(cloneResult.getValue());
+                Set<Integer> collapsed = new HashSet<Integer>(collapsedResult.getValue());
+                boolean allCollapsed = true;
+                List<Integer> spaceNumbers = new ArrayList<Integer>(grouped.keySet());
+                for (Integer number : spaceNumbers) {
+                    if (!collapsed.contains(number)) { allCollapsed = false; break; }
+                }
+                setAllSpacesCollapsed(spaceNumbers, !allCollapsed, 0);
+            });
+        });
+    }
+
+    private void setAllSpacesCollapsed(final List<Integer> spaceNumbers, final boolean collapsed, final int index) {
+        if (isFinishing() || isDestroyed()) return;
+        if (index >= spaceNumbers.size()) {
+            if (toggleAllButton != null) toggleAllButton.setEnabled(true);
+            refreshSpaces();
+            return;
+        }
+        repository.setSpaceCollapsed(spaceNumbers.get(index), collapsed, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                finishToggleAllWithFailure(result.getMessage());
+                return; // Earlier commits may have succeeded; reload and report the partial outcome.
+            }
+            setAllSpacesCollapsed(spaceNumbers, collapsed, index + 1);
+        });
+    }
+
+    private void finishToggleAllWithFailure(String detail) {
+        if (toggleAllButton != null) toggleAllButton.setEnabled(true);
+        if (isFinishing() || isDestroyed()) return;
+        String message = fa ? "تغییر همه فضاها کامل نشد؛ ممکن است بخشی از تغییرات ذخیره شده باشد."
+                : "Could not update every Space; some earlier changes may already be saved.";
+        if (detail != null && !detail.trim().isEmpty()) message += " " + detail;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        refreshSpaces();
+    }
+
+    private View buildSpaceCard(final int spaceNum, final List<CloneStore.CloneEntry> clones,
+                                final boolean collapsed) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundResource(R.drawable.bg_card_rounded);
@@ -289,12 +397,20 @@ public class MainActivity extends BaseActivity {
         spaceTitle.setTextColor(Color.parseColor("#111827"));
         header.addView(spaceTitle);
 
-        header.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                CloneStore.setSpaceCollapsed(MainActivity.this, spaceNum, !collapsed);
-                refreshSpaces();
-            }
+        header.setOnClickListener(v -> {
+            header.setEnabled(false);
+            repository.setSpaceCollapsed(spaceNum, !collapsed, result -> {
+                if (isFinishing() || isDestroyed()) return;
+                header.setEnabled(true);
+                if (result.isSuccess()) {
+                    refreshSpaces();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            (fa ? "وضعیت باز/بسته ذخیره نشد: " : "Space collapse state was not saved: ")
+                                    + result.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
         });
         card.addView(header);
 
