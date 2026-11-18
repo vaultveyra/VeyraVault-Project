@@ -87,6 +87,15 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
+        boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
+                reservation.getPackageName(), reservation.getUserId());
+        repository.releaseReservationAfterEngineAbsence(reservation, confirmedAbsent,
+                result -> {
+                    // A failed or unknown Engine query leaves the durable reservation in place.
+                });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -622,38 +631,56 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("⊞+", getString(R.string.duplicate), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                repository.allocateNextUserId(item.packageName, allocation -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    if (!allocation.isSuccess() || allocation.getValue() == null || allocation.getValue() < 0) {
-                        Toast.makeText(MainActivity.this,
-                                (fa ? "شناسهٔ کلون قابل تخصیص نیست: " : "A clone ID could not be allocated: ")
-                                        + allocation.getMessage(),
-                                Toast.LENGTH_LONG).show();
+                repository.reserveNextUserId(item.packageName, allocation -> {
+                    if (!allocation.isSuccess() || allocation.getValue() == null) {
+                        if (!isFinishing() && !isDestroyed()) {
+                            Toast.makeText(MainActivity.this,
+                                    (fa ? "رزرو شناسهٔ کلون ناموفق بود: " : "Could not reserve a clone ID: ")
+                                            + allocation.getMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        }
                         return;
                     }
-                    CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
+                    final CloneStore.CloneReservation reservation = allocation.getValue();
+                    if (isFinishing() || isDestroyed()) {
+                        releaseReservationIfEngineAbsent(reservation);
+                        return;
+                    }
+
+                    final CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
                     copy.packageName = item.packageName;
-                    copy.userId = allocation.getValue();
+                    copy.userId = reservation.getUserId();
                     copy.displayName = item.displayName;
                     if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
-                        Toast.makeText(MainActivity.this,
-                                fa ? "ساخت کلون ناموفق بود؛ اطلاعات فضا ثبت نشد."
-                                   : "Clone installation failed; no Space entry was saved.",
-                                Toast.LENGTH_LONG).show();
+                        boolean absent = Engine.isCloneConfirmedAbsent(copy.packageName, copy.userId);
+                        if (absent) releaseReservationIfEngineAbsent(reservation);
+                        if (!isFinishing() && !isDestroyed()) {
+                            Toast.makeText(MainActivity.this,
+                                    fa
+                                            ? (absent
+                                                ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
+                                                : "وضعیت نصب نامشخص است؛ شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
+                                            : (absent
+                                                ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
+                                                : "Engine absence is unconfirmed; the ID remains reserved to prevent collision."),
+                                    Toast.LENGTH_LONG).show();
+                        }
                         return;
                     }
-                    repository.upsertClone(copy, save -> {
+
+                    repository.commitReservedClone(copy, reservation, save -> {
                         if (!save.isSuccess()) {
-                            // Cleanup is required even if the Activity was closed while the async commit was pending.
                             boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
+                            if (cleanupConfirmed) releaseReservationIfEngineAbsent(reservation);
                             if (!isFinishing() && !isDestroyed()) {
                                 Toast.makeText(MainActivity.this,
-                                        fa ? (cleanupConfirmed
-                                                ? "ثبت کلون جدید ناموفق بود؛ نصب جدید پاک شد."
-                                                : "ثبت کلون جدید ناموفق بود و حذف نصب تأیید نشد؛ وضعیت را بررسی کن.")
-                                           : (cleanupConfirmed
-                                                ? "Clone registry save failed; the new installation was removed."
-                                                : "Clone registry save failed and uninstall could not be confirmed; inspect this clone."),
+                                        fa
+                                                ? (cleanupConfirmed
+                                                    ? "ثبت کلون ناموفق بود؛ حذف نصب تأیید شد و رزرو آزاد می‌شود."
+                                                    : "ثبت کلون ناموفق بود؛ حذف نصب تأیید نشد و شناسه رزرو می‌ماند.")
+                                                : (cleanupConfirmed
+                                                    ? "Clone registry commit failed; uninstall was confirmed and the reservation is being released."
+                                                    : "Clone registry commit failed and uninstall was not confirmed; the reservation remains blocked."),
                                         Toast.LENGTH_LONG).show();
                             }
                             return;
@@ -661,6 +688,7 @@ public class MainActivity extends BaseActivity {
                         if (isFinishing() || isDestroyed()) return;
                         refreshSpaces();
                     });
+                });
                 });
             }
         }));
