@@ -39,6 +39,9 @@ assert "readReservationsStrict(c)" in reserve
 assert "Reservation journal conflicts with the clone registry" in reserve
 assert "prefs(c).edit().putString(KEY_PENDING_RESERVATIONS" in reserve
 assert ".commit()" in reserve
+assert "throw new PersistenceException(\"Reservation journal commit failed\")" in reserve
+assert "CloneStore.PersistenceException) return Failure.PERSISTENCE_FAILURE" in REPO
+assert "reservationJournalCommitFailureIsClassifiedAsPersistenceFailure" in TEST
 
 commit = method_body(STORE, "static synchronized boolean commitReservedClone(")
 assert "reservation.token.equals(supplied.token)" in commit
