@@ -51,12 +51,13 @@ public class LegacyCloneSnapshotBackupInstrumentationTest {
         assertEquals(snapshot.sha256(), first.sha256);
         assertTrue(first.byteCount > 0);
         assertTrue(backupFile.isFile());
+        byte[] original = readFile(backupFile);
 
         LegacyCloneSnapshotBackup.Receipt second =
                 LegacyCloneSnapshotBackup.writeAndVerify(context, snapshot);
         assertEquals(first.sha256, second.sha256);
         assertEquals(first.byteCount, second.byteCount);
-        assertArrayEquals(readFile(backupFile), readFile(backupFile));
+        assertArrayEquals(original, readFile(backupFile));
     }
 
     @Test public void immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal() throws Exception {
