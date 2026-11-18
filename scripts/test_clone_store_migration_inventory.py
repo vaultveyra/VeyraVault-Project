@@ -48,8 +48,8 @@ assert 'readGlobalEnvStrict' in store
 assert 'return prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();' in store
 
 # Clone identity is a package + virtual-user pair, not package name alone.
-assert 'cur.packageName.equals(entry.packageName) && cur.userId == entry.userId' in store
-assert 'e.packageName.equals(pkg) && e.userId == userId' in store
+assert 'current.packageName.equals(entry.packageName) && current.userId == entry.userId' in store
+assert 'entry.packageName.equals(pkg) && entry.userId == userId' in store
 
 # Guard all separate persistence categories and the last-successful-launch marker.
 for method in (
