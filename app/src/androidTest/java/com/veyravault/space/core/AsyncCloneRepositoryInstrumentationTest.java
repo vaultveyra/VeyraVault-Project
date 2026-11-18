@@ -425,7 +425,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
 
 
     @Test public void malformedReservationJournalBlocksAllocationWithoutOverwritingIt() throws Exception {
-        String malformed = "{\\"schemaVersion\\":999,\\"reservations\\":[]}";
+        String malformed = "{\"schemaVersion\":999,\"reservations\":[]}";
         assertTrue(preferences.edit().putString("pending_clone_reservations_json", malformed).commit());
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         CountDownLatch done = new CountDownLatch(1);
@@ -441,8 +441,8 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
     @Test public void reservationJournalConflictWithExistingCloneBlocksAllocation() throws Exception {
-        String clones = "[{\\"pkg\\":\\"com.example.conflict\\",\\"uid\\":0}]";
-        String journal = "{\\"schemaVersion\\":1,\\"reservations\\":[{\\"token\\":\\"fixture-token\\",\\"pkg\\":\\"com.example.conflict\\",\\"uid\\":0}]}";
+        String clones = "[{\"pkg\":\"com.example.conflict\",\"uid\":0}]";
+        String journal = "{\"schemaVersion\":1,\"reservations\":[{\"token\":\"fixture-token\",\"pkg\":\"com.example.conflict\",\"uid\":0}]}";
         assertTrue(preferences.edit().putString("clones_json", clones)
                 .putString("pending_clone_reservations_json", journal).commit());
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
