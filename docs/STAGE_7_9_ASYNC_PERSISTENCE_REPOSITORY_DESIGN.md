@@ -24,11 +24,11 @@ The following CloneStore consumers were inspected on the feature branch:
 
 | File | Operations / concern |
 |---|---|
-| `AddAppActivity` | Allocates next virtual user ID, installs through Engine, then upserts clone; checks allocation and upsert status. |
+| `AddAppActivity` | Stage 7.9.7: allocates through AsyncCloneRepository, installs through Engine, then persists asynchronously with compensating cleanup; batch creation is sequential. |
 | `MainActivity` | Reads and groups clones; collapses Spaces; duplicates, renames, edits metadata, uninstalls single/batch clones. Stage 7.8 checks key mutation statuses. |
 | `SetLocationActivity` | Reads clone and performs GPS enable/disable upserts. **Both upsert return values are currently ignored**, and the UI may show success/finish despite a failed commit. |
 | `GlobalEnvironmentActivity` | Reads global metadata and master GPS; calls `saveGlobalEnv` and `setMasterMockGpsEnabled`, whose current APIs do not return persistence status; then syncs hooks and reports success. |
-| `DashboardActivity` | Reads clone registry for counts. |
+| `DashboardActivity` | Stage 7.9.7: reads a strict asynchronous clone snapshot for counts and shows unavailable state on read failure. |
 | `VaultApp` | Calls `CloneStore.syncAllHooks` during app startup. This remains existing runtime behavior and must not be changed as part of the repository foundation. |
 | `VirtualHookManager` / `Engine` | Read active clone/master GPS and record confirmed active launch. Active launch marker write currently has no surfaced status. |
 | `PermissionsActivity` | Read-only clone metadata display. |
@@ -174,3 +174,15 @@ Implementation now also includes:
 - Added a CI source-contract test covering strict shortcut reads, duplicate install/persist/cleanup order, rename/profile commit handling, uninstall ordering and batch sequencing.
 - AsyncCloneRepository serializes its own queue only. User-ID allocation is not an atomic reservation across other legacy synchronous callers; this limitation remains until all allocation callers adopt a coordinated reservation API.
 - This stage does not change Engine internals, clone app-private data, sessions/accounts, Room runtime wiring, migration/cutover or main branch. Android Emulator, Source Audit, unsigned release build and APK Audit for this sub-stage are pending.
+
+
+### Stage 7.9.7 — AddApp creation and Dashboard read adoption
+
+- AddAppActivity now obtains package-scoped user IDs through AsyncCloneRepository and persists new clone records asynchronously. Direct CloneStore allocation/upsert calls were removed from this Activity.
+- Preserves the required Engine install-before-registry-write ordering. If the async registry commit fails, Engine uninstall cleanup is attempted even when the Activity has already been destroyed; cleanup is reported as confirmed only when Engine verifies package absence.
+- Batch clone creation is now sequential: each selected app waits for its own allocation, Engine install and registry commit result before the next app begins. The screen does not finish before the batch callbacks complete, and it reports aggregate success/failure counts. Per-app success toasts are suppressed in batch mode.
+- DashboardActivity no longer calls the legacy CloneStore.getAll fallback for its counts. It loads a strict async snapshot, computes clone/Space counts only on success, and displays unavailable counts plus an error message if the registry cannot be validated.
+- Added `scripts/test_add_app_dashboard_async_persistence_contract.py` and wired it into the CI workflow.
+- Allocation is still a lookup, not a durable reservation. AsyncCloneRepository serializes its own operations, but a second allocator may obtain the same free ID during the gap between allocation and the later Engine install/registry commit. A coordinated reservation protocol remains a separate hardening item; no atomicity claim is made.
+- No Room runtime wiring, migration/cutover, startup hook changes, Engine internals, clone app-private data, sessions/accounts, or main branch changes. Physical-device validation remains outstanding.
+- CI validation for this stage is pending.
