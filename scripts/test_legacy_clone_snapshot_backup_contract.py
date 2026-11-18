@@ -23,6 +23,12 @@ for token in (
     'verified.getString("snapshotSha256")',
     "MessageDigest.getInstance(\"SHA-256\")",
     "return new Receipt(digest, actualBytes.length)",
+    "public static LegacyCloneSnapshot readAndVerify(Context context)",
+    "atomicFile.openRead()",
+    "LegacyCloneSnapshot.fromCanonicalPayload(payload)",
+    "snapshot.sha256()",
+    "Unsupported migration backup format version",
+
 ):
     assert token in source, "Atomic backup contract missing: " + token
 
