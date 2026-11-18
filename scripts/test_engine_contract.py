@@ -24,9 +24,12 @@ assert "success.getBoolean(res)" in install
 assert "catch (Throwable t)" in install and "return false;" in install
 
 installed = method_body("private static boolean isInstalledAsUser(")
-assert 'getMethod("isInstalled", String.class, int.class)' in installed
-assert "Boolean.TRUE.equals(result)" in installed
-assert "return false;" in installed
+assert "Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId))" in installed
+assert "return false;" not in installed
+query_installed = method_body("private static Boolean queryInstalledAsUser(")
+assert 'getMethod("isInstalled", String.class, int.class)' in query_installed
+assert "result instanceof Boolean ? (Boolean) result : null" in query_installed
+assert "return null;" in query_installed
 
 launch = method_body("public static boolean launchClone(")
 assert "if (!isInstalledAsUser(entry.packageName, entry.userId)" in launch
