@@ -36,6 +36,7 @@ assert "UUID.randomUUID().toString()" in STORE
 reserve = method_body(STORE, "static synchronized CloneReservation reserveNextUserId(")
 assert "readAllStrict(c)" in reserve
 assert "readReservationsStrict(c)" in reserve
+assert "Reservation journal conflicts with the clone registry" in reserve
 assert "prefs(c).edit().putString(KEY_PENDING_RESERVATIONS" in reserve
 assert ".commit()" in reserve
 
@@ -93,6 +94,8 @@ for test_name in (
     "reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken",
     "reservationReleaseRequiresExplicitEngineAbsenceAndAllowsSafeReuse",
     "pendingReservationCannotBeStolenByOrdinaryCloneUpsert",
+    "malformedReservationJournalBlocksAllocationWithoutOverwritingIt",
+    "reservationJournalConflictWithExistingCloneBlocksAllocation",
 ):
     assert test_name in TEST, test_name
 
