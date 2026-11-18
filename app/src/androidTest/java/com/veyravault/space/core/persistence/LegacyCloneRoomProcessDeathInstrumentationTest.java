@@ -54,7 +54,10 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
             throws Exception {
         Intent importIntent = new Intent(context, CloneMigrationCrashTestService.class)
                 .setAction(CloneMigrationCrashTestService.ACTION_IMPORT_AND_PAUSE);
-        assertNotNull(context.startService(importIntent));
+        assertNotNull("Debug process-death service is missing from the target manifest",
+                context.getPackageManager().resolveService(importIntent, 0));
+        assertNotNull("Could not start the import-and-pause service process",
+                context.startService(importIntent));
         String checkpoint = waitForMarker("checkpoint.txt", 30000L);
         assertTrue(checkpoint, checkpoint.contains("checkpoint=after_clone_and_permission_inserts"));
         killedServicePid = parsePid(checkpoint);
@@ -66,7 +69,10 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
 
         Intent verifyIntent = new Intent(context, CloneMigrationCrashTestService.class)
                 .setAction(CloneMigrationCrashTestService.ACTION_VERIFY_EMPTY);
-        assertNotNull(context.startService(verifyIntent));
+        assertNotNull("Debug process-death verification service is missing from the target manifest",
+                context.getPackageManager().resolveService(verifyIntent, 0));
+        assertNotNull("Could not restart the verification service after process death",
+                context.startService(verifyIntent));
         String verified = waitForMarker("verified.txt", 30000L);
         int restartedPid = parsePid(verified);
         assertTrue("Verification must run in a fresh OS process", restartedPid > 0
@@ -87,7 +93,8 @@ public class LegacyCloneRoomProcessDeathInstrumentationTest {
                 + "\"gpsOn\":false,\"lat\":0.0,\"lng\":0.0,\"locLabel\":\"\","
                 + "\"devOn\":false,\"devBrand\":\"\",\"devModel\":\"\","
                 + "\"denied\":[\"android.permission.CAMERA\"]}]";
-        assertTrue(prefs.edit()
+        assertTrue("Unable to seed the legacy CloneStore fixture",
+                prefs.edit()
                 .putString(LegacyCloneSnapshot.KEY_CLONES, clones)
                 .putStringSet(LegacyCloneSnapshot.KEY_COLLAPSED, new HashSet<>(Arrays.asList("social")))
                 .putBoolean(LegacyCloneSnapshot.KEY_MASTER_GPS, false)
