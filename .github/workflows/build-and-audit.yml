@@ -59,6 +59,9 @@ jobs:
       - name: Test MainActivity async Spaces persistence contract
         run: python3 scripts/test_main_activity_async_spaces_contract.py
 
+      - name: Test MainActivity async clone mutations contract
+        run: python3 scripts/test_main_activity_clone_mutations_async_contract.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 
