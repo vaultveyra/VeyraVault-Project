@@ -8,6 +8,8 @@ assert "repository.loadClones" in source
 assert "repository.loadCollapsedSpaces" in source
 assert "repository.setSpaceCollapsed" in source
 assert "repository.loadGlobalEnvironment" in source
+on_resume = source[source.index("protected void onResume()"):source.index("private void buildDashboardUi()")]
+assert "loadGlobalProfileSummary()" in on_resume
 assert "CloneStore.getGroupedBySpace" not in source
 assert "CloneStore.isSpaceCollapsed" not in source
 assert "CloneStore.setSpaceCollapsed" not in source
