@@ -61,6 +61,23 @@ public final class AsyncCloneRepository implements AutoCloseable {
         T run() throws Exception;
     }
 
+    private static volatile AsyncCloneRepository instance;
+
+    public static AsyncCloneRepository getInstance(Context context) {
+        if (context == null) throw new IllegalArgumentException("Context is required");
+        AsyncCloneRepository current = instance;
+        if (current == null) {
+            synchronized (AsyncCloneRepository.class) {
+                current = instance;
+                if (current == null) {
+                    current = new AsyncCloneRepository(context);
+                    instance = current;
+                }
+            }
+        }
+        return current;
+    }
+
     private final Context appContext;
     private final ExecutorService worker;
     private final Executor callbackExecutor;
@@ -176,7 +193,7 @@ public final class AsyncCloneRepository implements AutoCloseable {
                 Result<T> result;
                 try {
                     result = Result.success(operation.run());
-                } catch (Throwable error) {
+                } catch (Exception error) {
                     result = Result.failure(classify(error), safeMessage(error));
                 }
                 deliver(callback, result);
