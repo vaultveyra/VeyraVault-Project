@@ -282,6 +282,147 @@ public class AsyncCloneRepositoryInstrumentationTest {
         second.close();
     }
 
+
+    @Test public void independentRepositoriesCannotReserveSamePackageUserId() throws Exception {
+        AsyncCloneRepository first = new AsyncCloneRepository(context);
+        AsyncCloneRepository second = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(2);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> a = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> b = new AtomicReference<>();
+
+        first.reserveNextUserId("com.example.concurrent", result -> { a.set(result); done.countDown(); });
+        second.reserveNextUserId("com.example.concurrent", result -> { b.set(result); done.countDown(); });
+
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertTrue(a.get().isSuccess());
+        assertTrue(b.get().isSuccess());
+        assertNotEquals(a.get().getValue().getUserId(), b.get().getValue().getUserId());
+        assertNotEquals(a.get().getValue().getToken(), b.get().getValue().getToken());
+        assertEquals(2, CloneStore.readPendingReservationsStrict(context).size());
+        first.close();
+        second.close();
+    }
+
+    @Test public void reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken() throws Exception {
+        AsyncCloneRepository first = new AsyncCloneRepository(context);
+        CountDownLatch reserved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reservationRef = new AtomicReference<>();
+        first.reserveNextUserId("com.example.durable", result -> {
+            reservationRef.set(result);
+            reserved.countDown();
+        });
+        assertTrue(reserved.await(10, TimeUnit.SECONDS));
+        assertTrue(reservationRef.get().isSuccess());
+        CloneStore.CloneReservation reservation = reservationRef.get().getValue();
+        first.close();
+
+        AsyncCloneRepository restarted = new AsyncCloneRepository(context);
+        CountDownLatch nextReserved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> nextRef = new AtomicReference<>();
+        restarted.reserveNextUserId("com.example.durable", result -> {
+            nextRef.set(result);
+            nextReserved.countDown();
+        });
+        assertTrue(nextReserved.await(10, TimeUnit.SECONDS));
+        assertTrue(nextRef.get().isSuccess());
+        assertEquals(reservation.getUserId() + 1, nextRef.get().getValue().getUserId());
+
+        CloneStore.CloneEntry wrong = cloneEntry("com.example.other", reservation.getUserId());
+        CountDownLatch mismatchDone = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> mismatch = new AtomicReference<>();
+        restarted.commitReservedClone(wrong, reservation, result -> {
+            mismatch.set(result);
+            mismatchDone.countDown();
+        });
+        assertTrue(mismatchDone.await(10, TimeUnit.SECONDS));
+        assertFalse(mismatch.get().isSuccess());
+        assertEquals(2, CloneStore.readPendingReservationsStrict(context).size());
+
+        CloneStore.CloneEntry correct = cloneEntry(reservation.getPackageName(), reservation.getUserId());
+        CountDownLatch committed = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> commitResult = new AtomicReference<>();
+        restarted.commitReservedClone(correct, reservation, result -> {
+            commitResult.set(result);
+            committed.countDown();
+        });
+        assertTrue(committed.await(10, TimeUnit.SECONDS));
+        assertTrue(commitResult.get().isSuccess());
+        assertEquals(1, CloneStore.readAllStrict(context).size());
+        List<CloneStore.CloneReservation> remaining = CloneStore.readPendingReservationsStrict(context);
+        assertEquals(1, remaining.size());
+        assertEquals(nextRef.get().getValue().getToken(), remaining.get(0).getToken());
+        restarted.close();
+    }
+
+    @Test public void reservationReleaseRequiresExplicitEngineAbsenceAndAllowsSafeReuse() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch reserved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reservationRef = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.release", result -> {
+            reservationRef.set(result);
+            reserved.countDown();
+        });
+        assertTrue(reserved.await(10, TimeUnit.SECONDS));
+        assertTrue(reservationRef.get().isSuccess());
+        CloneStore.CloneReservation reservation = reservationRef.get().getValue();
+
+        CountDownLatch refused = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> refusedRef = new AtomicReference<>();
+        repository.releaseReservationAfterEngineAbsence(reservation, false, result -> {
+            refusedRef.set(result);
+            refused.countDown();
+        });
+        assertTrue(refused.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.ENGINE_STATE_UNCONFIRMED, refusedRef.get().getFailure());
+        assertEquals(1, CloneStore.readPendingReservationsStrict(context).size());
+
+        CountDownLatch released = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> releaseRef = new AtomicReference<>();
+        repository.releaseReservationAfterEngineAbsence(reservation, true, result -> {
+            releaseRef.set(result);
+            released.countDown();
+        });
+        assertTrue(released.await(10, TimeUnit.SECONDS));
+        assertTrue(releaseRef.get().isSuccess());
+        assertTrue(CloneStore.readPendingReservationsStrict(context).isEmpty());
+
+        CountDownLatch reused = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reusedRef = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.release", result -> {
+            reusedRef.set(result);
+            reused.countDown();
+        });
+        assertTrue(reused.await(10, TimeUnit.SECONDS));
+        assertTrue(reusedRef.get().isSuccess());
+        assertEquals(reservation.getUserId(), reusedRef.get().getValue().getUserId());
+        repository.close();
+    }
+
+    @Test public void pendingReservationCannotBeStolenByOrdinaryCloneUpsert() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch reserved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reservationRef = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.steal", result -> {
+            reservationRef.set(result);
+            reserved.countDown();
+        });
+        assertTrue(reserved.await(10, TimeUnit.SECONDS));
+        CloneStore.CloneReservation reservation = reservationRef.get().getValue();
+
+        CloneStore.CloneEntry competing = cloneEntry("com.example.steal", reservation.getUserId());
+        CountDownLatch upserted = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> upsertRef = new AtomicReference<>();
+        repository.upsertClone(competing, result -> {
+            upsertRef.set(result);
+            upserted.countDown();
+        });
+        assertTrue(upserted.await(10, TimeUnit.SECONDS));
+        assertFalse(upsertRef.get().isSuccess());
+        assertTrue(CloneStore.readAllStrict(context).isEmpty());
+        assertEquals(1, CloneStore.readPendingReservationsStrict(context).size());
+        repository.close();
+    }
+
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
