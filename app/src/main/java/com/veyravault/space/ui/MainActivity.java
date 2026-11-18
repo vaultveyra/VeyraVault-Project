@@ -624,7 +624,13 @@ public class MainActivity extends BaseActivity {
                         String n = et.getText().toString().trim();
                         if (!n.isEmpty()) {
                             item.displayName = n;
-                            CloneStore.upsertClone(MainActivity.this, item);
+                            if (!CloneStore.upsertClone(MainActivity.this, item)) {
+                                Toast.makeText(MainActivity.this,
+                                        fa ? "ذخیره ناموفق بود؛ اطلاعات قبلی حفظ شد."
+                                           : "Save failed; the previous registry data was preserved.",
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
                             refreshSpaces();
                         }
                     }
@@ -685,7 +691,13 @@ public class MainActivity extends BaseActivity {
                         item.customDeviceEnabled = true;
                         item.deviceBrand = brandEt.getText().toString().trim();
                         item.deviceModel = modelEt.getText().toString().trim();
-                        CloneStore.upsertClone(MainActivity.this, item);
+                        if (!CloneStore.upsertClone(MainActivity.this, item)) {
+                            Toast.makeText(MainActivity.this,
+                                    fa ? "ذخیره پروفایل ناموفق بود؛ تغییر اعمال نشد."
+                                       : "Profile save failed; the change was not applied.",
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
                         VirtualHookManager.syncCloneHooks(MainActivity.this, item);
                         Toast.makeText(MainActivity.this,
                                 fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند." : "Profile metadata saved; the current engine does not apply it to this clone.",
@@ -696,7 +708,12 @@ public class MainActivity extends BaseActivity {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         item.customDeviceEnabled = false;
-                        CloneStore.upsertClone(MainActivity.this, item);
+                        if (!CloneStore.upsertClone(MainActivity.this, item)) {
+                            Toast.makeText(MainActivity.this,
+                                    fa ? "ذخیره تنظیمات ناموفق بود؛ اطلاعات قبلی حفظ شد."
+                                       : "Settings save failed; previous data was preserved.",
+                                    Toast.LENGTH_LONG).show();
+                        }
                     }
                 })
                 .setNegativeButton(fa ? "بستن" : "Close", null)
@@ -726,8 +743,19 @@ public class MainActivity extends BaseActivity {
                         for (int i = 0; i < all.size(); i++) {
                             if (checked[i]) {
                                 CloneStore.CloneEntry e = all.get(i);
-                                Engine.uninstallClone(e.packageName, e.userId);
-                                CloneStore.removeClone(MainActivity.this, e.packageName, e.userId);
+                                if (Engine.uninstallClone(e.packageName, e.userId)) {
+                                    if (!CloneStore.removeClone(MainActivity.this, e.packageName, e.userId)) {
+                                        Toast.makeText(MainActivity.this,
+                                                fa ? "حذف برنامه انجام شد اما ثبت فهرست به‌روزرسانی نشد."
+                                                   : "App uninstall succeeded, but the Space registry update failed.",
+                                                Toast.LENGTH_LONG).show();
+                                    }
+                                } else {
+                                    Toast.makeText(MainActivity.this,
+                                            fa ? "حذف یک کلون تأیید نشد؛ رکورد آن حفظ شد."
+                                               : "One clone uninstall was not confirmed; its registry entry was preserved.",
+                                            Toast.LENGTH_LONG).show();
+                                }
                             }
                         }
                         refreshSpaces();
