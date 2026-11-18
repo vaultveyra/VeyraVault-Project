@@ -2,7 +2,7 @@
 
 ## Status and safety boundary
 
-This document records the source audit and the proposed contract for the next persistence layer. It does **not** implement the repository, switch any runtime caller, instantiate Room, migrate data, or change the SharedPreferences source of truth.
+This document records the original source audit/design and the subsequent additive asynchronous repository foundation. The repository is implemented over the existing SharedPreferences-backed stores, but no runtime UI caller or startup/Engine flow has been switched, Room has not been instantiated for production, and no data migration/cutover has been performed.
 
 - PR4 remains Draft and must not be merged.
 - SharedPreferences / CloneStore remains the active runtime source of truth.
