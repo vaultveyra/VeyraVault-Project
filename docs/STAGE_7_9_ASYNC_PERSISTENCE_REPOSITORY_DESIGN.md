@@ -93,3 +93,27 @@ Only after all gates pass should a separate reviewed stage migrate a small numbe
 - No guarantee is made that virtual app accounts or sessions can be restored on another device.
 - Device/SIM metadata remains metadata-only where no supported scoped Engine API exists.
 - Physical-device upgrade and clone/session regression tests remain required.
+
+
+## Stage 7.9.1 — Initial async CloneStore repository foundation
+
+Implementation added on the feature branch after the design-only audit:
+
+- Add `AsyncCloneRepository`, an application-context-backed facade with one dedicated single-thread executor and main-looper callback dispatch.
+- Add typed results and failure categories: invalid input, corrupt/unsupported stored data, persistence commit failure, closed/rejected executor, and unexpected internal failure.
+- Add asynchronous strict clone-list read, next-user-ID lookup, save-all, upsert and remove operations. The allocator reports an available ID but does not reserve it.
+- Copy clone records and permission sets on submission and before returning loaded lists. Validate clone identities, denied permissions and enabled GPS coordinates before queuing writes.
+- Expose the package-private strict CloneStore reader to other classes in the same persistence package. Existing public UI fallback behavior remains unchanged.
+- Correct the legacy ProfileStore location import to consume the strict CloneStore reader directly. Any malformed or semantically invalid registry now aborts the import before profile writes or the migration marker; the legacy CloneStore preferences remain untouched.
+- Add Android instrumentation coverage for queue ordering, main-thread callbacks, returned-record isolation, corrupt-registry failure propagation and closed-repository rejection.
+- Add a CI source-contract check for the repository's executor, callback, strict-read, defensive-copy and no-Room/no-Engine boundaries.
+
+### Stage 7.9.1 scope and validation status
+
+This is an initial core foundation, not full Stage 7.9 completion:
+- No Activity, startup hook, Engine lifecycle or UI caller has been switched to the async API.
+- The facade serializes only calls submitted to its own executor. Existing direct synchronous CloneStore writes are outside that queue; ID allocation is not an atomic reservation.
+- Collapsed Space, master GPS, global device metadata, active-launch marker and ProfileStore read/write APIs are not yet exposed by this repository.
+- The identified SetLocationActivity and GlobalEnvironmentActivity success-reporting gaps remain for a later, separately tested caller-adoption step.
+- Android instrumentation and CI for this implementation are pending. No test pass is claimed until the new workflow run completes.
+- Room remains inactive; no data migration, cutover, session/account data operation or startup behavior change is introduced.
