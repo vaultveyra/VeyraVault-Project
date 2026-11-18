@@ -162,3 +162,15 @@ Implementation now also includes:
 - Added a CI source-contract test for strict async reads, commit-aware collapse behavior, partial batch status and preserved Engine install/uninstall ordering.
 - Shortcut launch, duplicate, rename, clone metadata writes, single/batch uninstall and Engine operations remain unchanged in this sub-stage. No Room runtime wiring, migration/cutover, session/account data or startup behavior changes.
 - Android Emulator, Source Audit, unsigned release build and APK Audit validation for this sub-stage are pending the current CI run.
+
+
+### Stage 7.9.6 — MainActivity clone mutation caller adoption
+
+- Shortcut launch now reads the clone registry through strict AsyncCloneRepository.loadClones, validates the shortcut package/user identity and launches only a matching registered clone. Corrupt/unreadable registry state no longer falls through a legacy getter.
+- Clone duplication allocates the next package-scoped user ID through the repository, installs through the existing Engine API, then asynchronously persists the clone entry. If persistence fails, it attempts Engine uninstall and reports whether cleanup was confirmed. The Engine install-before-registry-write ordering is preserved.
+- Rename and per-clone device/SIM metadata writes use AsyncCloneRepository.upsertClone. In-memory edited fields are restored on commit failure; metadata hook synchronization is requested only after confirmed persistence success. Device/SIM values remain metadata-only and are not claimed to be applied by the current engine.
+- Single and batch uninstall still call Engine first. A registry record is removed asynchronously only after Engine confirms uninstall. Batch uninstall loads a strict snapshot, processes selected clones sequentially, waits for each registry commit before moving to the next, and reports separate counts for confirmed removals, Engine failures and registry commit failures.
+- Batch uninstall continues after a registry commit failure because the Engine removal has already occurred; the stale registry record is retained and counted for later inspection. No claim of an atomic batch operation is made.
+- Added a CI source-contract test covering strict shortcut reads, duplicate install/persist/cleanup order, rename/profile commit handling, uninstall ordering and batch sequencing.
+- AsyncCloneRepository serializes its own queue only. User-ID allocation is not an atomic reservation across other legacy synchronous callers; this limitation remains until all allocation callers adopt a coordinated reservation API.
+- This stage does not change Engine internals, clone app-private data, sessions/accounts, Room runtime wiring, migration/cutover or main branch. Android Emulator, Source Audit, unsigned release build and APK Audit for this sub-stage are pending.
