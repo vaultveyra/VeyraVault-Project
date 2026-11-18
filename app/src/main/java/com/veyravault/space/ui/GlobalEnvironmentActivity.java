@@ -222,7 +222,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 VirtualHookManager.syncAllHooks(getApplicationContext());
                 Toast.makeText(this, fa
                         ? "پروفایل و Master GPS ذخیره شدند؛ همگام‌سازی موقعیت کلون‌ها درخواست شد. مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
-                        : "Profile and Master GPS were saved; clone location hook sync was requested. Device/SIM values remain metadata only.",
+                        : "Profile and Master GPS were saved; clone location hook sync was requested. Device/SIM values are metadata only and are not applied to clones.",
                         Toast.LENGTH_LONG).show();
                 finish();
             });
