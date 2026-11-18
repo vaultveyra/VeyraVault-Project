@@ -106,6 +106,12 @@ public class Engine {
         return Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId));
     }
 
+    /** True only when the engine explicitly reports that this virtual package is absent. */
+    public static boolean isCloneConfirmedAbsent(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
+        return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId));
+    }
+
     public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
         if (!isInstalledAsUser(entry.packageName, entry.userId)
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
