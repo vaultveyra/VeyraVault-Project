@@ -239,3 +239,23 @@ Instrumentation now covers:
 - Import a snapshot returned by the verified backup reader into an empty Room database and compare all rows/provenance, while confirming the current legacy preferences remain untouched.
 
 **Scope boundary:** this is a restore/read API for the small internal CloneStore migration snapshot only. It is not the future user-facing Complete Backup & Restore feature and does not include virtual app package data, account/session state, media, or app-internal settings. Room remains inactive and SharedPreferences remains the sole runtime source of truth. Physical-device upgrade and backup/restore drills remain outstanding.
+
+
+## Stage 7.8 — Fail-closed legacy CloneStore mutations and clone lifecycle confirmation
+
+A targeted runtime-safety review found a destructive edge case in the legacy registry: CloneStore.getAll() swallowed malformed JSON and returned an empty list. The old upsertClone() and removeClone() then used that fallback list and could overwrite a malformed-but-still-recoverable registry. Clone ID allocation could also silently choose user ID 0 when the registry was unreadable.
+
+The mutation boundary is now hardened without changing the SharedPreferences namespace, keys, record schema, or source-of-truth role:
+
+- Add a strict internal registry reader for all mutation and allocation paths. It rejects wrong preference types, malformed JSON, non-object entries, invalid package/user identity, duplicate composite identities, wrong field types, malformed denied-permission arrays, and invalid enabled-location coordinates.
+- Keep getAll()'s historical display fallback for legacy UI compatibility, but no mutation or allocation path uses that lossy fallback.
+- Make saveAll, upsertClone, and removeClone return explicit commit/success booleans. Failed parse, validation, serialization, or SharedPreferences commit returns false and leaves the prior stored value untouched.
+- Return -1 from package-scoped virtual-user allocation when the registry cannot be strictly read; Add and Duplicate flows stop before asking the engine to install a clone.
+- If clone installation succeeds but the registry write fails, the UI attempts a virtual uninstall and reports whether the engine absence check confirmed cleanup.
+- Make Engine.uninstallClone return true only when the engine's isInstalled(package,userId) query explicitly returns false after the uninstall request. Reflection failure or an unknown result is not treated as success.
+- Single and batch uninstall flows preserve the registry entry when engine removal is not confirmed. If the app is removed but registry persistence fails, the UI reports the partial outcome rather than silently claiming complete success.
+- Rename and per-clone metadata writes now surface persistence failures instead of showing success unconditionally.
+
+Android instrumentation covers malformed JSON, duplicate package+user identities, invalid enabled-GPS coordinates, valid package-scoped composite identities, and successful CRUD return values. CI source contracts also guard fail-closed allocation, commit status, UI rollback attempts, and verified uninstall semantics.
+
+**Scope boundary:** this is a narrow safety hardening of the existing SharedPreferences store. It does not introduce Room runtime access, an asynchronous repository, background migration, dual-write, startup import, session/package-data changes, or persistence cutover. Existing legacy data is never auto-cleared or rewritten after a rejected read. The next stage should design the asynchronous repository contract and migrate callers incrementally only after its error/result semantics are independently tested.
