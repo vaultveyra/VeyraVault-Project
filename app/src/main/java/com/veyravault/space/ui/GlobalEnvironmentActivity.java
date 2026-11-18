@@ -40,16 +40,11 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         repository = AsyncCloneRepository.getInstance(getApplicationContext());
         config = new CloneStore.GlobalEnvConfig();
         buildContent();
-        setContentView(createScrollView());
+        setContentView(contentView);
         setControlsEnabled(false);
         loadSettings();
     }
 
-    private ScrollView createScrollView() {
-        ScrollView scroll = new ScrollView(this);
-        // buildContent() creates the root and attaches it to this ScrollView.
-        return scroll;
-    }
 
     private void buildContent() {
         ScrollView sv = new ScrollView(this);
