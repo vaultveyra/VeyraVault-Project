@@ -63,6 +63,47 @@ public final class ProfileStore {
         }
     }
 
+    static synchronized ProfileSettings readGlobalStrict(Context context) throws Exception {
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) throw new IllegalStateException("Profile schema is malformed or unsupported");
+        return fromJsonStrict(root.optJSONObject("global"));
+    }
+
+    static synchronized ProfileSettings readCloneOverrideStrict(Context context,
+                                                                  String packageName, int userId) throws Exception {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0)
+            throw new IllegalArgumentException("Clone identity is invalid");
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) throw new IllegalStateException("Profile schema is malformed or unsupported");
+        JSONObject clones = root.optJSONObject("clones");
+        Object raw = clones == null ? null : clones.opt(cloneKey(packageName, userId));
+        if (raw != null && !(raw instanceof JSONObject))
+            throw new IllegalStateException("Clone profile entry is malformed");
+        return fromJsonStrict((JSONObject) raw);
+    }
+
+    private static ProfileSettings fromJsonStrict(JSONObject json) throws Exception {
+        ProfileSettings out = new ProfileSettings();
+        if (json == null) return out;
+        Object locale = json.opt("localeTag");
+        Object zone = json.opt("timeZoneId");
+        Object enabled = json.opt("locationEnabled");
+        Object latitude = json.opt("latitude");
+        Object longitude = json.opt("longitude");
+        if (locale != null && !(locale instanceof String)) throw new IllegalStateException("localeTag is invalid");
+        if (zone != null && !(zone instanceof String)) throw new IllegalStateException("timeZoneId is invalid");
+        if (enabled != null && !(enabled instanceof Boolean)) throw new IllegalStateException("locationEnabled is invalid");
+        if (latitude != null && !(latitude instanceof Number)) throw new IllegalStateException("latitude is invalid");
+        if (longitude != null && !(longitude instanceof Number)) throw new IllegalStateException("longitude is invalid");
+        out.localeTag = (String) locale;
+        out.timeZoneId = (String) zone;
+        out.locationEnabled = (Boolean) enabled;
+        out.latitude = latitude == null ? null : ((Number) latitude).doubleValue();
+        out.longitude = longitude == null ? null : ((Number) longitude).doubleValue();
+        if (!out.isValid()) throw new IllegalStateException("Profile values are invalid");
+        return out;
+    }
+
     public static synchronized ProfileSettings getGlobal(Context context) {
         return fromJson(readRoot(context).optJSONObject("global"));
     }
