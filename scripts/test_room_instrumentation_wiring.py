@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 test = ROOT / "app/src/androidTest/java/com/veyravault/space/core/persistence/LegacyCloneRoomInstrumentationTest.java"
+backup_test = ROOT / "app/src/androidTest/java/com/veyravault/space/core/persistence/LegacyCloneSnapshotBackupInstrumentationTest.java"
 debug_manifest = ROOT / "app/src/debug/AndroidManifest.xml"
 debug_app = ROOT / "app/src/debug/java/com/veyravault/space/RoomTestApplication.java"
 prepare = (ROOT / "scripts/prepare_workspace.py").read_text(encoding="utf-8")
@@ -20,6 +21,17 @@ for marker in (
     "LegacyCloneRoomVerifier.matches",
 ):
     assert marker in source, f"Missing instrumentation scenario: {marker}"
+
+assert backup_test.is_file(), "Android backup integrity instrumentation test source is missing"
+backup_source = backup_test.read_text(encoding="utf-8")
+for marker in (
+    "backupIsWrittenReadBackAndReusedForExactSnapshot",
+    "immutableBackupRejectsDifferentSnapshotWithoutChangingOriginal",
+    "corruptExistingBackupIsRejectedAndNeverOverwritten",
+    "LegacyCloneSnapshotBackup.writeAndVerify",
+    "assertArrayEquals(original, readFile(backupFile))",
+):
+    assert marker in backup_source, f"Missing backup instrumentation scenario: {marker}"
 
 dao = (ROOT / "app/src/main/java/com/veyravault/space/core/persistence/LegacyMigrationMetadataDao.java").read_text(encoding="utf-8")
 assert '@Query("SELECT COUNT(*) FROM legacy_migration_metadata")' in dao
@@ -43,4 +55,4 @@ assert ":app:connectedDebugAndroidTest" in workflow
 assert ":app:assembleDebug :app:assembleDebugAndroidTest" in workflow, "Build debug APKs before native ABI diagnostics"
 assert "DEBUG APK NATIVE LIBRARIES" in workflow and "ANDROID TEST APK NATIVE LIBRARIES" in workflow, "CI must report native libraries in both instrumentation APKs before install"
 assert "MERGED DEBUG NATIVE LIBRARY INPUTS" in workflow, "CI must report merged debug native-library inputs"
-print("PASS: Android Room instrumentation harness and emulator CI wiring are present.")
+print("PASS: Android Room and atomic backup instrumentation harness wiring is present.")
