@@ -87,6 +87,16 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    private void releaseReservationAfterConfirmedEngineAbsence(
+            CloneStore.CloneReservation reservation) {
+        repository.releaseReservationAfterEngineAbsence(reservation, true,
+                new AsyncCloneRepository.Callback<Boolean>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
+                        // Explicit Engine absence was already verified by the caller.
+                    }
+                });
+    }
+
     private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
         boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
                 reservation.getPackageName(), reservation.getUserId());
@@ -653,7 +663,7 @@ public class MainActivity extends BaseActivity {
                     copy.displayName = item.displayName;
                     if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
                         boolean absent = Engine.isCloneConfirmedAbsent(copy.packageName, copy.userId);
-                        if (absent) releaseReservationIfEngineAbsent(reservation);
+                        if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
                         if (!isFinishing() && !isDestroyed()) {
                             Toast.makeText(MainActivity.this,
                                     fa
@@ -671,7 +681,7 @@ public class MainActivity extends BaseActivity {
                     repository.commitReservedClone(copy, reservation, save -> {
                         if (!save.isSuccess()) {
                             boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
-                            if (cleanupConfirmed) releaseReservationIfEngineAbsent(reservation);
+                            if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation);
                             if (!isFinishing() && !isDestroyed()) {
                                 Toast.makeText(MainActivity.this,
                                         fa
