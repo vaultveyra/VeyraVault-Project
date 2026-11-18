@@ -33,8 +33,9 @@ assert "Engine.uninstallClone(copy.packageName, copy.userId)" in duplicate
 assert "releaseReservationIfEngineAbsent(reservation)" in duplicate
 assert "repository.allocateNextUserId" not in source
 assert duplicate.index("if (!save.isSuccess())") < duplicate.index("Engine.uninstallClone(copy.packageName, copy.userId)")
-save_callback = duplicate[duplicate.index("repository.upsertClone(copy"):]
-assert save_callback.index("if (!save.isSuccess())") < save_callback.index("if (isFinishing() || isDestroyed()) return;")
+save_callback = duplicate[duplicate.index("repository.commitReservedClone(copy"):]
+assert save_callback.index("if (!save.isSuccess())") < save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)")
+assert save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)") < save_callback.index("if (!isFinishing() && !isDestroyed())")
 
 # Rename and per-clone profile writes are commit-aware; in-memory values are reverted on failure.
 rename_start = source.index("private void showRenameDialog")
