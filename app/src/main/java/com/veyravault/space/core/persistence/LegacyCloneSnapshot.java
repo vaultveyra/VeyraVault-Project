@@ -184,6 +184,81 @@ public final class LegacyCloneSnapshot {
         }
     }
 
+    /**
+     * Reconstructs a validated snapshot from a canonical backup payload without reading
+     * or mutating the device's current SharedPreferences.
+     */
+    public static LegacyCloneSnapshot fromCanonicalPayload(String payload) {
+        if (payload == null || payload.trim().isEmpty()) {
+            throw new IllegalArgumentException("Canonical migration payload is required");
+        }
+        try {
+            JSONObject root = new JSONObject(payload);
+            String rawClones = root.getString("rawClones");
+            String rawGlobal = root.getString("globalProfileRaw");
+            String rawActive = root.getString("activeLaunchRaw");
+            boolean hadClones = requireBoolean(root, "hadClonesKey");
+            boolean hadCollapsed = requireBoolean(root, "hadCollapsedSpacesKey");
+            boolean hadMasterGps = requireBoolean(root, "hadMasterGpsKey");
+            boolean hadGlobal = requireBoolean(root, "hadGlobalProfileKey");
+            boolean hadActive = requireBoolean(root, "hadActiveLaunchKey");
+            boolean masterGps = requireBoolean(root, "masterMockGpsEnabled");
+
+            JSONArray array = new JSONArray(rawClones);
+            List<CloneRecord> clones = new ArrayList<>();
+            Set<String> identities = new HashSet<>();
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject object = array.optJSONObject(i);
+                if (object == null) throw new IllegalStateException("Clone entry " + i + " is not a JSON object");
+                CloneRecord record = new CloneRecord(object);
+                if (record.packageName.trim().isEmpty()) throw new IllegalStateException("Clone entry " + i + " has an empty package name");
+                if (record.userId < 0) throw new IllegalStateException("Clone entry " + i + " has a negative virtual user ID");
+                if (record.mockGpsEnabled && (!isFinite(record.latitude) || !isFinite(record.longitude)
+                        || record.latitude < -90.0d || record.latitude > 90.0d
+                        || record.longitude < -180.0d || record.longitude > 180.0d)) {
+                    throw new IllegalStateException("Clone entry " + i + " has invalid enabled-location coordinates");
+                }
+                String identity = record.packageName + "\\u0000" + record.userId;
+                if (!identities.add(identity)) throw new IllegalStateException("Duplicate clone identity: " + record.packageName + "/" + record.userId);
+                clones.add(record);
+            }
+            Collections.sort(clones, new Comparator<CloneRecord>() {
+                @Override public int compare(CloneRecord a, CloneRecord b) {
+                    int byPackage = a.packageName.compareTo(b.packageName);
+                    return byPackage != 0 ? byPackage : Integer.compare(a.userId, b.userId);
+                }
+            });
+
+            JSONArray collapsedArray = root.getJSONArray("collapsedSpaces");
+            Set<String> collapsed = new TreeSet<>();
+            for (int i = 0; i < collapsedArray.length(); i++) {
+                Object value = collapsedArray.get(i);
+                if (!(value instanceof String)) throw new IllegalStateException("Collapsed space at index " + i + " is not a String");
+                collapsed.add((String) value);
+            }
+            GlobalProfile profile = new GlobalProfile(rawGlobal.isEmpty() ? new JSONObject() : new JSONObject(rawGlobal));
+            ActiveLaunch active = rawActive.isEmpty() ? null : new ActiveLaunch(new JSONObject(rawActive));
+            if (active != null && (active.packageName.trim().isEmpty() || active.userId < 0)) {
+                throw new IllegalStateException("Invalid last-active-launch marker");
+            }
+            LegacyCloneSnapshot snapshot = new LegacyCloneSnapshot(clones, collapsed, masterGps,
+                    profile, active, hadClones, hadCollapsed, hadMasterGps, hadGlobal, hadActive,
+                    rawClones, rawGlobal, rawActive);
+            if (!snapshot.canonicalPayload().equals(payload)) {
+                throw new IllegalStateException("Backup payload is not in canonical form or contains unsupported fields");
+            }
+            return snapshot;
+        } catch (Exception error) {
+            throw new IllegalArgumentException("Canonical migration backup payload rejected", error);
+        }
+    }
+
+    private static boolean requireBoolean(JSONObject object, String key) throws Exception {
+        Object value = object.get(key);
+        if (!(value instanceof Boolean)) throw new IllegalStateException("Canonical field " + key + " is not a Boolean");
+        return (Boolean) value;
+    }
+
     /** Deterministic envelope for checksum and later backup verification. */
     public String canonicalPayload() {
         try {
