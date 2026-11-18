@@ -131,72 +131,44 @@ The existing `CloneStore` remains the active runtime API and the only authoritat
 - Strictly rejects wrong preference types, malformed JSON, non-object clone entries, invalid scalar types, negative virtual user IDs, duplicate composite identities, malformed permission arrays, and invalid coordinates when per-clone GPS is enabled.
 - Preserves each complete original clone JSON object as a compatibility payload, so unrecognized optional fields are not silently discarded by the snapshot layer.
 - Retains stale last-active markers rather than requiring a matching clone row.
-- Produces a deterministic canonical envelope and SHA-256 digest; clone identities, collapsed-space values and permission sets are ordered deterministically.
-- Exposes immutable snapshot collections.
+- Produces a deterministic canonical payload and SHA-256 digest.
+- Does not mutate preferences, create a backup, access Room, or touch BlackBox/session storage.
 
-### Safety boundary
+### Boundary
 
-This is still a read-only preparation stage. The snapshot class does not write SharedPreferences, create a backup file, open Room, import rows, change startup behavior, or access BlackBox/virtual-app/session storage. Any parse or validation ambiguity aborts capture with an explicit exception; it is never treated as an empty registry. The original preferences are therefore left untouched.
-
-A CI source-contract test checks the read-only boundary, strict-validation markers, lossless raw JSON retention, deterministic digest implementation, and that startup has not been wired to the snapshot class.
-
-### Remaining before any import
-
-1. Add an atomic app-private backup writer and read-back checksum verifier, with interruption/failure tests.
-2. Add snapshot-to-Room conversion and one-transaction import, still behind an explicit opt-in test entry point.
-3. Add semantic round-trip parity tests covering every clone field, permissions, collapsed groups, global profile, master GPS and stale active marker.
-4. Exercise idempotence and crash/restart recovery before considering any repository cutover.
-5. Keep the SharedPreferences implementation authoritative until a separate, reviewed migration/cutover stage is approved.
+This is a read-only capture API. It is not invoked from app startup or ordinary CloneStore operations. A rejected snapshot leaves the original preferences unchanged.
 
 
-### Atomic backup implementation
+## Stage 7.2 — Atomic app-private snapshot backup
 
-`LegacyCloneSnapshotBackup.java` now provides an explicit, opt-in backup operation:
+`LegacyCloneSnapshotBackup.java` adds an explicit, opt-in backup operation:
 
-- Writes only beneath the app-private `filesDir/migration-backups/` directory.
-- Uses Android `AtomicFile` with `startWrite`, file-descriptor `sync`, `finishWrite`, and `failWrite` handling.
-- Stores a versioned envelope containing the canonical snapshot payload and SHA-256 digest.
-- Reads the file back after commit and verifies byte-for-byte equality, envelope version, payload digest, and equality with the captured snapshot digest.
-- Treats an existing verified backup as immutable: an identical snapshot reuses it; a different snapshot or corrupt existing file is rejected rather than silently overwriting the pre-migration copy. It also detects AtomicFile's recovery sidecar after interruption and validates/reuses that recovered copy rather than blindly replacing it.
-- Returns a small receipt containing the verified digest and byte count.
+- Stores the validated snapshot under app-private `filesDir/migration-backups/`.
+- Uses Android `AtomicFile`, flushes and fsyncs the write, finishes atomically, and reads the file back.
+- Verifies exact byte equality, envelope format version, payload SHA-256, and equality with the captured snapshot digest.
+- Treats a prior backup as immutable: exact same snapshot can reuse it; a different, unreadable, or corrupt prior backup is rejected rather than overwritten.
+- Detects an interrupted `.bak` sidecar and uses `AtomicFile.openRead()` recovery semantics before considering the backup reusable.
+- Does not use external storage, does not delete databases, and does not access BlackBox/virtual-app/session data.
+- Is not called by `VaultApp` or runtime CloneStore flows.
 
-The backup writer is not invoked by startup or any current user flow. It does not enumerate, copy, or modify BlackBox data, virtual package directories, account/session state, or the legacy preferences. A dedicated CI source-contract test guards the app-private path, atomic write/sync/read-back sequence, checksum checks, and inactive runtime boundary.
-
-**Stage 7.2 remains preparation only:** no Room import or read/write cutover has been added. The next gate is transactional import plus exact semantic parity and restart/idempotence tests, all behind an opt-in test path.
+The source-contract test checks the atomic write, fsync, read-back verification, checksum, immutability, and isolation boundaries.
 
 
-## Stage 7.3 — Opt-in transactional import and semantic parity
+## Stage 7.3 — Opt-in transactional Room importer and parity verifier
 
-The Room foundation now includes a migration-provenance singleton table. It stores the source snapshot SHA-256 and complete canonical source payload, including the original JSON strings and key-presence flags. Each imported clone row also retains its exact legacy JSON object in `legacyJson`, so fields not yet modeled as columns are not discarded.
+`LegacyCloneRoomImporter.java` adds a worker-thread-only, explicit importer:
 
-### Import boundary
+- Refuses main-thread execution.
+- Imports only into an empty Room database, inside one Room transaction.
+- Refuses an existing non-empty database without matching migration provenance.
+- Repeated import is idempotent only if the snapshot digest matches and the verifier confirms every persisted row still matches exactly.
+- Same digest with altered/missing rows is an error; a different digest with prior provenance is an error.
+- Preserves clone composite identity, modeled fields, exact original clone JSON, denied permissions, collapsed keys, global profile, master GPS, optional/stale active marker, and full migration provenance.
+- Does not read or write SharedPreferences, call BlackBox, or manipulate engine/session files.
 
-`LegacyCloneRoomImporter.importIntoEmptyDatabase(...)` is an explicit worker-thread-only operation. It is not called by `VaultApp`, `CloneStore`, any Activity, or normal runtime flows.
+`LegacyCloneRoomVerifier.matches(...)` compares all imported tables against the captured snapshot, including the canonical payload and digest.
 
-- Rejects calls from the Android main thread.
-- Runs the entire import inside `RoomDatabase.runInTransaction`.
-- Refuses a database containing any clone, permission, collapsed-space, profile, settings, or active-marker rows unless matching migration provenance already exists.
-- Inserts clone rows before dependent denied-permission rows, then collapsed keys, global profile, master GPS setting, optional active-launch marker and migration provenance.
-- Does not delete or overwrite existing Room data.
-- Preserves stale active-launch markers without introducing a foreign key to clone rows.
-- A repeated import returns `ALREADY_IMPORTED` only when the source digest matches and the verifier confirms every persisted field still matches. Same digest with altered/missing Room rows is an error, not a silent success.
-
-### Semantic parity verifier
-
-`LegacyCloneRoomVerifier.matches(...)` compares:
-- Composite clone identities and all modeled clone fields, including exact original per-clone JSON.
-- Every denied permission keyed by package/user/permission.
-- Exact collapsed-space string keys.
-- All global device profile metadata fields.
-- Master GPS enabled state.
-- Optional/stale last-active marker.
-- Migration metadata digest and full canonical source payload, which retains source key-presence semantics and raw global/active/clones JSON.
-
-A dedicated CI source-contract test checks the transactional boundary, worker-thread guard, empty-database protection, all field mappings, parity checks, and the fact that no runtime caller invokes the importer.
-
-### Important test limitation and next gate
-
-The CI contract test is a source-level regression guard; it is not a physical-device or Android instrumentation round-trip test. The APK build validates Java/Room annotation-processor compilation. Before any cutover, run actual Room database tests on Android (including forced exception rollback, process death/restart, repeat import, and row corruption detection), then retain the legacy store and verified backup through an upgrade cycle. No production persistence switch is authorized by this stage.
+The source-level contract test protects the worker-thread guard, transaction, empty database guard, row mappings, parity checks, and no-runtime-wiring boundary.
 
 
 ## Stage 7.4 — Android Room instrumentation test harness
@@ -216,3 +188,17 @@ The test APK uses a debug-only `RoomTestApplication` so the instrumentation proc
 ### Boundary and remaining validation
 
 These are automated emulator tests, not physical-device upgrade tests. They do not invoke the importer from startup and do not change the production persistence provider. Before any production cutover, still require an upgrade test against a real legacy installation, a verified backup/restore drill, app-process death during an import, and device-level clone/session regression checks. SharedPreferences remains authoritative.
+
+
+## Stage 7.5 — Android backup integrity instrumentation coverage
+
+This follow-up adds Android instrumentation coverage for the existing opt-in `LegacyCloneSnapshotBackup` implementation:
+
+- A valid snapshot is written, read back through the backup API, and the receipt digest/byte count are checked.
+- Repeating the operation with the exact same snapshot must reuse the immutable backup without changing its bytes.
+- A different snapshot must be rejected and the original backup bytes must remain unchanged.
+- A corrupted existing backup must be rejected and must not be silently replaced.
+
+A separate AndroidX instrumentation class is discovered by the existing `:app:connectedDebugAndroidTest` task. The source-contract wiring test now requires all three backup scenarios to remain present.
+
+**Explicit limitations:** these tests have been added to the feature branch but are not yet CI-verified. They do not simulate an OS-killed app process, and the current backup class does not yet expose a standalone restore API. A future recovery stage must test AtomicFile sidecar recovery, define a validated restore/read contract, and exercise abrupt process termination around the Room transaction boundary. No production import, startup wiring, SharedPreferences mutation, database cutover, or virtual-app/session operation is introduced here. SharedPreferences remains the sole runtime source of truth.
