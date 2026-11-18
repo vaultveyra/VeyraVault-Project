@@ -34,12 +34,18 @@ for key, field in fields.items():
     assert f'o.opt' in store and f'"{key}"' in store and field in store, (key, field)
     assert f'o.put("{key}",' in store and f'e.{field}' in store, "Write mapping missing: " + key
 
-assert 'o.optString("pkg")' in store
-assert 'o.optInt("uid", 0)' in store
+assert 'Object pkg = marker.opt("pkg")' in store
+assert 'Object uid = marker.opt("uid")' in store
+assert 'readLastActiveLaunchStrict' in store
+assert 'return prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();' in store
 assert 'Object denied = o.opt("denied")' in store
 assert 'denied instanceof JSONArray' in store
 assert 'o.put("denied", pArr)' in store
 assert 'e.deniedPermissions.add((String) permission)' in store
+assert 'readCollapsedSpaceNumbersStrict' in store
+assert 'readMasterMockGpsEnabledStrict' in store
+assert 'readGlobalEnvStrict' in store
+assert 'return prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();' in store
 
 # Clone identity is a package + virtual-user pair, not package name alone.
 assert 'cur.packageName.equals(entry.packageName) && cur.userId == entry.userId' in store
