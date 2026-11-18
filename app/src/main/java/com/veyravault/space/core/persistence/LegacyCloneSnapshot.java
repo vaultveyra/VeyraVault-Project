@@ -218,7 +218,7 @@ public final class LegacyCloneSnapshot {
                         || record.longitude < -180.0d || record.longitude > 180.0d)) {
                     throw new IllegalStateException("Clone entry " + i + " has invalid enabled-location coordinates");
                 }
-                String identity = record.packageName + "\\u0000" + record.userId;
+                String identity = record.packageName + "\u0000" + record.userId;
                 if (!identities.add(identity)) throw new IllegalStateException("Duplicate clone identity: " + record.packageName + "/" + record.userId);
                 clones.add(record);
             }
