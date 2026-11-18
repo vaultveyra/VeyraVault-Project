@@ -129,6 +129,132 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertTrue(preferences.getString("clones_json", "").contains("\"gpsOn\":\"true\""));
     }
 
+
+    @Test public void collapsedSpacesAndMasterGpsRoundTripThroughRepository() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch writes = new CountDownLatch(2);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> collapsedWrite = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> masterWrite = new AtomicReference<>();
+        repository.setSpaceCollapsed(3, true, result -> { collapsedWrite.set(result); writes.countDown(); });
+        repository.setMasterMockGpsEnabled(false, result -> { masterWrite.set(result); writes.countDown(); });
+        assertTrue(writes.await(10, TimeUnit.SECONDS));
+        assertTrue(collapsedWrite.get().isSuccess());
+        assertTrue(masterWrite.get().isSuccess());
+
+        CountDownLatch reads = new CountDownLatch(2);
+        AtomicReference<AsyncCloneRepository.Result<java.util.Set<Integer>>> collapsedRead = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> masterRead = new AtomicReference<>();
+        repository.loadCollapsedSpaces(result -> { collapsedRead.set(result); reads.countDown(); });
+        repository.loadMasterMockGpsEnabled(result -> { masterRead.set(result); reads.countDown(); });
+        assertTrue(reads.await(10, TimeUnit.SECONDS));
+        assertTrue(collapsedRead.get().isSuccess());
+        assertTrue(collapsedRead.get().getValue().contains(3));
+        assertTrue(masterRead.get().isSuccess());
+        assertFalse(masterRead.get().getValue());
+        repository.close();
+    }
+
+    @Test public void globalEnvironmentAndProfilesRoundTrip() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CloneStore.GlobalEnvConfig config = new CloneStore.GlobalEnvConfig();
+        config.brand = "google";
+        config.manufacturer = "Google";
+        config.model = "Pixel 9";
+        config.device = "tokay";
+        config.countryIso = "gb";
+        config.simOperator = "23415";
+        config.simOperatorName = "Vodafone";
+        CountDownLatch envSaved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> envSaveResult = new AtomicReference<>();
+        repository.saveGlobalEnvironment(config, result -> { envSaveResult.set(result); envSaved.countDown(); });
+        assertTrue(envSaved.await(10, TimeUnit.SECONDS));
+        assertTrue(envSaveResult.get().isSuccess());
+
+        CountDownLatch envLoaded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.GlobalEnvConfig>> envLoadResult = new AtomicReference<>();
+        repository.loadGlobalEnvironment(result -> { envLoadResult.set(result); envLoaded.countDown(); });
+        assertTrue(envLoaded.await(10, TimeUnit.SECONDS));
+        assertEquals("Pixel 9", envLoadResult.get().getValue().model);
+        assertEquals("gb", envLoadResult.get().getValue().countryIso);
+
+        ProfileSettings profile = new ProfileSettings();
+        profile.localeTag = "en-GB";
+        profile.timeZoneId = "Europe/London";
+        profile.locationEnabled = Boolean.FALSE;
+        CountDownLatch profileSaved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> profileSaveResult = new AtomicReference<>();
+        repository.saveGlobalProfile(profile, result -> { profileSaveResult.set(result); profileSaved.countDown(); });
+        assertTrue(profileSaved.await(10, TimeUnit.SECONDS));
+        assertTrue(profileSaveResult.get().isSuccess());
+
+        CountDownLatch profileLoaded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<ProfileSettings>> profileLoadResult = new AtomicReference<>();
+        repository.loadGlobalProfile(result -> { profileLoadResult.set(result); profileLoaded.countDown(); });
+        assertTrue(profileLoaded.await(10, TimeUnit.SECONDS));
+        assertEquals("en-GB", profileLoadResult.get().getValue().localeTag);
+        assertEquals(Boolean.FALSE, profileLoadResult.get().getValue().locationEnabled);
+        repository.close();
+    }
+
+    @Test public void activeLaunchMarkerRequiresAndReturnsExistingClone() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CloneStore.CloneEntry entry = cloneEntry("com.example.active", 2);
+        CountDownLatch saved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> saveResult = new AtomicReference<>();
+        repository.upsertClone(entry, result -> { saveResult.set(result); saved.countDown(); });
+        assertTrue(saved.await(10, TimeUnit.SECONDS));
+        assertTrue(saveResult.get().isSuccess());
+
+        CountDownLatch recorded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> recordResult = new AtomicReference<>();
+        repository.recordActiveLaunch(entry, result -> { recordResult.set(result); recorded.countDown(); });
+        assertTrue(recorded.await(10, TimeUnit.SECONDS));
+        assertTrue(recordResult.get().isSuccess());
+
+        CountDownLatch loaded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneEntry>> loadResult = new AtomicReference<>();
+        repository.loadLastActiveLaunch(result -> { loadResult.set(result); loaded.countDown(); });
+        assertTrue(loaded.await(10, TimeUnit.SECONDS));
+        assertTrue(loadResult.get().isSuccess());
+        assertEquals("com.example.active", loadResult.get().getValue().packageName);
+        assertEquals(2, loadResult.get().getValue().userId);
+        repository.close();
+    }
+
+    @Test public void malformedSettingsAreReportedAsCorruptData() throws Exception {
+        preferences.edit().putString("collapsed_spaces", "not-a-set")
+                .putString("global_device_json", "{broken")
+                .putString("master_mock_gps", "not-a-boolean").commit();
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(3);
+        AtomicReference<AsyncCloneRepository.Result<java.util.Set<Integer>>> collapsed = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.GlobalEnvConfig>> global = new AtomicReference<>();
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> master = new AtomicReference<>();
+        repository.loadCollapsedSpaces(result -> { collapsed.set(result); done.countDown(); });
+        repository.loadGlobalEnvironment(result -> { global.set(result); done.countDown(); });
+        repository.loadMasterMockGpsEnabled(result -> { master.set(result); done.countDown(); });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, collapsed.get().getFailure());
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, global.get().getFailure());
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, master.get().getFailure());
+        assertEquals("not-a-set", preferences.getString("collapsed_spaces", null));
+        assertEquals("{broken", preferences.getString("global_device_json", null));
+        assertEquals("not-a-boolean", preferences.getString("master_mock_gps", null));
+        repository.close();
+    }
+
+    @Test public void unsupportedProfileSchemaIsNotReportedAsEmptySuccess() throws Exception {
+        profilePreferences.edit().putString("profiles_json", "{\\"schemaVersion\\":999}").commit();
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<ProfileSettings>> resultRef = new AtomicReference<>();
+        repository.loadGlobalProfile(result -> { resultRef.set(result); done.countDown(); });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, resultRef.get().getFailure());
+        assertEquals("{\\"schemaVersion\\":999}", profilePreferences.getString("profiles_json", null));
+        repository.close();
+    }
+
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
