@@ -59,11 +59,12 @@ Introduce one application-scoped, single-writer asynchronous repository facade o
 - Allocate next user ID with an explicit error result.
 - Upsert and remove clone with explicit commit result.
 - Save the complete validated clone list with explicit commit result.
-- Read and write collapsed Space state with explicit commit result.
-- Read and write master GPS state with explicit commit result.
-- Read and write global device-profile metadata with explicit commit result.
-- Record/read the last confirmed active-launch marker with explicit commit/read result.
-- Read/write ProfileStore global and per-clone overrides through its own versioned namespace.
+- Read and write collapsed Space state with explicit commit result and strict stored-type validation.
+- Read and write master GPS state with explicit commit result and strict stored-type validation.
+- Read and write global device-profile metadata with explicit commit result and strict JSON field validation.
+- Record/read the last confirmed active-launch marker with explicit commit/read result and strict identity validation.
+- Read/write ProfileStore global and per-clone overrides through its own versioned namespace, with strict schema/field reads and defensive copies.
+- Clear individual profile fields without erasing sibling overrides.
 - Run legacy profile import only from a strict validated CloneStore snapshot; report whether import committed.
 
 No operation should accept an arbitrary callback that performs Android UI or Engine work on the persistence thread.
@@ -108,12 +109,20 @@ Implementation added on the feature branch after the design-only audit:
 - Add Android instrumentation coverage for queue ordering, main-thread callbacks, returned-record isolation, corrupt-registry failure propagation, closed-repository rejection and strict ProfileStore migration-marker protection.
 - Add a CI source-contract check for the repository's executor, callback, strict-read, defensive-copy and no-Room/no-Engine boundaries.
 
-### Stage 7.9.1 scope and validation status
+### Stage 7.9.2 — Expanded repository surface and strict settings reads
 
-This is an initial core foundation, not full Stage 7.9 completion:
+Implementation now also includes:
+- Async read/write for collapsed Space keys, master GPS, global device/SIM metadata, and last confirmed active-launch marker.
+- Commit-aware CloneStore setters for collapsed Spaces, master GPS, global metadata, and active launch marker. Existing call sites may ignore the returned boolean for source compatibility; they will be reviewed separately before async adoption.
+- Strict validation of preference types, JSON field types, Space numbers, and active-launch composite identity. Repository writes preflight existing values so malformed settings are reported as corrupt data and are not overwritten.
+- Strict ProfileStore reads for global and per-clone settings; unknown schema versions and malformed field types become typed failures rather than empty/default success.
+- Async ProfileStore save and field-clear operations with defensive copies, plus queued legacy location import.
+- Android instrumentation for round trips, malformed settings, active marker identity and unsupported ProfileStore schema.
+
+### Stage 7.9 implementation scope and validation status
+
 - No Activity, startup hook, Engine lifecycle or UI caller has been switched to the async API.
 - The facade serializes only calls submitted to its own executor. Existing direct synchronous CloneStore writes are outside that queue; ID allocation is not an atomic reservation.
-- Collapsed Space, master GPS, global device metadata, active-launch marker and ProfileStore read/write APIs are not yet exposed by this repository.
-- The identified SetLocationActivity and GlobalEnvironmentActivity success-reporting gaps remain for a later, separately tested caller-adoption step.
-- Android instrumentation and CI for this implementation are pending. No test pass is claimed until the new workflow run completes.
+- SetLocationActivity and GlobalEnvironmentActivity still need a separate, reviewed caller-adoption step so they stop reporting success after failed persistence.
+- CI for Stage 7.9.2 is pending; do not infer a test pass until the current workflow run completes.
 - Room remains inactive; no data migration, cutover, session/account data operation or startup behavior change is introduced.
