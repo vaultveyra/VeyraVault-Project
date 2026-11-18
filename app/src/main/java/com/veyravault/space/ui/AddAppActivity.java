@@ -22,6 +22,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
+import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
@@ -47,11 +48,14 @@ public class AddAppActivity extends BaseActivity {
     private Button batchConfirmBtn;
     private boolean fa;
     private String currentQuery = "";
+    private AsyncCloneRepository repository;
+    private boolean cloneOperationRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
+        repository = AsyncCloneRepository.getInstance(getApplicationContext());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -125,12 +129,14 @@ public class AddAppActivity extends BaseActivity {
         batchConfirmBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (cloneOperationRunning || batchSelected.isEmpty()) return;
+                List<InstalledApp> selected = new ArrayList<InstalledApp>();
                 for (InstalledApp app : allApps) {
-                    if (batchSelected.contains(app.pkg)) {
-                        cloneSingleApp(app);
-                    }
+                    if (batchSelected.contains(app.pkg)) selected.add(app);
                 }
-                finish();
+                cloneOperationRunning = true;
+                batchConfirmBtn.setEnabled(false);
+                cloneBatchAt(selected, 0, 0, 0);
             }
         });
         root.addView(batchConfirmBtn, blp);
@@ -221,8 +227,15 @@ public class AddAppActivity extends BaseActivity {
                         batchConfirmBtn.setText((fa ? "کلون کردن (" : "Clone (") + batchSelected.size() + ")");
                         renderGrid(query);
                     } else {
-                        cloneSingleApp(app);
-                        finish();
+                        if (!cloneOperationRunning) {
+                            cloneOperationRunning = true;
+                            cloneSingleApp(app, new CloneCallback() {
+                                @Override public void onComplete(boolean saved) {
+                                    cloneOperationRunning = false;
+                                    if (saved && !isFinishing() && !isDestroyed()) finish();
+                                }
+                            });
+                        }
                     }
                 }
             });
@@ -230,40 +243,89 @@ public class AddAppActivity extends BaseActivity {
         }
     }
 
-    private void cloneSingleApp(InstalledApp app) {
-        int nextUid = CloneStore.nextFreeUserIdForPackage(this, app.pkg);
-        if (nextUid < 0) {
+    private interface CloneCallback {
+        void onComplete(boolean saved);
+    }
+
+    private void cloneBatchAt(final List<InstalledApp> selected, final int index,
+                              final int savedCount, final int failedCount) {
+        if (isFinishing() || isDestroyed()) return;
+        if (index >= selected.size()) {
+            cloneOperationRunning = false;
+            if (batchConfirmBtn != null) batchConfirmBtn.setEnabled(true);
             Toast.makeText(this,
-                    fa ? "فهرست کلون‌ها قابل خواندن نیست؛ برای جلوگیری از ثبت اشتباه، نصب انجام نشد."
-                       : "Clone registry could not be validated; installation was stopped to prevent an incorrect Space assignment.",
+                    fa ? ("پایان عملیات: " + savedCount + " موفق، " + failedCount + " ناموفق")
+                       : ("Batch complete: " + savedCount + " succeeded, " + failedCount + " failed"),
                     Toast.LENGTH_LONG).show();
+            finish();
             return;
         }
-        CloneStore.CloneEntry e = new CloneStore.CloneEntry();
-        e.packageName = app.pkg;
-        e.userId = nextUid;
-        e.displayName = app.label;
-        if (!Engine.installPackageAsUser(e.packageName, e.userId)) {
-            Toast.makeText(this,
-                    fa ? "نصب کلون ناموفق بود؛ فضای جدید ثبت نشد." : "Clone installation failed; no space entry was saved.",
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (!CloneStore.upsertClone(this, e)) {
-            boolean cleanupConfirmed = Engine.uninstallClone(e.packageName, e.userId);
-            Toast.makeText(this,
-                    fa ? (cleanupConfirmed
-                            ? "ثبت فضای جدید ناموفق بود؛ نصب آزمایشی نیز پاک شد."
-                            : "ثبت فضای جدید ناموفق بود و حذف نصب تأیید نشد؛ لطفاً وضعیت کلون را بررسی کن.")
-                       : (cleanupConfirmed
-                            ? "Saving the new Space failed; the just-installed clone was removed."
-                            : "Saving the new Space failed and uninstall could not be confirmed; please inspect this clone."),
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        Toast.makeText(this,
-                fa ? (app.label + " به فضای " + e.getSpaceNumber() + " اضافه شد")
-                   : (app.label + " cloned into Space " + e.getSpaceNumber()),
-                Toast.LENGTH_SHORT).show();
+        cloneSingleApp(selected.get(index), new CloneCallback() {
+            @Override public void onComplete(boolean saved) {
+                if (isFinishing() || isDestroyed()) return;
+                cloneBatchAt(selected, index + 1, savedCount + (saved ? 1 : 0),
+                        failedCount + (saved ? 0 : 1));
+            }
+        });
+    }
+
+    private void cloneSingleApp(final InstalledApp app, final CloneCallback callback) {
+        repository.allocateNextUserId(app.pkg, new AsyncCloneRepository.Callback<Integer>() {
+            @Override public void onComplete(AsyncCloneRepository.Result<Integer> allocation) {
+                if (!allocation.isSuccess()) {
+                    showCloneError(fa
+                            ? "فهرست کلون‌ها قابل خواندن نیست؛ نصب برای جلوگیری از ثبت اشتباه متوقف شد."
+                            : "Clone registry could not be validated; installation was stopped.");
+                    callback.onComplete(false);
+                    return;
+                }
+                if (isFinishing() || isDestroyed()) {
+                    callback.onComplete(false);
+                    return;
+                }
+                final CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
+                entry.packageName = app.pkg;
+                entry.userId = allocation.getValue();
+                entry.displayName = app.label;
+                if (!Engine.installPackageAsUser(entry.packageName, entry.userId)) {
+                    showCloneError(fa
+                            ? "نصب کلون ناموفق بود؛ فضای جدید ثبت نشد."
+                            : "Clone installation failed; no Space entry was saved.");
+                    callback.onComplete(false);
+                    return;
+                }
+                repository.upsertClone(entry, new AsyncCloneRepository.Callback<Boolean>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> save) {
+                        if (!save.isSuccess()) {
+                            // Engine cleanup is mandatory even if the Activity has already been destroyed.
+                            boolean cleanupConfirmed = Engine.uninstallClone(entry.packageName, entry.userId);
+                            if (!isFinishing() && !isDestroyed()) {
+                                showCloneError(fa
+                                        ? (cleanupConfirmed
+                                            ? "ثبت فضای جدید ناموفق بود؛ نصب کلون نیز پاک شد."
+                                            : "ثبت فضا ناموفق بود و حذف کلون تأیید نشد؛ وضعیت آن را بررسی کن.")
+                                        : (cleanupConfirmed
+                                            ? "Saving the new Space failed; the installed clone was removed."
+                                            : "Saving the new Space failed and clone removal was not confirmed; please inspect it."));
+                            }
+                            callback.onComplete(false);
+                            return;
+                        }
+                        if (!isFinishing() && !isDestroyed()) {
+                            Toast.makeText(AddAppActivity.this,
+                                    fa ? (app.label + " به فضای " + entry.getSpaceNumber() + " اضافه شد")
+                                       : (app.label + " cloned into Space " + entry.getSpaceNumber()),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                        callback.onComplete(true);
+                    }
+                });
+            }
+        });
+    }
+
+    private void showCloneError(String message) {
+        if (isFinishing() || isDestroyed()) return;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }
