@@ -182,6 +182,147 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    public void loadCollapsedSpaces(Callback<Set<Integer>> callback) {
+        enqueue(() -> new HashSet<Integer>(CloneStore.readCollapsedSpaceNumbersStrict(appContext)), callback);
+    }
+
+    public void setSpaceCollapsed(int spaceNumber, boolean collapsed, Callback<Boolean> callback) {
+        if (spaceNumber < 1) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Space number must be positive"));
+            return;
+        }
+        enqueue(() -> {
+            if (!CloneStore.setSpaceCollapsed(appContext, spaceNumber, collapsed))
+                throw new PersistenceFailureException("Collapsed Spaces update was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadMasterMockGpsEnabled(Callback<Boolean> callback) {
+        enqueue(() -> CloneStore.readMasterMockGpsEnabledStrict(appContext), callback);
+    }
+
+    public void setMasterMockGpsEnabled(boolean enabled, Callback<Boolean> callback) {
+        enqueue(() -> {
+            if (!CloneStore.setMasterMockGpsEnabled(appContext, enabled))
+                throw new PersistenceFailureException("Master GPS update was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadGlobalEnvironment(Callback<CloneStore.GlobalEnvConfig> callback) {
+        enqueue(() -> copyGlobalEnvironment(CloneStore.readGlobalEnvStrict(appContext)), callback);
+    }
+
+    public void saveGlobalEnvironment(CloneStore.GlobalEnvConfig config, Callback<Boolean> callback) {
+        if (config == null || config.brand == null || config.manufacturer == null
+                || config.model == null || config.device == null || config.countryIso == null
+                || config.simOperator == null || config.simOperatorName == null) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Global environment profile is invalid"));
+            return;
+        }
+        final CloneStore.GlobalEnvConfig snapshot = copyGlobalEnvironment(config);
+        enqueue(() -> {
+            if (!CloneStore.saveGlobalEnv(appContext, snapshot))
+                throw new PersistenceFailureException("Global environment profile was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadLastActiveLaunch(Callback<CloneStore.CloneEntry> callback) {
+        enqueue(() -> {
+            CloneStore.CloneEntry entry = CloneStore.readLastActiveLaunchStrict(appContext);
+            return entry == null ? null : copyEntry(entry);
+        }, callback);
+    }
+
+    public void recordActiveLaunch(CloneStore.CloneEntry entry, Callback<Boolean> callback) {
+        if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
+                || entry.userId < 0) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Active clone identity is invalid"));
+            return;
+        }
+        final CloneStore.CloneEntry snapshot = copyEntry(entry);
+        enqueue(() -> {
+            if (!CloneStore.recordActiveLaunch(appContext, snapshot))
+                throw new PersistenceFailureException("Active launch marker was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadGlobalProfile(Callback<ProfileSettings> callback) {
+        enqueue(() -> ProfileStore.readGlobalStrict(appContext).copy(), callback);
+    }
+
+    public void saveGlobalProfile(ProfileSettings settings, Callback<Boolean> callback) {
+        if (settings == null || !settings.isValid()) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Global profile is invalid"));
+            return;
+        }
+        final ProfileSettings snapshot = settings.copy();
+        enqueue(() -> {
+            if (!ProfileStore.saveGlobal(appContext, snapshot))
+                throw new PersistenceFailureException("Global profile was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void loadCloneProfile(String packageName, int userId, Callback<ProfileSettings> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
+            deliver(callback, Result.<ProfileSettings>failure(Failure.INVALID_INPUT, "Clone identity is invalid"));
+            return;
+        }
+        enqueue(() -> ProfileStore.readCloneOverrideStrict(appContext, packageName, userId).copy(), callback);
+    }
+
+    public void saveCloneProfile(String packageName, int userId, ProfileSettings settings,
+                                 Callback<Boolean> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || settings == null || !settings.isValid()) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile is invalid"));
+            return;
+        }
+        final ProfileSettings snapshot = settings.copy();
+        enqueue(() -> {
+            if (!ProfileStore.saveCloneOverride(appContext, packageName, userId, snapshot))
+                throw new PersistenceFailureException("Clone profile was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void clearCloneProfileField(String packageName, int userId, String field,
+                                       Callback<Boolean> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0 || field == null) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile field request is invalid"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileStore.clearCloneOverrideField(appContext, packageName, userId, field))
+                throw new PersistenceFailureException("Clone profile field clear was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void clearGlobalProfileField(String field, Callback<Boolean> callback) {
+        if (field == null || field.trim().isEmpty()) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Profile field is required"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileStore.clearGlobalField(appContext, field))
+                throw new PersistenceFailureException("Global profile field clear was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void migrateLegacyLocationProfiles(Callback<Boolean> callback) {
+        enqueue(() -> {
+            if (!ProfileStore.migrateLegacyLocationSettings(appContext))
+                throw new PersistenceFailureException("Legacy profile import was not completed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
     private <T> void enqueue(Operation<T> operation, Callback<T> callback) {
         if (callback == null) return;
         if (closed) {
@@ -250,6 +391,19 @@ public final class AsyncCloneRepository implements AutoCloseable {
             if (permission == null || permission.trim().isEmpty())
                 throw new IllegalArgumentException("Denied permission is invalid");
         }
+    }
+
+    private static CloneStore.GlobalEnvConfig copyGlobalEnvironment(CloneStore.GlobalEnvConfig source) {
+        CloneStore.GlobalEnvConfig copy = new CloneStore.GlobalEnvConfig();
+        copy.enabled = source.enabled;
+        copy.brand = source.brand;
+        copy.manufacturer = source.manufacturer;
+        copy.model = source.model;
+        copy.device = source.device;
+        copy.countryIso = source.countryIso;
+        copy.simOperator = source.simOperator;
+        copy.simOperatorName = source.simOperatorName;
+        return copy;
     }
 
     private static List<CloneStore.CloneEntry> copyEntries(List<CloneStore.CloneEntry> entries) {
