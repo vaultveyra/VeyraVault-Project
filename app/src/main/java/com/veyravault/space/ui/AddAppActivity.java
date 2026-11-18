@@ -311,7 +311,7 @@ public class AddAppActivity extends BaseActivity {
                             callback.onComplete(false);
                             return;
                         }
-                        if (!isFinishing() && !isDestroyed()) {
+                        if (!batchMode && !isFinishing() && !isDestroyed()) {
                             Toast.makeText(AddAppActivity.this,
                                     fa ? (app.label + " به فضای " + entry.getSpaceNumber() + " اضافه شد")
                                        : (app.label + " cloned into Space " + entry.getSpaceNumber()),
