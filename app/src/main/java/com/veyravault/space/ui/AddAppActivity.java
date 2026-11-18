@@ -295,7 +295,7 @@ public class AddAppActivity extends BaseActivity {
 
                 if (!Engine.installPackageAsUser(entry.packageName, entry.userId)) {
                     boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
-                    if (absent) releaseReservationIfEngineAbsent(reservation);
+                    if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
                     showCloneError(fa
                             ? (absent
                                 ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
@@ -313,7 +313,7 @@ public class AddAppActivity extends BaseActivity {
                         if (!save.isSuccess()) {
                             // The durable reservation remains until Engine confirms cleanup.
                             boolean cleanupConfirmed = Engine.uninstallClone(entry.packageName, entry.userId);
-                            if (cleanupConfirmed) releaseReservationIfEngineAbsent(reservation);
+                            if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation);
                             if (!isFinishing() && !isDestroyed()) {
                                 showCloneError(fa
                                         ? (cleanupConfirmed
@@ -337,6 +337,16 @@ public class AddAppActivity extends BaseActivity {
                 });
             }
         });
+    }
+
+    private void releaseReservationAfterConfirmedEngineAbsence(
+            CloneStore.CloneReservation reservation) {
+        repository.releaseReservationAfterEngineAbsence(reservation, true,
+                new AsyncCloneRepository.Callback<Boolean>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
+                        // Explicit Engine absence was already verified by the caller.
+                    }
+                });
     }
 
     private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
