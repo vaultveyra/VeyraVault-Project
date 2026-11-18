@@ -44,6 +44,9 @@ jobs:
       - name: Test engine install/launch failure contract
         run: python3 scripts/test_engine_contract.py
 
+      - name: Test fail-closed CloneStore mutations
+        run: python3 scripts/test_clone_store_safe_mutations.py
+
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
 
