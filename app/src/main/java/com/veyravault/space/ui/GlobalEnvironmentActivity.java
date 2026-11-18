@@ -16,7 +16,6 @@ import com.veyravault.space.R;
 import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
-import com.veyravault.space.core.VirtualHookManager;
 
 public class GlobalEnvironmentActivity extends BaseActivity {
     private AsyncCloneRepository repository;
@@ -219,7 +218,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                     return;
                 }
                 // Both independent commits are confirmed before requesting hook synchronization.
-                VirtualHookManager.syncAllHooks(getApplicationContext());
+                CloneStore.syncAllHooks(getApplicationContext());
                 Toast.makeText(this, fa
                         ? "پروفایل و Master GPS ذخیره شدند؛ همگام‌سازی موقعیت کلون‌ها درخواست شد. مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
                         : "Profile and Master GPS were saved; clone location hook sync was requested. Device/SIM values are metadata only and are not applied to clones.",
