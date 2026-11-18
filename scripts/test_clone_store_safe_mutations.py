@@ -42,8 +42,12 @@ assert "readAllStrict(c)" in remove and "return false;" in remove
 assert "readAllStrict(c)" in next_id and "return -1;" in next_id
 assert "public static List<CloneEntry> getAll(Context c)" in store
 
-assert "if (nextUid < 0)" in add_ui
-assert "if (!CloneStore.upsertClone(this, e))" in add_ui
+assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
+assert "CloneStore.upsertClone(" not in add_ui
+assert "repository.allocateNextUserId(app.pkg" in add_ui
+assert "repository.upsertClone(entry" in add_ui
+assert "if (!Engine.installPackageAsUser(entry.packageName, entry.userId))" in add_ui
+assert add_ui.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < add_ui.index("repository.upsertClone(entry")
 assert "repository.allocateNextUserId(item.packageName" in main_ui
 assert "allocation.getValue() < 0" in main_ui
 assert "repository.upsertClone(copy" in main_ui
