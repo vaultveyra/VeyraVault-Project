@@ -419,8 +419,9 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
     }
 
-    private static Failure classify(Throwable error) {
-        if (error instanceof PersistenceFailureException) return Failure.PERSISTENCE_FAILURE;
+    static Failure classify(Throwable error) {
+        if (error instanceof PersistenceFailureException
+                || error instanceof CloneStore.PersistenceException) return Failure.PERSISTENCE_FAILURE;
         if (error instanceof IllegalArgumentException) return Failure.INVALID_INPUT;
         if (error instanceof IllegalStateException
                 || error instanceof org.json.JSONException) return Failure.CORRUPT_DATA;
