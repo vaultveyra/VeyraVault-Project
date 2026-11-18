@@ -47,6 +47,8 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 - Add instrumentation coverage for the tri-state mapping of true/false/null.
 - Add instrumentation proving pending reservation diagnostics are strict and read-only: both clone-registry JSON and reservation-journal bytes remain unchanged after loading.
 - Add `scripts/test_pending_reservation_recovery_contract.py` to verify tri-state semantics, Settings/manifest wiring, no automatic release, no uninstall/data-clear/clone-write APIs in the diagnostics Activity, a confirmation dialog, and a fresh Engine-absence recheck before release.
+- The pre-existing Room OS process-death harness was made more diagnosable after CI run #500 found one failure in `LegacyCloneRoomProcessDeathInstrumentationTest`. CI run #501 did not execute tests because the Emulator failed to install the debug split APK (0 tests). CI run #502 reached 39 tests but found a marker-publication race: the test process observed an empty marker before the Debug service finished writing its PID.
+- Follow-up commits `359f9bfa07b145a999b3df29393753464860d076`, `32501b5c5a1f56fb8ec2f74df2aa2c8b1c63df4c`, and `7d695a1d52e732acf23d57528e3992e203d18a3f` make marker publication temp-file + fsync + rename, wait only for a non-empty marker, add named assertions for every Room table count, and extend the source wiring contract. They do not weaken or skip the process-death test.
 - The current branch adds two Android instrumentation tests. The full Emulator suite is expected to contain 39 tests; the actual runner output is authoritative.
 
 ## Safety boundaries and limitations
@@ -57,6 +59,14 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 - This does not introduce a cross-process lock. Stage 7.9.8 reservation coordination remains limited to the host app process.
 - Physical-device checks are still required for Engine reflection compatibility, interrupted installation, and process restart behavior.
 - No Room runtime activation, migration/cutover, changes to CloneStore clone JSON, virtual package data, sessions/accounts, or main branch are performed.
+
+## Current validation
+
+- The new diagnostics source-contract steps pass in CI runs #500 and #502.
+- CI #500 completed 39 tests with 38 passing and the existing Room process-death harness failing.
+- CI #501 executed zero tests because Android Emulator failed to install the debug split APK.
+- CI #502 completed the 39-test suite but the process-death harness failed with `Missing pid in marker:`; this exposed the test-harness marker-publication race described above.
+- The follow-up atomic-marker commits are awaiting a fresh CI run on the new branch head. Stage 7.9.9 is not considered fully validated until that run passes the complete Emulator suite, Source Audit, Release build and APK Audit.
 
 ## Explicit non-goals
 
