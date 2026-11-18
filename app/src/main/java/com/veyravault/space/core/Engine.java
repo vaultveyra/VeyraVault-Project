@@ -90,16 +90,20 @@ public class Engine {
         }
     }
 
-    private static boolean isInstalledAsUser(String pkg, int userId) {
+    private static Boolean queryInstalledAsUser(String pkg, int userId) {
         try {
             Object core = getCore();
-            if (core == null) return false;
+            if (core == null) return null;
             Method m = core.getClass().getMethod("isInstalled", String.class, int.class);
             Object result = m.invoke(core, pkg, userId);
-            return Boolean.TRUE.equals(result);
+            return result instanceof Boolean ? (Boolean) result : null;
         } catch (Throwable ignored) {
-            return false;
+            return null;
         }
+    }
+
+    private static boolean isInstalledAsUser(String pkg, int userId) {
+        return Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId));
     }
 
     public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
@@ -149,13 +153,19 @@ public class Engine {
         } catch (Throwable ignored) {}
     }
 
-    public static void uninstallClone(String pkg, int userId) {
+    public static boolean uninstallClone(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
         try {
             Object core = getCore();
-            if (core == null) return;
+            if (core == null) return false;
             Method m = core.getClass().getMethod("uninstallPackageAsUser", String.class, int.class);
             m.invoke(core, pkg, userId);
-        } catch (Throwable ignored) {}
+            // A successful reflection call is not enough: confirm the engine reports
+            // the virtual package absent. Unknown/error state is never success.
+            return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId));
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public static boolean isGmsInstalled(int userId) {
