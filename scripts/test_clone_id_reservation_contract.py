@@ -63,7 +63,9 @@ assert "reserved.contains(identityKey(entry.packageName, entry.userId))" in save
 
 # Engine absence is a positive-only check; reflection/query uncertainty cannot free a reservation.
 absence = method_body(ENGINE, "public static boolean isCloneConfirmedAbsent(")
-assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in absence
+assert "getCloneInstallState(pkg, userId) == CloneInstallState.ABSENT" in absence
+install_state = method_body(ENGINE, "public static CloneInstallState getCloneInstallState(")
+assert "classifyInstalledQueryResult(queryInstalledAsUser(pkg, userId))" in install_state
 
 # Repository APIs expose reservation operations without performing Engine side effects.
 for api in (
