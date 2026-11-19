@@ -48,6 +48,7 @@ public class SetLocationActivity extends BaseActivity {
     private Button saveButton;
     private TextView resetButton;
     private TextView sourceTv;
+    private boolean locationPointSelected;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -239,6 +240,7 @@ public class SetLocationActivity extends BaseActivity {
                     cloneProfile.locationEnabled = null;
                     cloneProfile.latitude = null;
                     cloneProfile.longitude = null;
+                    applyLoadedProfilesIfReady();
                     syncSavedCloneLocation();
                 });
             }
@@ -281,6 +283,9 @@ public class SetLocationActivity extends BaseActivity {
                 cloneProfile, globalProfile, ProfileRuntimeApplier.systemFallback());
         if (effective.latitude != null && effective.longitude != null) {
             updateSelectedPoint(effective.latitude, effective.longitude);
+        } else {
+            locationPointSelected = false;
+            saveButton.setEnabled(false);
         }
         String state = String.valueOf(effective.locationEnabled) + " (" + effective.locationEnabledSource + ")";
         String coordinates = effective.latitude == null || effective.longitude == null
@@ -288,7 +293,7 @@ public class SetLocationActivity extends BaseActivity {
                 : effective.latitudeSource + " / " + effective.longitudeSource;
         sourceTv.setText(fa ? "وضعیت مؤثر: " + state + "؛ منبع مختصات: " + coordinates
                 : "Effective enabled: " + state + "; coordinate source: " + coordinates);
-        saveButton.setEnabled(true);
+        saveButton.setEnabled(locationPointSelected);
         resetButton.setEnabled(true);
     }
 
@@ -302,7 +307,7 @@ public class SetLocationActivity extends BaseActivity {
         hookRepository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId, (hookResult, error) -> {
             if (isFinishing() || isDestroyed()) return;
             if (error != null || hookResult == null) {
-                saveButton.setEnabled(true);
+                saveButton.setEnabled(locationPointSelected);
                 resetButton.setEnabled(true);
                 Toast.makeText(this, (fa ? "ذخیره انجام شد اما اجرای همگام‌سازی ناموفق بود: " :
                         "Profile saved, but hook synchronization could not run: ")
@@ -323,7 +328,7 @@ public class SetLocationActivity extends BaseActivity {
             finish();
             return;
         }
-        saveButton.setEnabled(true);
+        saveButton.setEnabled(locationPointSelected);
         resetButton.setEnabled(true);
         Toast.makeText(this, (fa ? "تنظیم ذخیره شد اما اعمال موقعیت تأیید نشد: " :
                 "Profile saved, but engine application was not verified: ")
@@ -333,6 +338,8 @@ public class SetLocationActivity extends BaseActivity {
     private void updateSelectedPoint(double lat, double lng) {
         selectedLat = lat;
         selectedLng = lng;
+        locationPointSelected = true;
+        if (saveButton != null && cloneProfileLoaded && globalProfileLoaded) saveButton.setEnabled(true);
         GeoPoint gp = new GeoPoint(lat, lng);
         pinMarker.setPosition(gp);
         mapView.getController().animateTo(gp);
