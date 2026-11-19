@@ -213,29 +213,29 @@ public class MainActivity extends BaseActivity {
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setGravity(Gravity.CENTER);
         bottomBar.setBackgroundResource(R.drawable.bg_card_rounded);
-        bottomBar.setPadding(20, 18, 20, 18);
+        bottomBar.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams bottomLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bottomLp.setMargins(28, 8, 28, 24);
+        bottomLp.setMargins(dp(16), dp(6), dp(16), dp(14));
 
-        bottomBar.addView(makeNavButton(fa ? "خانه" : "Dashboard", false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "خانه" : "Home", android.R.drawable.ic_menu_view, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, DashboardActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
-        bottomBar.addView(makeNavButton(fa ? "فضاها" : "Spaces", true, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "فضاها" : "Spaces", android.R.drawable.ic_menu_agenda, true, new View.OnClickListener() {
             @Override public void onClick(View v) { refreshSpaces(); }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
-        TextView fabPlus = new TextView(this);
-        fabPlus.setText("+");
-        fabPlus.setTextColor(Color.WHITE);
-        fabPlus.setTextSize(28f);
-        fabPlus.setGravity(Gravity.CENTER);
+        ImageView fabPlus = new ImageView(this);
+        fabPlus.setImageResource(android.R.drawable.ic_input_add);
+        fabPlus.setColorFilter(Color.WHITE);
+        fabPlus.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        fabPlus.setContentDescription(fa ? "افزودن برنامه" : "Add app");
         fabPlus.setBackgroundResource(R.drawable.bg_pill_blue);
-        LinearLayout.LayoutParams fabLp = new LinearLayout.LayoutParams(132, 132);
-        fabLp.setMargins(16, 0, 16, 0);
+        LinearLayout.LayoutParams fabLp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        fabLp.setMargins(dp(8), 0, dp(8), 0);
         fabPlus.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -244,17 +244,17 @@ public class MainActivity extends BaseActivity {
         });
         bottomBar.addView(fabPlus, fabLp);
 
-        bottomBar.addView(makeNavButton("VPN", false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton("VPN", android.R.drawable.ic_menu_compass, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, VpnStatusActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
-        bottomBar.addView(makeNavButton(fa ? "تنظیمات" : "Settings", false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "تنظیمات" : "Settings", android.R.drawable.ic_menu_preferences, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, SettingsHubActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
         root.addView(bottomBar, bottomLp);
         setContentView(root);
@@ -1034,15 +1034,32 @@ public class MainActivity extends BaseActivity {
         return tv;
     }
 
-    private View makeNavButton(String title, boolean active, View.OnClickListener l) {
-        TextView tv = new TextView(this);
-        tv.setText(title);
-        tv.setGravity(Gravity.CENTER);
-        tv.setTextSize(12f);
-        tv.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-        tv.setTextColor(Color.parseColor(active ? "#2563EB" : "#6B7280"));
-        tv.setPadding(8, 16, 8, 16);
-        tv.setOnClickListener(l);
-        return tv;
+    private View makeNavButton(String title, int iconRes, boolean active, View.OnClickListener listener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(title);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(Color.parseColor(active ? "#2563EB" : "#6B7280"));
+        item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
+
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setGravity(Gravity.CENTER);
+        label.setTextSize(10f);
+        label.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        label.setTextColor(Color.parseColor(active ? "#2563EB" : "#6B7280"));
+        label.setPadding(0, dp(3), 0, 0);
+        item.addView(label);
+        item.setOnClickListener(listener);
+        return item;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }
