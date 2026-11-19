@@ -25,5 +25,12 @@ assert "clearCloneLocationOverrides(" in store
 assert "legacyLocationCleared" in store
 assert "optBoolean(KEY_LEGACY_LOCATION_CLEARED, false)" in store
 assert "out.remove(KEY_LEGACY_LOCATION_CLEARED)" in store
+assert "saveGlobalLocationOverrides(" in store
+assert "clearGlobalLocationOverrides(" in store
+
+repository = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneRepository.java").read_text(encoding="utf-8")
+assert "clearCloneLocationOverrides(" in repository
+assert "saveGlobalLocationProfile(" in repository
+assert "clearGlobalLocationOverrides(" in repository
 
 print("PASS: Location hook resolves strict profiles, honors Master GPS, verifies pinned-engine readback, and preserves explicit inheritance resets.")
