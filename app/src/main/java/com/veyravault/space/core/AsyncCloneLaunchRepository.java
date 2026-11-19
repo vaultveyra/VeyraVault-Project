@@ -79,7 +79,7 @@ public final class AsyncCloneLaunchRepository {
                         Engine.CloneLaunchResult result = Engine.launchCloneDetailed(appContext, target);
                         outcome = new Outcome(target, result, null);
                     }
-                } catch (Exception failure) {
+                } catch (Throwable failure) {
                     outcome = new Outcome(null, null, failure.getClass().getSimpleName() + ":"
                             + (failure.getMessage() == null ? "CLONE_LAUNCH_PREPARATION_FAILED" : failure.getMessage()));
                 }
