@@ -95,12 +95,16 @@ public final class ProfileStore {
         if (enabled != null && !(enabled instanceof Boolean)) throw new IllegalStateException("locationEnabled is invalid");
         if (latitude != null && !(latitude instanceof Number)) throw new IllegalStateException("latitude is invalid");
         if (longitude != null && !(longitude instanceof Number)) throw new IllegalStateException("longitude is invalid");
-        out.localeTag = (String) locale;
-        out.timeZoneId = (String) zone;
+        // Semantic invalidity is field-scoped: ignore only the bad value so the
+        // resolver can continue to the next source for that field. Structural type
+        // errors still fail the strict read and are never silently coerced.
+        out.localeTag = ProfileSettings.isLocaleTagValid((String) locale) ? (String) locale : null;
+        out.timeZoneId = ProfileSettings.isTimeZoneIdValid((String) zone) ? (String) zone : null;
         out.locationEnabled = (Boolean) enabled;
-        out.latitude = latitude == null ? null : ((Number) latitude).doubleValue();
-        out.longitude = longitude == null ? null : ((Number) longitude).doubleValue();
-        if (!out.isValid()) throw new IllegalStateException("Profile values are invalid");
+        Double lat = latitude == null ? null : ((Number) latitude).doubleValue();
+        Double lng = longitude == null ? null : ((Number) longitude).doubleValue();
+        out.latitude = ProfileSettings.isLatitudeValid(lat) ? lat : null;
+        out.longitude = ProfileSettings.isLongitudeValid(lng) ? lng : null;
         return out;
     }
 
@@ -287,12 +291,24 @@ public final class ProfileStore {
     private static ProfileSettings fromJson(JSONObject json) {
         ProfileSettings out = new ProfileSettings();
         if (json == null) return out;
-        if (json.has("localeTag") && !json.isNull("localeTag")) out.localeTag = json.optString("localeTag", null);
-        if (json.has("timeZoneId") && !json.isNull("timeZoneId")) out.timeZoneId = json.optString("timeZoneId", null);
-        if (json.has("locationEnabled") && !json.isNull("locationEnabled"))
-            out.locationEnabled = json.optBoolean("locationEnabled");
-        if (json.has("latitude") && !json.isNull("latitude")) out.latitude = json.optDouble("latitude");
-        if (json.has("longitude") && !json.isNull("longitude")) out.longitude = json.optDouble("longitude");
-        return out.isValid() ? out : new ProfileSettings();
+        Object locale = json.opt("localeTag");
+        Object zone = json.opt("timeZoneId");
+        Object enabled = json.opt("locationEnabled");
+        Object latitude = json.opt("latitude");
+        Object longitude = json.opt("longitude");
+        if (locale instanceof String && ProfileSettings.isLocaleTagValid((String) locale))
+            out.localeTag = (String) locale;
+        if (zone instanceof String && ProfileSettings.isTimeZoneIdValid((String) zone))
+            out.timeZoneId = (String) zone;
+        if (enabled instanceof Boolean) out.locationEnabled = (Boolean) enabled;
+        if (latitude instanceof Number) {
+            double value = ((Number) latitude).doubleValue();
+            if (ProfileSettings.isLatitudeValid(value)) out.latitude = value;
+        }
+        if (longitude instanceof Number) {
+            double value = ((Number) longitude).doubleValue();
+            if (ProfileSettings.isLongitudeValid(value)) out.longitude = value;
+        }
+        return out;
     }
 }
