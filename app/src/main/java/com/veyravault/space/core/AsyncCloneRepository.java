@@ -421,32 +421,6 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
-    /** Performs package/user-scoped Engine location synchronization on the repository worker. */
-    public void syncCloneLocationHook(String packageName, int userId,
-            Callback<VirtualHookManager.LocationApplyResult> callback) {
-        if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
-            deliver(callback, Result.<VirtualHookManager.LocationApplyResult>failure(
-                    Failure.INVALID_INPUT, "Clone identity is invalid"));
-            return;
-        }
-        enqueue(() -> {
-            CloneStore.CloneEntry target = null;
-            for (CloneStore.CloneEntry entry : CloneStore.readAllStrict(appContext)) {
-                if (packageName.equals(entry.packageName) && userId == entry.userId) {
-                    target = entry;
-                    break;
-                }
-            }
-            if (target == null) throw new IllegalStateException("Clone identity is not present in the strict registry");
-            return VirtualHookManager.syncCloneHooks(appContext, target);
-        }, callback);
-    }
-
-    /** Synchronizes all clone location hooks off the UI thread and returns typed per-clone totals. */
-    public void syncAllCloneLocationHooks(Callback<VirtualHookManager.SyncSummary> callback) {
-        enqueue(() -> VirtualHookManager.syncAllClones(appContext), callback);
-    }
-
     public void migrateLegacyLocationProfiles(Callback<Boolean> callback) {
         enqueue(() -> {
             if (!ProfileStore.migrateLegacyLocationSettings(appContext))
