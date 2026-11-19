@@ -18,8 +18,8 @@ def method_body(signature):
     raise AssertionError("Unclosed method: " + signature)
 
 install = method_body("public static boolean installPackageAsUser(")
-assert "if (core == null) return false;" in install
-assert "if (res == null) return false;" in install
+assert "if (core == null) {" in install
+assert "if (res == null) {" in install
 assert "success.getBoolean(res)" in install
 assert "lastInstallDiagnostic" in source
 assert "ENGINE_UNAVAILABLE" in install
@@ -27,7 +27,7 @@ assert "ENGINE_INVALID_RESULT" in install
 assert "ENGINE_REJECTED_INSTALL" in install
 assert "ENGINE_INSTALL_EXCEPTION" in install
 assert 'getField("msg")' in install
-assert "catch (Throwable t)" in install and "return false;" in install
+assert "catch (Throwable error)" in install and "return false;" in install
 
 installed = method_body("private static boolean isInstalledAsUser(")
 assert "Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId))" in installed
