@@ -16,6 +16,9 @@ assert "cloneEntry.latitude =" not in source
 assert "cloneEntry.longitude =" not in source
 assert "A valid target clone is required." in source
 assert "Clone not found or stored data is unreadable." in source
+assert "locationPointSelected" in source
+assert "saveButton.setEnabled(locationPointSelected)" in source
+assert "No effective coordinates configured" in source
 assert "hookRepository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId" in source
 assert "Engine result verified:" in source
 assert "Profile saved, but engine application was not verified:" in source
