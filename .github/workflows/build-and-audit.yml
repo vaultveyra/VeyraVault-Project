@@ -55,6 +55,8 @@ jobs:
 
       - name: Test async CloneStore repository contract
         run: python3 scripts/test_async_clone_repository_contract.py
+
+      - name: Test async clone launch orchestration contract
         run: python3 scripts/test_async_clone_launch_contract.py
 
       - name: Test async location persistence UI contract
