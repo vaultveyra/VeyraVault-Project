@@ -338,7 +338,8 @@ public class GlobalEnvironmentActivity extends BaseActivity {
     }
 
     private void updateGlobalLocationControls() {
-        boolean editable = !globalLocationInherit.isChecked();
+        boolean editable = profileLoaded && locationProfileLoaded && masterGpsLoaded
+                && !loadFailed && !globalLocationInherit.isChecked();
         if (globalLocationEnabled != null) globalLocationEnabled.setEnabled(editable && !loadFailed);
         if (globalLatitudeEt != null) globalLatitudeEt.setEnabled(editable && !loadFailed);
         if (globalLongitudeEt != null) globalLongitudeEt.setEnabled(editable && !loadFailed);
