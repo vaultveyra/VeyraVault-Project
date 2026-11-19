@@ -398,6 +398,39 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void reservationReleaseRefusesRegistryConflictAndPreservesJournal() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch reserved = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reservationRef = new AtomicReference<>();
+        repository.reserveNextUserId("com.example.releaseconflict", result -> {
+            reservationRef.set(result);
+            reserved.countDown();
+        });
+        assertTrue(reserved.await(10, TimeUnit.SECONDS));
+        assertTrue(reservationRef.get().isSuccess());
+        CloneStore.CloneReservation reservation = reservationRef.get().getValue();
+        String journalBefore = preferences.getString("pending_clone_reservations_json", null);
+        assertNotNull(journalBefore);
+
+        // Simulate an inconsistent persisted registry that collides with the pending identity.
+        String conflictingClones = "[{\\"pkg\\":\\"com.example.releaseconflict\\",\\"uid\\":"
+                + reservation.getUserId() + "}]";
+        assertTrue(preferences.edit().putString("clones_json", conflictingClones).commit());
+
+        CountDownLatch released = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> releaseResult = new AtomicReference<>();
+        repository.releaseReservationAfterEngineAbsence(reservation, true, result -> {
+            releaseResult.set(result);
+            released.countDown();
+        });
+        assertTrue(released.await(10, TimeUnit.SECONDS));
+        assertFalse(releaseResult.get().isSuccess());
+        assertEquals(AsyncCloneRepository.Failure.CORRUPT_DATA, releaseResult.get().getFailure());
+        assertEquals(conflictingClones, preferences.getString("clones_json", null));
+        assertEquals(journalBefore, preferences.getString("pending_clone_reservations_json", null));
+        repository.close();
+    }
+
     @Test public void pendingReservationCannotBeStolenByOrdinaryCloneUpsert() throws Exception {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         CountDownLatch reserved = new CountDownLatch(1);

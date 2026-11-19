@@ -53,6 +53,7 @@ assert "return editor.commit();" in commit
 
 release = method_body(STORE, "static synchronized boolean releaseReservationAfterEngineAbsence(")
 assert "if (!engineAbsenceConfirmed) return false;" in release
+assert "readPendingReservationsStrict(c)" in release
 assert "reservation.token.equals(supplied.token)" in release
 assert "return editor.commit();" in release
 
@@ -98,6 +99,7 @@ for test_name in (
     "independentRepositoriesCannotReserveSamePackageUserId",
     "reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken",
     "reservationReleaseRequiresExplicitEngineAbsenceAndAllowsSafeReuse",
+    "reservationReleaseRefusesRegistryConflictAndPreservesJournal",
     "pendingReservationCannotBeStolenByOrdinaryCloneUpsert",
     "malformedReservationJournalBlocksAllocationWithoutOverwritingIt",
     "reservationJournalConflictWithExistingCloneBlocksAllocation",

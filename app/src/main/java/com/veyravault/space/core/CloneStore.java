@@ -259,7 +259,7 @@ public class CloneStore {
             Context c, CloneReservation supplied, boolean engineAbsenceConfirmed) throws Exception {
         if (c == null || supplied == null) throw new IllegalArgumentException("Reservation is required");
         if (!engineAbsenceConfirmed) return false;
-        List<CloneReservation> reservations = readReservationsStrict(c);
+        List<CloneReservation> reservations = readPendingReservationsStrict(c);
         boolean found = false;
         List<CloneReservation> remaining = new ArrayList<CloneReservation>();
         for (CloneReservation reservation : reservations) {

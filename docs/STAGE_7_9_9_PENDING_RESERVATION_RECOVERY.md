@@ -41,6 +41,7 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 - After confirmation, Engine state is queried again immediately before the repository release call.
 - The release API is called only when this fresh query returns ABSENT. If the state changed to INSTALLED or UNKNOWN, the reservation stays blocked.
 - The release operation removes only the matching reservation token. It does not uninstall a virtual package, clear clone data, mutate session/account data, or create a registry record.
+- Immediately before removing the token, CloneStore also performs a strict consistency read of the clone registry and reservation journal. A package/user identity already present in the registry makes the release fail closed as corrupt/conflicting state; both persisted values remain untouched.
 
 ## Tests and CI wiring
 
