@@ -59,18 +59,18 @@ public class AddAppActivity extends BaseActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F3F5F9"));
+        root.setBackgroundColor(Color.parseColor("#F4F6FB"));
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(36, 32, 36, 20);
+        header.setPadding(dp(20), dp(22), dp(20), dp(12));
 
         final TextView batchBtn = new TextView(this);
         batchBtn.setText(getString(R.string.batch_clone));
         batchBtn.setTextColor(Color.parseColor("#2563EB"));
         batchBtn.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        batchBtn.setPadding(32, 16, 32, 16);
+        batchBtn.setPadding(dp(16), dp(9), dp(16), dp(9));
         batchBtn.setTypeface(Typeface.DEFAULT_BOLD);
         batchBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -95,7 +95,7 @@ public class AddAppActivity extends BaseActivity {
         backBtn.setText("→");
         backBtn.setTextSize(24f);
         backBtn.setTextColor(Color.parseColor("#111827"));
-        backBtn.setPadding(20, 0, 20, 0);
+        backBtn.setPadding(dp(12), 0, dp(12), 0);
         backBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
         });
@@ -105,16 +105,18 @@ public class AddAppActivity extends BaseActivity {
         EditText searchEt = new EditText(this);
         searchEt.setHint("🔍  " + getString(R.string.search_apps));
         searchEt.setBackgroundResource(R.drawable.bg_card_rounded);
-        searchEt.setPadding(42, 28, 42, 28);
+        searchEt.setSingleLine(true);
+        searchEt.setTextSize(14f);
+        searchEt.setPadding(dp(18), dp(13), dp(18), dp(13));
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        slp.setMargins(36, 12, 36, 20);
+        slp.setMargins(dp(20), dp(8), dp(20), dp(16));
         root.addView(searchEt, slp);
 
         ScrollView sv = new ScrollView(this);
         grid = new GridLayout(this);
-        grid.setColumnCount(4);
-        grid.setPadding(24, 12, 24, 32);
+        grid.setColumnCount(3);
+        grid.setPadding(dp(14), dp(8), dp(14), dp(24));
         sv.addView(grid);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -125,7 +127,7 @@ public class AddAppActivity extends BaseActivity {
         batchConfirmBtn.setText(fa ? "کلون کردن برنامه‌های انتخابی" : "Clone Selected Apps");
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.setMargins(36, 12, 36, 28);
+        blp.setMargins(dp(20), dp(10), dp(20), dp(20));
         batchConfirmBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -153,6 +155,10 @@ public class AddAppActivity extends BaseActivity {
             }
             @Override public void afterTextChanged(Editable s) {}
         });
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void loadInstalledApps() {
@@ -183,7 +189,7 @@ public class AddAppActivity extends BaseActivity {
     private void renderGrid(final String query) {
         grid.removeAllViews();
         String q = query.trim().toLowerCase();
-        int cellW = (getResources().getDisplayMetrics().widthPixels - 96) / 4;
+        int cellW = (getResources().getDisplayMetrics().widthPixels - dp(48)) / 3;
         for (final InstalledApp app : allApps) {
             if (!q.isEmpty() && !app.label.toLowerCase().contains(q) && !app.pkg.toLowerCase().contains(q)) {
                 continue;
@@ -192,21 +198,21 @@ public class AddAppActivity extends BaseActivity {
             card.setOrientation(LinearLayout.VERTICAL);
             card.setGravity(Gravity.CENTER);
             card.setBackgroundResource(R.drawable.bg_card_rounded);
-            card.setPadding(16, 28, 16, 28);
+            card.setPadding(dp(12), dp(16), dp(12), dp(16));
             GridLayout.LayoutParams glp = new GridLayout.LayoutParams();
-            glp.width = cellW - 16;
-            glp.setMargins(8, 8, 8, 8);
+            glp.width = cellW - dp(12);
+            glp.setMargins(dp(6), dp(6), dp(6), dp(6));
             card.setLayoutParams(glp);
 
             if (batchMode && batchSelected.contains(app.pkg)) {
-                card.getBackground().setTint(Color.parseColor("#DBEAFE"));
+                card.getBackground().setTint(Color.parseColor("#E8EEFF"));
             } else {
-                card.getBackground().setTint(Color.WHITE);
+                card.getBackground().setTint(Color.parseColor("#FFFFFF"));
             }
 
             ImageView iv = new ImageView(this);
             iv.setImageDrawable(app.icon);
-            card.addView(iv, new LinearLayout.LayoutParams(116, 116));
+            card.addView(iv, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
             TextView tv = new TextView(this);
             tv.setText(app.label);
@@ -215,7 +221,7 @@ public class AddAppActivity extends BaseActivity {
             tv.setSingleLine(true);
             tv.setEllipsize(TextUtils.TruncateAt.END);
             tv.setGravity(Gravity.CENTER);
-            tv.setPadding(0, 14, 0, 0);
+            tv.setPadding(0, dp(10), 0, 0);
             card.addView(tv);
 
             card.setOnClickListener(new View.OnClickListener() {
