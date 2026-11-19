@@ -33,7 +33,7 @@ location_save = source.index("repository.saveGlobalLocationProfile(locationEnabl
 location_failure = source.index("if (!locationResult.isSuccess())", location_save)
 gps_save = source.index("repository.setMasterMockGpsEnabled(masterGpsEnabled, gpsResult ->", location_failure)
 gps_failure = source.index("if (!gpsResult.isSuccess())", gps_save)
-sync = source.index("repository.syncAllCloneLocationHooks(syncResult ->", gps_failure)
+sync = source.index("hookRepository.syncAllCloneLocationHooks((summary, error) ->", gps_failure)
 assert profile_save < profile_success < location_save < location_failure < gps_save < gps_failure < sync
 
 location_partial_failure = source[location_failure:gps_save]
