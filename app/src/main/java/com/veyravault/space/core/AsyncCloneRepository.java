@@ -381,6 +381,16 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Clears global location defaults atomically without changing locale/time-zone defaults. */
+    public void clearGlobalLocationOverrides(Callback<Boolean> callback) {
+        enqueue(() -> {
+            ProfileStore.readGlobalStrict(appContext);
+            if (!ProfileStore.clearGlobalLocationOverrides(appContext))
+                throw new PersistenceFailureException("Global location reset was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
     public void clearGlobalProfileField(String field, Callback<Boolean> callback) {
         if (!isSupportedProfileField(field)) {
             deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Profile field is unsupported or missing"));
