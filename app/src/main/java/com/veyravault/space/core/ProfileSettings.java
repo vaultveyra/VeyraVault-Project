@@ -1,8 +1,11 @@
 package com.veyravault.space.core;
 
+import java.util.Locale;
+import java.util.TimeZone;
+
 /**
  * Nullable profile values represent inheritance: null means "not overridden".
- * This model intentionally contains user-configurable settings only.
+ * Validation is field-scoped so one invalid field cannot suppress valid siblings.
  */
 public final class ProfileSettings {
     public String localeTag;
@@ -27,11 +30,34 @@ public final class ProfileSettings {
     }
 
     public boolean isValid() {
-        if (localeTag != null && localeTag.trim().isEmpty()) return false;
-        if (timeZoneId != null && timeZoneId.trim().isEmpty()) return false;
-        if (latitude != null && (Double.isNaN(latitude) || Double.isInfinite(latitude)
-                || latitude < -90.0 || latitude > 90.0)) return false;
-        return longitude == null || (!Double.isNaN(longitude) && !Double.isInfinite(longitude)
-                && longitude >= -180.0 && longitude <= 180.0);
+        return isLocaleTagValid(localeTag) && isTimeZoneIdValid(timeZoneId)
+                && isLatitudeValid(latitude) && isLongitudeValid(longitude);
+    }
+
+    public static boolean isLocaleTagValid(String value) {
+        if (value == null) return true;
+        if (value.trim().isEmpty()) return false;
+        try {
+            return !new Locale.Builder().setLanguageTag(value).build().getLanguage().isEmpty();
+        } catch (RuntimeException invalidTag) {
+            return false;
+        }
+    }
+
+    public static boolean isTimeZoneIdValid(String value) {
+        if (value == null) return true;
+        if (value.trim().isEmpty()) return false;
+        if ("UTC".equals(value) || "GMT".equals(value)) return true;
+        return value.equals(TimeZone.getTimeZone(value).getID());
+    }
+
+    public static boolean isLatitudeValid(Double value) {
+        return value == null || (!Double.isNaN(value) && !Double.isInfinite(value)
+                && value >= -90.0 && value <= 90.0);
+    }
+
+    public static boolean isLongitudeValid(Double value) {
+        return value == null || (!Double.isNaN(value) && !Double.isInfinite(value)
+                && value >= -180.0 && value <= 180.0);
     }
 }

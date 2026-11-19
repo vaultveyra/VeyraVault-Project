@@ -2,7 +2,8 @@ package com.veyravault.space.core;
 
 /**
  * Resolves each setting independently using clone override -> global default
- * -> supplied system fallback. No settings are written back during resolution.
+ * -> supplied system fallback. Invalid individual values are treated as absent;
+ * they do not suppress valid values in sibling fields or lower-priority profiles.
  */
 public final class ProfileResolver {
     public enum Source { CLONE, GLOBAL, SYSTEM, UNSET }
@@ -21,24 +22,36 @@ public final class ProfileResolver {
 
         private ResolvedProfile(ProfileSettings clone, ProfileSettings global,
                                 ProfileSettings system) {
-            Value<String> locale = choose(clone.localeTag, global.localeTag, system.localeTag);
+            Value<String> locale = choose(clone.localeTag, global.localeTag, system.localeTag,
+                    ProfileSettings.isLocaleTagValid(clone.localeTag),
+                    ProfileSettings.isLocaleTagValid(global.localeTag),
+                    ProfileSettings.isLocaleTagValid(system.localeTag));
             localeTag = locale.value;
             localeSource = locale.source;
 
-            Value<String> zone = choose(clone.timeZoneId, global.timeZoneId, system.timeZoneId);
+            Value<String> zone = choose(clone.timeZoneId, global.timeZoneId, system.timeZoneId,
+                    ProfileSettings.isTimeZoneIdValid(clone.timeZoneId),
+                    ProfileSettings.isTimeZoneIdValid(global.timeZoneId),
+                    ProfileSettings.isTimeZoneIdValid(system.timeZoneId));
             timeZoneId = zone.value;
             timeZoneSource = zone.source;
 
             Value<Boolean> enabled = choose(clone.locationEnabled, global.locationEnabled,
-                    system.locationEnabled);
+                    system.locationEnabled, true, true, true);
             locationEnabled = enabled.value;
             locationEnabledSource = enabled.source;
 
-            Value<Double> lat = choose(clone.latitude, global.latitude, system.latitude);
+            Value<Double> lat = choose(clone.latitude, global.latitude, system.latitude,
+                    ProfileSettings.isLatitudeValid(clone.latitude),
+                    ProfileSettings.isLatitudeValid(global.latitude),
+                    ProfileSettings.isLatitudeValid(system.latitude));
             latitude = lat.value;
             latitudeSource = lat.source;
 
-            Value<Double> lng = choose(clone.longitude, global.longitude, system.longitude);
+            Value<Double> lng = choose(clone.longitude, global.longitude, system.longitude,
+                    ProfileSettings.isLongitudeValid(clone.longitude),
+                    ProfileSettings.isLongitudeValid(global.longitude),
+                    ProfileSettings.isLongitudeValid(system.longitude));
             longitude = lng.value;
             longitudeSource = lng.source;
         }
@@ -65,10 +78,12 @@ public final class ProfileResolver {
         return value == null ? new ProfileSettings() : value;
     }
 
-    private static <T> Value<T> choose(T clone, T global, T system) {
-        if (clone != null) return new Value<T>(clone, Source.CLONE);
-        if (global != null) return new Value<T>(global, Source.GLOBAL);
-        if (system != null) return new Value<T>(system, Source.SYSTEM);
+    private static <T> Value<T> choose(T clone, T global, T system,
+                                       boolean cloneValid, boolean globalValid,
+                                       boolean systemValid) {
+        if (clone != null && cloneValid) return new Value<T>(clone, Source.CLONE);
+        if (global != null && globalValid) return new Value<T>(global, Source.GLOBAL);
+        if (system != null && systemValid) return new Value<T>(system, Source.SYSTEM);
         return new Value<T>(null, Source.UNSET);
     }
 }

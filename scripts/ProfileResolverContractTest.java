@@ -50,8 +50,59 @@ public final class ProfileResolverContractTest {
         check(!newNaNLatitude().isValid(), "NaN latitude must be rejected");
         check(!newInfiniteLongitude().isValid(), "infinite longitude must be rejected");
 
-        // Clearing one clone's override (represented by null) must reveal the
-        // global/system value without changing another clone's profile.
+        // Invalid clone values fall back field-by-field without suppressing valid siblings.
+        ProfileSettings invalidClone = new ProfileSettings();
+        invalidClone.localeTag = "not a valid tag";
+        invalidClone.timeZoneId = "Mars/Olympus";
+        invalidClone.latitude = 999.0;
+        invalidClone.longitude = 45.0;
+        invalidClone.locationEnabled = false;
+        ProfileSettings validGlobal = new ProfileSettings();
+        validGlobal.localeTag = "fr-FR";
+        validGlobal.timeZoneId = "Europe/Paris";
+        validGlobal.latitude = 48.0;
+        validGlobal.longitude = 2.0;
+        validGlobal.locationEnabled = true;
+        ProfileResolver.ResolvedProfile invalidFallback =
+                ProfileResolver.resolve(invalidClone, validGlobal, system);
+        check("fr-FR".equals(invalidFallback.localeTag)
+                        && invalidFallback.localeSource == ProfileResolver.Source.GLOBAL,
+                "invalid clone locale must fall back to global");
+        check("Europe/Paris".equals(invalidFallback.timeZoneId)
+                        && invalidFallback.timeZoneSource == ProfileResolver.Source.GLOBAL,
+                "invalid clone timezone must fall back to global");
+        check(Double.valueOf(48.0).equals(invalidFallback.latitude)
+                        && invalidFallback.latitudeSource == ProfileResolver.Source.GLOBAL,
+                "invalid latitude must fall back independently");
+        check(Double.valueOf(45.0).equals(invalidFallback.longitude)
+                        && invalidFallback.longitudeSource == ProfileResolver.Source.CLONE,
+                "valid clone longitude must remain an override");
+        check(Boolean.FALSE.equals(invalidFallback.locationEnabled)
+                        && invalidFallback.locationEnabledSource == ProfileResolver.Source.CLONE,
+                "valid explicit false must remain an override");
+
+        // Invalid global values must fall through to system values independently.
+        ProfileSettings invalidGlobal = new ProfileSettings();
+        invalidGlobal.localeTag = "bad tag";
+        invalidGlobal.timeZoneId = "Not/AZone";
+        invalidGlobal.latitude = -999.0;
+        invalidGlobal.longitude = 181.0;
+        ProfileResolver.ResolvedProfile systemFallback =
+                ProfileResolver.resolve(new ProfileSettings(), invalidGlobal, system);
+        check("en-US".equals(systemFallback.localeTag)
+                        && systemFallback.localeSource == ProfileResolver.Source.SYSTEM,
+                "invalid global locale must fall back to system");
+        check("America/New_York".equals(systemFallback.timeZoneId)
+                        && systemFallback.timeZoneSource == ProfileResolver.Source.SYSTEM,
+                "invalid global timezone must fall back to system");
+        check(Double.valueOf(10.0).equals(systemFallback.latitude)
+                        && systemFallback.latitudeSource == ProfileResolver.Source.SYSTEM,
+                "invalid global latitude must fall back to system");
+        check(Double.valueOf(20.0).equals(systemFallback.longitude)
+                        && systemFallback.longitudeSource == ProfileResolver.Source.SYSTEM,
+                "invalid global longitude must fall back to system");
+
+        // Clearing one clone's override (represented by null) reveals the next fallback.
         ProfileSettings cloneA = new ProfileSettings();
         cloneA.timeZoneId = "Asia/Tehran";
         ProfileSettings cloneB = new ProfileSettings();

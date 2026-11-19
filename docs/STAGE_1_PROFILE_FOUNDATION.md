@@ -15,6 +15,8 @@ Each field resolves independently in this order:
 
 A nullable value means that the field is not overridden. An explicit Boolean false is a value and must not be confused with an absent override.
 
+Invalid individual values are treated as absent for resolution. A bad locale, time-zone ID, latitude, or longitude must not suppress a valid value in another field or prevent a lower-priority profile from supplying that same field. Locale tags are validated with the platform Locale parser; time-zone IDs must resolve to their exact requested ID (with UTC/GMT accepted explicitly); coordinates must be finite and within their legal ranges.
+
 The current model covers locale tag, time-zone ID, location-enabled state, latitude, and longitude. This is a foundation; it is not yet a complete device-profile schema.
 
 ## Persistence behavior
@@ -46,6 +48,7 @@ The standalone Java contract test covers:
 - Clearing an override revealing the next fallback.
 - Copy isolation.
 - Out-of-range, NaN, and infinite coordinate rejection.
+- Invalid locale/time-zone/coordinate values falling through independently to the next valid profile.
 
 The Android CI build additionally compiles the new persistence classes, runs source audit, assembles the release APK, and audits/packages the APK.
 
