@@ -17,6 +17,7 @@ import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileSettings;
+import com.veyravault.space.core.VirtualHookManager;
 
 public class GlobalEnvironmentActivity extends BaseActivity {
     private AsyncCloneRepository repository;
@@ -328,10 +329,13 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                         return;
                     }
                     // All three independent commits are confirmed before requesting hook synchronization.
-                    CloneStore.syncAllHooks(getApplicationContext());
+                    VirtualHookManager.SyncSummary summary =
+                            CloneStore.syncAllHooks(getApplicationContext());
                     Toast.makeText(this, fa
-                            ? "اطلاعات، پروفایل موقعیت و Master GPS ذخیره شدند؛ همگام‌سازی کلون‌ها درخواست شد. مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
-                            : "Metadata, Global location profile and Master GPS were saved; clone hook synchronization was requested. Device/SIM values remain metadata only.",
+                            ? "اطلاعات و تنظیمات ذخیره شدند. نتیجه Hookها: " + formatSyncSummary(summary)
+                                    + " مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
+                            : "Metadata and Global location settings were saved. Hook outcomes: "
+                                    + formatSyncSummary(summary) + " Device/SIM values remain metadata only.",
                             Toast.LENGTH_LONG).show();
                     finish();
                 });
@@ -345,6 +349,18 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         if (globalLocationEnabled != null) globalLocationEnabled.setEnabled(editable && !loadFailed);
         if (globalLatitudeEt != null) globalLatitudeEt.setEnabled(editable && !loadFailed);
         if (globalLongitudeEt != null) globalLongitudeEt.setEnabled(editable && !loadFailed);
+    }
+
+    private String formatSyncSummary(VirtualHookManager.SyncSummary summary) {
+        if (summary == null) return fa ? "نتیجه‌ای دریافت نشد." : "No sync summary was returned.";
+        if (!summary.registryReadable) return fa
+                ? "همگام‌سازی انجام نشد؛ فهرست کلون‌ها قابل خواندن نیست: " + summary.detail
+                : "No hooks synchronized; clone registry is unreadable: " + summary.detail;
+        return fa
+                ? "اعمال‌شده=" + summary.applied + "، غیرفعال=" + summary.disabled
+                        + "، پشتیبانی‌نشده=" + summary.unsupported + "، ناموفق=" + summary.failed
+                : "applied=" + summary.applied + ", disabled=" + summary.disabled
+                        + ", unsupported=" + summary.unsupported + ", failed=" + summary.failed;
     }
 
     private Double parseOptionalCoordinate(String raw, double min, double max) {
@@ -386,10 +402,10 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             globalLatitudeEt.setText("");
             globalLongitudeEt.setText("");
             updateGlobalLocationControls();
-            CloneStore.syncAllHooks(getApplicationContext());
+            VirtualHookManager.SyncSummary summary = CloneStore.syncAllHooks(getApplicationContext());
             Toast.makeText(this, fa
-                    ? "پیش‌فرض‌های موقعیت سراسری پاک شدند؛ کلون‌ها به اولویت بعدی بازمی‌گردند."
-                    : "Global location defaults cleared; clones now inherit from their next available profile source.",
+                    ? "پیش‌فرض‌های موقعیت سراسری پاک شدند. نتیجه Hookها: " + formatSyncSummary(summary)
+                    : "Global location defaults cleared. Hook outcomes: " + formatSyncSummary(summary),
                     Toast.LENGTH_LONG).show();
             resetGlobalLocationButton.setEnabled(true);
             saveButton.setEnabled(true);
