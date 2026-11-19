@@ -91,6 +91,9 @@ public final class ProfileStore {
         Object enabled = json.opt("locationEnabled");
         Object latitude = json.opt("latitude");
         Object longitude = json.opt("longitude");
+        Object legacyLocationCleared = json.opt(KEY_LEGACY_LOCATION_CLEARED);
+        if (legacyLocationCleared != null && !(legacyLocationCleared instanceof Boolean))
+            throw new IllegalStateException("legacyLocationCleared is invalid");
         if (locale != null && !(locale instanceof String)) throw new IllegalStateException("localeTag is invalid");
         if (zone != null && !(zone instanceof String)) throw new IllegalStateException("timeZoneId is invalid");
         if (enabled != null && !(enabled instanceof Boolean)) throw new IllegalStateException("locationEnabled is invalid");
@@ -318,9 +321,12 @@ public final class ProfileStore {
                         || entry.userId < 0 || !entry.mockGpsEnabled) continue;
                 String key = cloneKey(entry.packageName, entry.userId);
                 Object existingValue = clones.opt(key);
-                if (existingValue instanceof JSONObject
-                        && ((JSONObject) existingValue).optBoolean(KEY_LEGACY_LOCATION_CLEARED, false)) continue;
                 if (existingValue != null && !(existingValue instanceof JSONObject)) return false;
+                if (existingValue instanceof JSONObject) {
+                    Object tombstone = ((JSONObject) existingValue).opt(KEY_LEGACY_LOCATION_CLEARED);
+                    if (tombstone != null && !(tombstone instanceof Boolean)) return false;
+                    if (Boolean.TRUE.equals(tombstone)) continue;
+                }
                 JSONObject existing = existingValue instanceof JSONObject
                         ? (JSONObject) existingValue : null;
                 JSONObject imported = existing == null ? new JSONObject() : new JSONObject(existing.toString());
