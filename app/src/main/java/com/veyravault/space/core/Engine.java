@@ -98,7 +98,7 @@ public class Engine {
         StringBuilder safe = new StringBuilder();
         for (int i = 0; i < message.length() && safe.length() < 180; i++) {
             char c = message.charAt(i);
-            if (c >= 32 && c != 127) safe.append(c == '\\t' ? ' ' : c);
+            if (c >= 32 && c != 127) safe.append(c == '\t' ? ' ' : c);
         }
         return safe.toString().trim();
     }

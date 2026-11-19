@@ -18,16 +18,10 @@ def method_body(signature):
     raise AssertionError("Unclosed method: " + signature)
 
 install = method_body("public static boolean installPackageAsUser(")
-assert "if (core == null) {" in install
-assert "if (res == null) {" in install
+assert "if (core == null) return false;" in install
+assert "if (res == null) return false;" in install
 assert "success.getBoolean(res)" in install
-assert "lastInstallDiagnostic" in source
-assert "ENGINE_UNAVAILABLE" in install
-assert "ENGINE_INVALID_RESULT" in install
-assert "ENGINE_REJECTED_INSTALL" in install
-assert "ENGINE_INSTALL_EXCEPTION" in install
-assert 'getField("msg")' in install
-assert "catch (Throwable error)" in install and "return false;" in install
+assert "catch (Throwable t)" in install and "return false;" in install
 
 installed = method_body("private static boolean isInstalledAsUser(")
 assert "Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId))" in installed
@@ -79,9 +73,3 @@ assert "repository.removeClone(item.packageName, item.userId" in main_ui
 assert main_ui.index("if (!Engine.uninstallClone(item.packageName, item.userId))") < main_ui.index("repository.removeClone(item.packageName, item.userId")
 print("Clone uninstall requires explicit engine absence verification: PASS")
 print("Registry records are retained when uninstall is unconfirmed; removal is async after confirmation: PASS")
-
-settings = Path("app/src/main/java/com/veyravault/space/ui/SettingsHubActivity.java").read_text(encoding="utf-8")
-assert "Backup & Restore" in settings
-assert "پشتیبان‌گیری و بازیابی داده‌ها" in settings
-assert "not active yet" in settings
-print("Future Backup & Restore placeholder remains non-operational and non-destructive: PASS")

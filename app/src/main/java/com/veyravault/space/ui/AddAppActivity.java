@@ -304,7 +304,7 @@ public class AddAppActivity extends BaseActivity {
                             : (absent
                                 ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
                                 : "Clone installation failed and Engine absence is unconfirmed; the ID remains reserved to prevent collision."))
-                            + "\\n" + diagnostic);
+                            + "\n" + diagnostic);
                     callback.onComplete(false);
                     return;
                 }
