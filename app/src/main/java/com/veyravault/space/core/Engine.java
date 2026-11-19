@@ -242,16 +242,13 @@ public class Engine {
         }
         if (!isInstalledAsUser(entry.packageName, entry.userId)
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
-            return new CloneLaunchResult(false, lastInstallDiagnostic, null);
+            return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
         }
 
-        VirtualHookManager.LocationApplyResult hookResult;
-        try {
-            // Preserve the required hook-before-launch ordering.
-            hookResult = VirtualHookManager.syncCloneHooks(ctx, entry);
-        } catch (Throwable hookFailure) {
-            hookResult = VirtualHookManager.getLastLocationResult();
-        }
+        // Preserve the required hook-before-launch ordering. Let unexpected hook exceptions
+        // fail the preparation step rather than reporting a stale global last-result value.
+        VirtualHookManager.LocationApplyResult hookResult =
+                VirtualHookManager.syncCloneHooks(ctx, entry);
 
         try {
             Object core = getCore();
