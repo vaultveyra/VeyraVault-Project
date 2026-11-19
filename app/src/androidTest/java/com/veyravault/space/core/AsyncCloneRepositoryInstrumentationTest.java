@@ -198,11 +198,11 @@ public class AsyncCloneRepositoryInstrumentationTest {
 
     @Test public void invalidPersistedProfileValuesFallBackIndependently() throws Exception {
         profilePreferences.edit().putString("profiles_json",
-                "{\\"schemaVersion\\":1,"
-                + "\\"global\\":{\\"localeTag\\":\\"fr-FR\\",\\"timeZoneId\\":\\"Europe/Paris\\",\\"latitude\\":48.0,\\"longitude\\":2.0},"
-                + "\\"clones\\":{\\"com.example.profile#7\\":{"
-                + "\\"localeTag\\":\\"invalid locale\\",\\"timeZoneId\\":\\"Mars/Olympus\\","
-                + "\\"latitude\\":999.0,\\"longitude\\":45.0,\\"locationEnabled\\":false}}}")
+                "{\"schemaVersion\":1,"
+                + "\"global\":{\"localeTag\":\"fr-FR\",\"timeZoneId\":\"Europe/Paris\",\"latitude\":48.0,\"longitude\":2.0},"
+                + "\"clones\":{\"com.example.profile#7\":{"
+                + "\"localeTag\":\"invalid locale\",\"timeZoneId\":\"Mars/Olympus\","
+                + "\"latitude\":999.0,\"longitude\":45.0,\"locationEnabled\":false}}}")
                 .commit();
 
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
@@ -234,7 +234,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals(ProfileResolver.Source.CLONE, effective.locationEnabledSource);
 
         // Reading/resolving must not rewrite or erase the original persisted payload.
-        assertTrue(profilePreferences.getString("profiles_json", "").contains("\\"invalid locale\\""));
+        assertTrue(profilePreferences.getString("profiles_json", "").contains("\"invalid locale\""));
         repository.close();
     }
 
