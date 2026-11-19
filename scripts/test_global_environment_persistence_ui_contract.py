@@ -15,6 +15,9 @@ assert "CloneStore.isMasterMockGpsEnabled" not in source
 assert "CloneStore.saveGlobalEnv" not in source
 assert "CloneStore.setMasterMockGpsEnabled" not in source
 assert "CloneStore.syncAllHooks(getApplicationContext())" in source
+assert "formatSyncSummary(summary)" in source
+assert "summary.registryReadable" in source
+assert "summary.unsupported" in source and "summary.failed" in source
 assert "profileLoaded && locationProfileLoaded && masterGpsLoaded && !loadFailed" in source
 assert "Both global coordinates are required when global location is enabled." in source
 assert "parseOptionalCoordinate" in source
