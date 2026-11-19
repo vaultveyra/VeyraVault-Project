@@ -284,8 +284,10 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         final Double latitude;
         final Double longitude;
         try {
-            latitude = parseOptionalCoordinate(globalLatitudeEt.getText().toString(), -90.0d, 90.0d);
-            longitude = parseOptionalCoordinate(globalLongitudeEt.getText().toString(), -180.0d, 180.0d);
+            latitude = globalLocationInherit.isChecked() ? null
+                    : parseOptionalCoordinate(globalLatitudeEt.getText().toString(), -90.0d, 90.0d);
+            longitude = globalLocationInherit.isChecked() ? null
+                    : parseOptionalCoordinate(globalLongitudeEt.getText().toString(), -180.0d, 180.0d);
         } catch (IllegalArgumentException invalid) {
             saveButton.setEnabled(true);
             showSaveFailure(invalid.getMessage());
