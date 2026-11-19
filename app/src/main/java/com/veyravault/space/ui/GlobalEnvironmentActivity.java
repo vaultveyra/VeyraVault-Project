@@ -329,15 +329,25 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                         return;
                     }
                     // All three independent commits are confirmed before requesting hook synchronization.
-                    VirtualHookManager.SyncSummary summary =
-                            CloneStore.syncAllHooks(getApplicationContext());
-                    Toast.makeText(this, fa
-                            ? "اطلاعات و تنظیمات ذخیره شدند. نتیجه Hookها: " + formatSyncSummary(summary)
-                                    + " مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
-                            : "Metadata and Global location settings were saved. Hook outcomes: "
-                                    + formatSyncSummary(summary) + " Device/SIM values remain metadata only.",
-                            Toast.LENGTH_LONG).show();
-                    finish();
+                    repository.syncAllCloneLocationHooks(syncResult -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (!syncResult.isSuccess()) {
+                            saveButton.setEnabled(true);
+                            showSaveFailure(fa
+                                    ? "تنظیمات ذخیره شدند اما همگام‌سازی کلون‌ها اجرا نشد: " + syncResult.getMessage()
+                                    : "Settings were saved, but clone hook synchronization could not run: "
+                                            + syncResult.getMessage());
+                            return;
+                        }
+                        VirtualHookManager.SyncSummary summary = syncResult.getValue();
+                        Toast.makeText(this, fa
+                                ? "اطلاعات و تنظیمات ذخیره شدند. نتیجه Hookها: " + formatSyncSummary(summary)
+                                        + " مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
+                                : "Metadata and Global location settings were saved. Hook outcomes: "
+                                        + formatSyncSummary(summary) + " Device/SIM values remain metadata only.",
+                                Toast.LENGTH_LONG).show();
+                        finish();
+                    });
                 });
             });
         });
@@ -402,13 +412,24 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             globalLatitudeEt.setText("");
             globalLongitudeEt.setText("");
             updateGlobalLocationControls();
-            VirtualHookManager.SyncSummary summary = CloneStore.syncAllHooks(getApplicationContext());
-            Toast.makeText(this, fa
-                    ? "پیش‌فرض‌های موقعیت سراسری پاک شدند. نتیجه Hookها: " + formatSyncSummary(summary)
-                    : "Global location defaults cleared. Hook outcomes: " + formatSyncSummary(summary),
-                    Toast.LENGTH_LONG).show();
-            resetGlobalLocationButton.setEnabled(true);
-            saveButton.setEnabled(true);
+            repository.syncAllCloneLocationHooks(syncResult -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!syncResult.isSuccess()) {
+                    resetGlobalLocationButton.setEnabled(true);
+                    saveButton.setEnabled(true);
+                    showSaveFailure((fa ? "پیش‌فرض‌ها پاک شدند اما همگام‌سازی اجرا نشد: " :
+                            "Global defaults were cleared, but hook synchronization could not run: ")
+                            + syncResult.getMessage());
+                    return;
+                }
+                VirtualHookManager.SyncSummary summary = syncResult.getValue();
+                Toast.makeText(this, fa
+                        ? "پیش‌فرض‌های موقعیت سراسری پاک شدند. نتیجه Hookها: " + formatSyncSummary(summary)
+                        : "Global location defaults cleared. Hook outcomes: " + formatSyncSummary(summary),
+                        Toast.LENGTH_LONG).show();
+                resetGlobalLocationButton.setEnabled(true);
+                saveButton.setEnabled(true);
+            });
         });
     }
 
