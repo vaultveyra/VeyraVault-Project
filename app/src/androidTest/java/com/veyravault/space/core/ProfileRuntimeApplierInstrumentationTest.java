@@ -63,8 +63,8 @@ public class ProfileRuntimeApplierInstrumentationTest {
             ProfileSettings system = new ProfileSettings();
             system.localeTag = "en-US";
             system.timeZoneId = "UTC";
-            ProfileResolver.ResolvedProfile resolved = ProfileStore.resolveStrict(
-                    context, "com.example.runtime", 3, system);
+            ProfileResolver.ResolvedProfile resolved =
+                    ProfileRuntimeClient.resolve(context, "com.example.runtime", 3);
 
             assertEquals("fr-FR", resolved.localeTag);
             assertEquals(ProfileResolver.Source.CLONE, resolved.localeSource);
@@ -75,4 +75,33 @@ public class ProfileRuntimeApplierInstrumentationTest {
             else prefs.edit().putString("profiles_json", before).commit();
         }
     }
+    @Test public void nextCloneSystemFallbackDoesNotInheritPreviousCloneTimeZone() {
+        Context context = ApplicationProvider.getApplicationContext();
+        Locale originalLocale = Locale.getDefault();
+        TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
+        Configuration originalConfiguration =
+                new Configuration(context.getResources().getConfiguration());
+        ProfileRuntimeApplier.initializeSystemFallback(context);
+        String systemZone = ProfileRuntimeApplier.systemFallback().timeZoneId;
+        try {
+            ProfileSettings cloneA = new ProfileSettings();
+            cloneA.timeZoneId = "Europe/Paris";
+            ProfileResolver.ResolvedProfile first =
+                    ProfileResolver.resolve(cloneA, new ProfileSettings(),
+                            ProfileRuntimeApplier.systemFallback());
+            ProfileRuntimeApplier.apply(context, first);
+            assertEquals("Europe/Paris", TimeZone.getDefault().getID());
+
+            // Simulate the next virtual package/user bind in the same reused :pN process.
+            ProfileRuntimeApplier.restoreSystemDefaults(context);
+            assertEquals(systemZone, ProfileRuntimeApplier.systemFallback().timeZoneId);
+            assertEquals(systemZone, TimeZone.getDefault().getID());
+        } finally {
+            Locale.setDefault(originalLocale);
+            TimeZone.setDefault(originalZone);
+            context.getResources().updateConfiguration(
+                    originalConfiguration, context.getResources().getDisplayMetrics());
+        }
+    }
+
 }

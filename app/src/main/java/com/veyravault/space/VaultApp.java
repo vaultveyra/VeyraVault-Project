@@ -6,6 +6,8 @@ import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileStore;
+import com.veyravault.space.core.ProfileRuntimeApplier;
+import com.veyravault.space.core.ProcessUtils;
 import com.veyravault.space.core.VirtualHookManager;
 
 public class VaultApp extends Application {
@@ -24,10 +26,16 @@ public class VaultApp extends Application {
         super.onCreate();
         instance = this;
         LocaleHelper.applyLocale(this);
+        // Capture the actual system baseline before any virtual app can override process defaults.
+        ProfileRuntimeApplier.initializeSystemFallback(this);
         Engine.doOnCreate(this);
-        // Additive import only: preserve legacy clone preferences and session lifecycle.
-        ProfileStore.migrateLegacyLocationSettings(this);
-        // Register per-clone locale/time-zone application after additive profile migration.
+        // SharedPreferences profile migration is authoritative in the default app process only.
+        // BlackBox :pN processes are readers and must not race writes through independent caches.
+        if (ProcessUtils.isMainProcess(this)) {
+            ProfileStore.migrateLegacyLocationSettings(this);
+        }
+        // Register the lifecycle callback in every BlackBox host process. Profile reads are
+        // routed back to the default process through the non-exported runtime provider.
         // The callback runs inside the virtual package/user process, not the host UI process.
         Engine.registerCloneProfileLifecycleCallback(this);
         VirtualHookManager.installProcessHooks(this);

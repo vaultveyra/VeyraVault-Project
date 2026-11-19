@@ -34,6 +34,12 @@
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme"
         tools:replace="android:allowBackup,android:label,android:theme,android:icon,android:usesCleartextTraffic">
+        <provider
+            android:name="com.veyravault.space.core.ProfileRuntimeProvider"
+            android:authorities="${applicationId}.profile-runtime"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
 
         <activity
             android:name=".ui.MainActivity"

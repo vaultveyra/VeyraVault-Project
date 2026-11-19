@@ -27,8 +27,10 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             return;
         }
         try {
-            ProfileResolver.ResolvedProfile resolved = ProfileStore.resolveStrict(
-                    appContext, packageName, userId, ProfileRuntimeApplier.systemFallback());
+            // Reset process-wide defaults first so a prior clone cannot leak locale/time-zone.
+            ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
+            ProfileResolver.ResolvedProfile resolved =
+                    ProfileRuntimeClient.resolve(appContext, packageName, userId);
             ProfileRuntimeApplier.apply(packageContext, resolved);
             Log.i(TAG, "Applied clone locale/time-zone profile before Application creation: "
                     + packageName + "#" + userId
@@ -36,6 +38,7 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
                     + " timeZoneSource=" + resolved.timeZoneSource);
         } catch (Exception error) {
             // A malformed profile must not crash the target app or be silently rewritten.
+            ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
             Log.w(TAG, "Clone profile could not be resolved; system process defaults retained for "
                     + packageName + "#" + userId, error);
         }
