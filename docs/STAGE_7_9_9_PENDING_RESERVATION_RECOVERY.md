@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation is committed on `feat/veyra-vault-product-foundation`. CI validation is pending for the current branch head. This stage follows the validated Stage 7.9.8 durable reservation journal; it does not replace or weaken the reservation invariants.
+Implementation is committed on `feat/veyra-vault-product-foundation`. The Stage 7.9.9 implementation commit `26d0982f24b62ec6ab2a6dce75e5c25235bdb202` passed the complete CI validation in run #508 (push) and run #509 (pull request). This stage follows the validated Stage 7.9.8 durable reservation journal; it does not replace or weaken the reservation invariants.
 
 PR #4 must remain Draft, open, and unmerged.
 
@@ -49,7 +49,7 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 - Add `scripts/test_pending_reservation_recovery_contract.py` to verify tri-state semantics, Settings/manifest wiring, no automatic release, no uninstall/data-clear/clone-write APIs in the diagnostics Activity, a confirmation dialog, and a fresh Engine-absence recheck before release.
 - The pre-existing Room OS process-death harness was made more diagnosable after CI run #500 found one failure in `LegacyCloneRoomProcessDeathInstrumentationTest`. CI run #501 did not execute tests because the Emulator failed to install the debug split APK (0 tests). CI run #502 reached 39 tests but found a marker-publication race: the test process observed an empty marker before the Debug service finished writing its PID.
 - Follow-up commits `359f9bfa07b145a999b3df29393753464860d076`, `32501b5c5a1f56fb8ec2f74df2aa2c8b1c63df4c`, and `7d695a1d52e732acf23d57528e3992e203d18a3f` make marker publication temp-file + fsync + rename, wait only for a non-empty marker, add named assertions for every Room table count, and extend the source wiring contract. They do not weaken or skip the process-death test.
-- The current branch adds two Android instrumentation tests. The full Emulator suite is expected to contain 39 tests; the actual runner output is authoritative.
+- The current branch adds two Android instrumentation tests. On commit `26d0982f24b62ec6ab2a6dce75e5c25235bdb202`, the Emulator runner completed **39/39 tests, 0 skipped, 0 failed**. The newly added Stage 7.9.9 tests and the previously failing Room OS process-death test all passed.
 
 ## Safety boundaries and limitations
 
@@ -62,11 +62,13 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 
 ## Current validation
 
-- The new diagnostics source-contract steps pass in CI runs #500 and #502.
-- CI #500 completed 39 tests with 38 passing and the existing Room process-death harness failing.
-- CI #501 executed zero tests because Android Emulator failed to install the debug split APK.
-- CI #502 completed the 39-test suite but the process-death harness failed with `Missing pid in marker:`; this exposed the test-harness marker-publication race described above.
-- The follow-up atomic-marker commits are awaiting a fresh CI run on the new branch head. Stage 7.9.9 is not considered fully validated until that run passes the complete Emulator suite, Source Audit, Release build and APK Audit.
+- CI run #508 (push; run ID `44397505197`) on implementation commit `26d0982f24b62ec6ab2a6dce75e5c25235bdb202`: **39/39 Android Emulator tests passed, 0 skipped, 0 failed**. Source Audit, unsigned Release APK compilation, package/APK audit and artifact upload all succeeded.
+- CI run #509 (pull_request; run ID `44397514877`) on the same commit also completed successfully; its isolated signing job was skipped by the workflow for the PR event.
+- The full process-death test passed after atomic marker publication (temporary file, flush/fsync, rename) and non-empty-marker polling. The test remains enabled; it was not skipped or weakened.
+- [Signed release artifact](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44397505197/artifacts/14472396111) — artifact ID `14472396111`, SHA-256 ZIP `73c57198625785fcf72c084eac6b6a9b88ba832b1aea72b7833eab0268838652`.
+- [Unsigned build and audit artifact](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44397505197/artifacts/14471299891) — artifact ID `14471299891`, SHA-256 ZIP `1ba33b5c7a27d176691e9641f9b2197b5f5e6dddec221d3d236b9184fcd000a9`.
+- Isolated signing verified APK signature schemes v1, v2 and v3 and uploaded the signed artifact. The log also emitted META-INF signature-coverage warnings for build/dependency metadata entries; these were warnings, not CI failures, and should remain visible in release review.
+- Runs #500–#502 remain recorded as diagnostic attempts preceding the harness fix; the authoritative passing validation is #508/#509 above.
 
 ## Explicit non-goals
 
