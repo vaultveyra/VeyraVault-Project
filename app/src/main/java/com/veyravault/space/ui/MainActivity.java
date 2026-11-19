@@ -23,6 +23,7 @@ import android.widget.Toast;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.veyravault.space.R;
 import com.veyravault.space.core.AsyncCloneRepository;
+import com.veyravault.space.core.AsyncCloneLaunchRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
@@ -40,6 +41,7 @@ public class MainActivity extends BaseActivity {
     private LinearLayout spacesContainer;
     private boolean fa;
     private AsyncCloneRepository repository;
+    private AsyncCloneLaunchRepository launchRepository;
     private long refreshGeneration;
     private View toggleAllButton;
     private TextView globalProfileSummary;
@@ -49,6 +51,7 @@ public class MainActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
         repository = AsyncCloneRepository.getInstance(getApplicationContext());
+        launchRepository = AsyncCloneLaunchRepository.getInstance(getApplicationContext());
         buildDashboardUi();
         handleShortcutLaunch(getIntent());
     }
@@ -68,23 +71,34 @@ public class MainActivity extends BaseActivity {
                         Toast.LENGTH_LONG).show();
                 return;
             }
-            repository.loadClones(result -> {
+            launchRepository.launchClone(pkg, uid, outcome -> {
                 if (isFinishing() || isDestroyed()) return;
-                if (!result.isSuccess() || result.getValue() == null) {
-                    Toast.makeText(this, fa ? "فهرست کلون‌ها قابل خواندن نیست؛ اجرای میانبر متوقف شد."
-                            : "Clone registry could not be read; shortcut launch was stopped.", Toast.LENGTH_LONG).show();
+                if (outcome == null || !outcome.isLaunched()) {
+                    String detail = outcome == null ? "UNKNOWN_LAUNCH_FAILURE"
+                            : (outcome.error != null ? outcome.error
+                            : outcome.launchResult == null ? "UNKNOWN_LAUNCH_FAILURE"
+                            : outcome.launchResult.failure);
+                    Toast.makeText(this, (fa ? "اجرای میانبر ناموفق بود: " : "Shortcut launch failed: ")
+                            + detail, Toast.LENGTH_LONG).show();
                     return;
                 }
-                for (CloneStore.CloneEntry entry : result.getValue()) {
-                    if (pkg.equals(entry.packageName) && uid == entry.userId) {
-                        Engine.launchClone(this, entry);
-                        return;
-                    }
-                }
-                Toast.makeText(this, fa ? "کلون میانبر در فهرست پیدا نشد." : "Shortcut clone was not found in the registry.",
-                        Toast.LENGTH_LONG).show();
+                showCloneLaunchFeedback(outcome, outcome.clone.displayName);
             });
         }
+    }
+
+    private void showCloneLaunchFeedback(AsyncCloneLaunchRepository.Outcome outcome, String displayName) {
+        VirtualHookManager.LocationApplyResult hook = outcome.launchResult.locationResult;
+        if (hook != null && (hook.status == VirtualHookManager.LocationStatus.FAILED
+                || hook.status == VirtualHookManager.LocationStatus.UNSUPPORTED)) {
+            Toast.makeText(this,
+                    (fa ? "کلون اجرا شد؛ اما اعمال موقعیت تأیید نشد: " : "Clone launched; location hook was not verified: ")
+                            + hook.status + " (" + hook.detail + ")",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, (fa ? "در حال اجرای " : "Launching ") + displayName + "...",
+                Toast.LENGTH_SHORT).show();
     }
 
     private void releaseReservationAfterConfirmedEngineAbsence(
@@ -500,12 +514,22 @@ public class MainActivity extends BaseActivity {
         iconFrame.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                boolean launched = Engine.launchClone(MainActivity.this, item);
-                Toast.makeText(MainActivity.this,
-                        launched
-                                ? ((fa ? "در حال اجرای " : "Launching ") + item.displayName + "...")
-                                : (fa ? "اجرای کلون ناموفق بود؛ وضعیت نصب و موتور را بررسی کنید." : "Clone launch failed. Check installation and engine status."),
-                        Toast.LENGTH_SHORT).show();
+                iconFrame.setEnabled(false);
+                launchRepository.launchClone(item.packageName, item.userId, outcome -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    iconFrame.setEnabled(true);
+                    if (outcome == null || !outcome.isLaunched()) {
+                        String detail = outcome == null ? "UNKNOWN_LAUNCH_FAILURE"
+                                : (outcome.error != null ? outcome.error
+                                : outcome.launchResult == null ? "UNKNOWN_LAUNCH_FAILURE"
+                                : outcome.launchResult.failure);
+                        Toast.makeText(MainActivity.this,
+                                (fa ? "اجرای کلون ناموفق بود: " : "Clone launch failed: ") + detail,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    showCloneLaunchFeedback(outcome, item.displayName);
+                });
             }
         });
         cell.addView(iconFrame);
