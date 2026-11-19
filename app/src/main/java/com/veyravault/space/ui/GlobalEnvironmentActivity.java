@@ -16,14 +16,21 @@ import com.veyravault.space.R;
 import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.ProfileSettings;
 
 public class GlobalEnvironmentActivity extends BaseActivity {
     private AsyncCloneRepository repository;
     private boolean fa;
     private boolean profileLoaded;
+    private boolean locationProfileLoaded;
     private boolean masterGpsLoaded;
     private boolean loadFailed;
     private CloneStore.GlobalEnvConfig config;
+    private ProfileSettings globalProfile;
+    private CheckBox globalLocationEnabled;
+    private EditText globalLatitudeEt;
+    private EditText globalLongitudeEt;
+    private TextView resetGlobalLocationButton;
     private CheckBox enableGlobal;
     private EditText brandEt;
     private EditText modelEt;
@@ -123,6 +130,50 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         masterGps.setPadding(0, 24, 0, 24);
         root.addView(masterGps);
 
+        TextView locationTitle = new TextView(this);
+        locationTitle.setText(fa ? "پیش‌فرض موقعیت مکانی سراسری" : "Global Location Defaults");
+        locationTitle.setTextSize(17f);
+        locationTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        locationTitle.setPadding(0, 20, 0, 8);
+        root.addView(locationTitle);
+
+        TextView locationDesc = new TextView(this);
+        locationDesc.setTextSize(13f);
+        locationDesc.setTextColor(Color.parseColor("#4B5563"));
+        locationDesc.setText(fa
+                ? "اولویت هر فیلد: تنظیم اختصاصی کلون، سپس این پروفایل سراسری، سپس مقدار امن سیستم. Master Mock GPS کلید قطع‌کننده اصلی است."
+                : "Per-field priority: Clone override, then this Global profile, then the safe system default. Master Mock GPS remains the global kill switch.");
+        root.addView(locationDesc);
+
+        globalLocationEnabled = new CheckBox(this);
+        globalLocationEnabled.setText(fa ? "فعال‌سازی پیش‌فرض موقعیت برای کلون‌های بدون Override" :
+                "Enable location by default for clones without an override");
+        root.addView(globalLocationEnabled);
+
+        globalLatitudeEt = new EditText(this);
+        globalLatitudeEt.setSingleLine(true);
+        globalLatitudeEt.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        globalLatitudeEt.setHint("Global latitude (-90 to 90)");
+        root.addView(globalLatitudeEt);
+
+        globalLongitudeEt = new EditText(this);
+        globalLongitudeEt.setSingleLine(true);
+        globalLongitudeEt.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        globalLongitudeEt.setHint("Global longitude (-180 to 180)");
+        root.addView(globalLongitudeEt);
+
+        resetGlobalLocationButton = new TextView(this);
+        resetGlobalLocationButton.setText(fa ? "پاک‌کردن پیش‌فرض‌های موقعیت سراسری و بازگشت به سیستم" :
+                "Clear Global location defaults (inherit System)");
+        resetGlobalLocationButton.setTextColor(Color.parseColor("#2563EB"));
+        resetGlobalLocationButton.setPadding(0, 12, 0, 18);
+        resetGlobalLocationButton.setOnClickListener(v -> resetGlobalLocation());
+        root.addView(resetGlobalLocationButton);
+
         saveButton = new Button(this);
         saveButton.setBackgroundResource(R.drawable.bg_pill_blue);
         saveButton.setTextColor(Color.WHITE);
@@ -144,6 +195,10 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         if (countryEt != null) countryEt.setEnabled(enabled);
         if (simOpEt != null) simOpEt.setEnabled(enabled);
         if (masterGps != null) masterGps.setEnabled(enabled);
+        if (globalLocationEnabled != null) globalLocationEnabled.setEnabled(enabled);
+        if (globalLatitudeEt != null) globalLatitudeEt.setEnabled(enabled);
+        if (globalLongitudeEt != null) globalLongitudeEt.setEnabled(enabled);
+        if (resetGlobalLocationButton != null) resetGlobalLocationButton.setEnabled(enabled);
     }
 
     private void loadSettings() {
@@ -162,6 +217,20 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             profileLoaded = true;
             finishLoadingIfReady();
         });
+        repository.loadGlobalProfile(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                failLoading((fa ? "خواندن تنظیمات موقعیت سراسری ناموفق بود: " :
+                        "Could not read Global location profile: ") + result.getMessage());
+                return;
+            }
+            globalProfile = result.getValue();
+            globalLocationEnabled.setChecked(Boolean.TRUE.equals(globalProfile.locationEnabled));
+            globalLatitudeEt.setText(globalProfile.latitude == null ? "" : String.valueOf(globalProfile.latitude));
+            globalLongitudeEt.setText(globalProfile.longitude == null ? "" : String.valueOf(globalProfile.longitude));
+            locationProfileLoaded = true;
+            finishLoadingIfReady();
+        });
         repository.loadMasterMockGpsEnabled(result -> {
             if (isFinishing() || isDestroyed()) return;
             if (!result.isSuccess()) {
@@ -175,7 +244,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
     }
 
     private void finishLoadingIfReady() {
-        if (profileLoaded && masterGpsLoaded && !loadFailed) setControlsEnabled(true);
+        if (profileLoaded && locationProfileLoaded && masterGpsLoaded && !loadFailed) setControlsEnabled(true);
     }
 
     private void failLoading(String message) {
@@ -186,7 +255,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
     }
 
     private void saveSettings() {
-        if (!profileLoaded || !masterGpsLoaded || loadFailed) return;
+        if (!profileLoaded || !locationProfileLoaded || !masterGpsLoaded || loadFailed) return;
         saveButton.setEnabled(false);
         final CloneStore.GlobalEnvConfig updated = new CloneStore.GlobalEnvConfig();
         updated.enabled = enableGlobal.isChecked();
@@ -198,6 +267,23 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         updated.simOperator = simOpEt.getText().toString().trim();
         updated.simOperatorName = config.simOperatorName;
         final boolean masterGpsEnabled = masterGps.isChecked();
+        final Boolean locationEnabled = globalLocationEnabled.isChecked();
+        final Double latitude;
+        final Double longitude;
+        try {
+            latitude = parseOptionalCoordinate(globalLatitudeEt.getText().toString(), -90.0d, 90.0d);
+            longitude = parseOptionalCoordinate(globalLongitudeEt.getText().toString(), -180.0d, 180.0d);
+        } catch (IllegalArgumentException invalid) {
+            saveButton.setEnabled(true);
+            showSaveFailure(invalid.getMessage());
+            return;
+        }
+        if (locationEnabled && (latitude == null || longitude == null)) {
+            saveButton.setEnabled(true);
+            showSaveFailure(fa ? "برای فعال‌سازی پیش‌فرض موقعیت، هر دو مختصات لازم است." :
+                    "Both global coordinates are required when global location is enabled.");
+            return;
+        }
 
         repository.saveGlobalEnvironment(updated, profileResult -> {
             if (isFinishing() || isDestroyed()) return;
@@ -207,24 +293,81 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                         + profileResult.getMessage());
                 return;
             }
-            repository.setMasterMockGpsEnabled(masterGpsEnabled, gpsResult -> {
+            repository.saveGlobalLocationProfile(locationEnabled, latitude, longitude, locationResult -> {
                 if (isFinishing() || isDestroyed()) return;
-                if (!gpsResult.isSuccess()) {
+                if (!locationResult.isSuccess()) {
                     saveButton.setEnabled(true);
                     showSaveFailure(fa
-                            ? "پروفایل ذخیره شد، اما Master GPS ذخیره نشد. همگام‌سازی اجرا نشد: " + gpsResult.getMessage()
-                            : "Profile was saved, but Master GPS was not. Hook synchronization was not run: "
-                                    + gpsResult.getMessage());
+                            ? "اطلاعات دستگاه ذخیره شد، اما پروفایل موقعیت سراسری ذخیره نشد: " + locationResult.getMessage()
+                            : "Device metadata was saved, but Global location profile was not: " + locationResult.getMessage());
                     return;
                 }
-                // Both independent commits are confirmed before requesting hook synchronization.
-                CloneStore.syncAllHooks(getApplicationContext());
-                Toast.makeText(this, fa
-                        ? "پروفایل و Master GPS ذخیره شدند؛ همگام‌سازی موقعیت کلون‌ها درخواست شد. مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
-                        : "Profile and Master GPS were saved; clone location hook sync was requested. Device/SIM values are metadata only and are not applied to clones.",
-                        Toast.LENGTH_LONG).show();
-                finish();
+                repository.setMasterMockGpsEnabled(masterGpsEnabled, gpsResult -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!gpsResult.isSuccess()) {
+                        saveButton.setEnabled(true);
+                        showSaveFailure(fa
+                                ? "اطلاعات و پروفایل موقعیت ذخیره شدند، اما Master GPS ذخیره نشد؛ همگام‌سازی انجام نشد: " + gpsResult.getMessage()
+                                : "Metadata and Global location profile were saved, but Master GPS was not; hooks were not synchronized: "
+                                        + gpsResult.getMessage());
+                        return;
+                    }
+                    // All three independent commits are confirmed before requesting hook synchronization.
+                    CloneStore.syncAllHooks(getApplicationContext());
+                    Toast.makeText(this, fa
+                            ? "اطلاعات، پروفایل موقعیت و Master GPS ذخیره شدند؛ همگام‌سازی کلون‌ها درخواست شد. مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
+                            : "Metadata, Global location profile and Master GPS were saved; clone hook synchronization was requested. Device/SIM values remain metadata only.",
+                            Toast.LENGTH_LONG).show();
+                    finish();
+                });
             });
+        });
+    }
+
+    private Double parseOptionalCoordinate(String raw, double min, double max) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.isEmpty()) return null;
+        final double parsed;
+        try {
+            parsed = Double.parseDouble(value);
+        } catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException(fa ? "مختصات باید عدد معتبر باشد." :
+                    "Coordinates must be valid numbers.");
+        }
+        if (Double.isNaN(parsed) || Double.isInfinite(parsed) || parsed < min || parsed > max) {
+            throw new IllegalArgumentException(fa ? "مختصات خارج از محدوده مجاز است." :
+                    "Coordinates are outside the allowed range.");
+        }
+        return parsed;
+    }
+
+    private void resetGlobalLocation() {
+        if (loadFailed || !locationProfileLoaded) return;
+        resetGlobalLocationButton.setEnabled(false);
+        saveButton.setEnabled(false);
+        repository.clearGlobalLocationOverrides(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                resetGlobalLocationButton.setEnabled(true);
+                saveButton.setEnabled(true);
+                showSaveFailure((fa ? "پاک‌کردن پیش‌فرض‌های موقعیت ناموفق بود: " :
+                        "Could not clear Global location defaults: ") + result.getMessage());
+                return;
+            }
+            if (globalProfile == null) globalProfile = new ProfileSettings();
+            globalProfile.locationEnabled = null;
+            globalProfile.latitude = null;
+            globalProfile.longitude = null;
+            globalLocationEnabled.setChecked(false);
+            globalLatitudeEt.setText("");
+            globalLongitudeEt.setText("");
+            CloneStore.syncAllHooks(getApplicationContext());
+            Toast.makeText(this, fa
+                    ? "پیش‌فرض‌های موقعیت سراسری پاک شدند؛ کلون‌ها به اولویت بعدی بازمی‌گردند."
+                    : "Global location defaults cleared; clones now inherit from their next available profile source.",
+                    Toast.LENGTH_LONG).show();
+            resetGlobalLocationButton.setEnabled(true);
+            saveButton.setEnabled(true);
         });
     }
 
