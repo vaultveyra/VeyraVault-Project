@@ -22,12 +22,21 @@ for forbidden in (
 ):
     assert forbidden not in hooks, "Unexpected host/global hook remains: " + forbidden
 
-# The pinned engine's location service accepts package + virtual-user scoped settings.
-location_method = hooks.split("public static void applyEngineLocationHook", 1)[1]
-assert 'm.getName().equals("setPattern")' in location_method
-assert "m.invoke(mgr, userId, pkg, enable ? 2 : 0)" in location_method
-assert 'm.getName().equals("setLocation")' in location_method
-assert "m.invoke(mgr, userId, pkg, bLoc)" in location_method
+# The pinned engine exposes a package/user-scoped service. The adapter calls
+# the service proxy directly so RemoteException is not swallowed by BLocationManager's
+# convenience wrappers, then verifies the stored pattern and coordinates.
+assert "top.niunaijun.blackbox.fake.frameworks.BLocationManager" in hooks
+assert 'managerClass.getMethod("getService")' in hooks
+location_method = hooks.split("private static LocationApplyResult applyEngineLocationHook", 1)[1]
+set_location = location_method.index('invoke(service, "setLocation"')
+set_pattern = location_method.index('invoke(service, "setPattern"')
+assert set_location < set_pattern
+assert '"getPattern"' in location_method
+assert '"getLocation"' in location_method
+assert '"getLatitude"' in location_method
+assert '"getLongitude"' in location_method
+assert "failClosedAfterEnableFailure" in location_method
+assert "catch (Throwable ignored)" not in hooks
 
 # Startup synchronization must not attempt to apply unsupported device-profile APIs.
 sync_method = store.split("public static void syncAllHooks", 1)[1]
