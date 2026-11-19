@@ -191,6 +191,24 @@ public final class ProfileStore {
         }
     }
 
+    /** Clears the three global location fields together while preserving locale/time-zone defaults. */
+    public static synchronized boolean clearGlobalLocationOverrides(Context context) {
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) return false;
+        try {
+            JSONObject global = root.optJSONObject("global");
+            if (global == null) return true;
+            global.remove("locationEnabled");
+            global.remove("latitude");
+            global.remove("longitude");
+            if (global.length() == 0) root.remove("global");
+            else root.put("global", global);
+            return writeRoot(context, root);
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
     /** Remove one global default only; all other defaults and clone overrides are retained. */
     public static synchronized boolean clearGlobalField(Context context, String field) {
         if (!isKnownField(field)) return false;
