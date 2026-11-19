@@ -179,3 +179,18 @@ GitHub Actions runs `:app:connectedDebugAndroidTest` before the unsigned release
 - The only in-app reflective `launchApk` invocation is inside `Engine.launchCloneDetailed`, after location-hook synchronization. The two MainActivity paths dispatch through the serialized single-thread worker. Completion callbacks are posted to the main looper; the Activity callback paths check finishing/destroyed state. The clone-icon path disables its clickable frame while the launch is pending.
 - This was a static source audit, not a new runtime test. It does not inspect opaque runtime-generated calls, external consumers of the public compatibility wrapper, or the pinned engine's internal implementation. CI emulator evidence remains the existing Stage 8.3 evidence; physical-device launch/lifecycle/process-isolation and third-party location-observation validation remain outstanding.
 - No runtime source, CloneStore payload, Clone/session/account data, manifest, or engine dependency was changed by this audit. No Room migration/cutover was performed.
+
+
+## Stage 8.4 — User acceptance and runtime gap audit (2026-11-19)
+
+Added `docs/STAGE_8_4_USER_ACCEPTANCE_AND_RUNTIME_GAP_AUDIT.md` to reconcile the user's first installed-build walkthrough with the current source.
+
+Confirmed gaps:
+- Dashboard/navigation remains programmatic and text-led; the center add action is 132 x 132 and does not meet the requested compact icon-led design.
+- The dashboard requirements for Tehran/New York clocks and verified device/network summaries are not met by the installed build reported by the user.
+- SettingsHub has no persisted System/Light/Dark appearance selector.
+- VPN status screen is explicitly read-only system-VPN detection; no VeyraVault VPN service/server tunnel is implemented.
+- ProfileSettings/ProfileResolver/ProfileRuntimeClient/CloneProfileLifecycleCallback currently support locale, time zone and location fields only. Brand/model/country/SIM values in CloneStore remain metadata; the pinned engine review found no supported BDeviceManager/BDeviceConfig API. The user's observation that target apps still see host device properties is consistent with source.
+- Chrome, Instagram and Soroush launch/runtime failures remain unclassified until redacted per-app diagnostics are available.
+
+This is a static audit and user-reported acceptance record, not a runtime fix or physical-device certification. It defines Stages 8.5–8.10 and preserves the CloneStore/session, no-Room-cutover, feature-branch-only and Draft PR constraints.
