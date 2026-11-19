@@ -413,7 +413,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertNotNull(journalBefore);
 
         // Simulate an inconsistent persisted registry that collides with the pending identity.
-        String conflictingClones = "[{\\"pkg\\":\\"com.example.releaseconflict\\",\\"uid\\":"
+        String conflictingClones = "[{\"pkg\":\"com.example.releaseconflict\",\"uid\":"
                 + reservation.getUserId() + "}]";
         assertTrue(preferences.edit().putString("clones_json", conflictingClones).commit());
 
