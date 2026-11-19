@@ -351,6 +351,21 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Clears all clone location overrides atomically while preserving locale/time-zone fields. */
+    public void clearCloneLocationOverrides(String packageName, int userId,
+                                             Callback<Boolean> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone identity is invalid"));
+            return;
+        }
+        enqueue(() -> {
+            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
+            if (!ProfileStore.clearCloneLocationOverrides(appContext, packageName, userId))
+                throw new PersistenceFailureException("Clone location reset was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
     public void clearCloneProfileField(String packageName, int userId, String field,
                                        Callback<Boolean> callback) {
         if (packageName == null || packageName.trim().isEmpty() || userId < 0
