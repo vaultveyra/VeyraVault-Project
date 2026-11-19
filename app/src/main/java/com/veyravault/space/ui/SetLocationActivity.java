@@ -205,9 +205,7 @@ public class SetLocationActivity extends BaseActivity {
                         return;
                     }
                     cloneProfile = updated;
-                    VirtualHookManager.LocationApplyResult applied =
-                            VirtualHookManager.syncCloneHooks(getApplicationContext(), cloneEntry);
-                    showHookResult(applied);
+                    syncSavedCloneLocation();
                 });
             }
         });
@@ -298,6 +296,21 @@ public class SetLocationActivity extends BaseActivity {
         saveButton.setEnabled(false);
         resetButton.setEnabled(false);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private void syncSavedCloneLocation() {
+        repository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                saveButton.setEnabled(true);
+                resetButton.setEnabled(true);
+                Toast.makeText(this, (fa ? "ذخیره انجام شد اما اجرای همگام‌سازی ناموفق بود: " :
+                        "Profile saved, but hook synchronization could not run: ") + result.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            showHookResult(result.getValue());
+        });
     }
 
     private void showHookResult(VirtualHookManager.LocationApplyResult result) {
