@@ -16,17 +16,18 @@ assert "cloneEntry.latitude =" not in source
 assert "cloneEntry.longitude =" not in source
 assert "A valid target clone is required." in source
 assert "Clone not found or stored data is unreadable." in source
+assert "repository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId" in source
 assert "Engine result verified:" in source
 assert "Profile saved, but engine application was not verified:" in source
 
 save_start = source.index("repository.saveCloneProfile(")
 save_success = source.index("if (!result.isSuccess())", save_start)
-save_hook = source.index("VirtualHookManager.syncCloneHooks", save_success)
+save_hook = source.index("syncSavedCloneLocation();", save_success)
 assert save_start < save_success < save_hook
 
 reset_start = source.index("repository.clearCloneLocationOverrides(")
 reset_success = source.index("if (!result.isSuccess())", reset_start)
-reset_hook = source.index("VirtualHookManager.syncCloneHooks", reset_success)
+reset_hook = source.index("syncSavedCloneLocation();", reset_success)
 assert reset_start < reset_success < reset_hook
 
 store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").read_text(encoding="utf-8")
