@@ -48,8 +48,7 @@ profile = source[profile_start:profile_end]
 assert profile.count("repository.upsertClone(item") == 2
 assert "item.deviceBrand = previousBrand" in profile
 assert "item.deviceModel = previousModel" in profile
-assert "VirtualHookManager.syncCloneHooks(MainActivity.this, item)" in profile
-assert profile.index("if (!result.isSuccess())") < profile.index("VirtualHookManager.syncCloneHooks")
+assert "VirtualHookManager.syncCloneHooks" not in profile
 
 # Uninstall registry removal happens only after Engine confirms absence.
 single_start = source.index('makeSheetActionBtn("🗑️"')
