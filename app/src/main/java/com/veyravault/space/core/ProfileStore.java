@@ -199,6 +199,15 @@ public final class ProfileStore {
         }
     }
 
+    /** Strict runtime resolver: malformed profile structure is reported, never treated as empty. */
+    public static synchronized ProfileResolver.ResolvedProfile resolveStrict(
+            Context context, String packageName, int userId, ProfileSettings systemFallback) throws Exception {
+        return ProfileResolver.resolve(
+                readCloneOverrideStrict(context, packageName, userId),
+                readGlobalStrict(context),
+                systemFallback);
+    }
+
     public static synchronized ProfileResolver.ResolvedProfile resolve(
             Context context, String packageName, int userId, ProfileSettings systemFallback) {
         return ProfileResolver.resolve(getCloneOverride(context, packageName, userId),

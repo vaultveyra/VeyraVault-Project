@@ -86,6 +86,51 @@ public class Engine {
         } catch (Throwable ignored) {}
     }
 
+    private static volatile boolean profileLifecycleCallbackRegistered;
+    private static volatile String profileLifecycleDiagnostic = "NOT_REGISTERED";
+
+    /**
+     * Register a callback in each BlackBox host process. The pinned engine invokes
+     * beforeCreateApplication inside the package/user-scoped virtual process, before
+     * the target Application is instantiated.
+     */
+    public static boolean registerCloneProfileLifecycleCallback(Context context) {
+        if (context == null) {
+            profileLifecycleDiagnostic = "INVALID_CONTEXT";
+            return false;
+        }
+        if (profileLifecycleCallbackRegistered) return true;
+        synchronized (Engine.class) {
+            if (profileLifecycleCallbackRegistered) return true;
+            Object core = getCore();
+            if (core == null) {
+                profileLifecycleDiagnostic = "ENGINE_UNAVAILABLE";
+                return false;
+            }
+            try {
+                Class<?> callbackBase = Class.forName(
+                        "top.niunaijun.blackbox.app.configuration.AppLifecycleCallback");
+                Class<?> callbackImpl = Class.forName(
+                        "com.veyravault.space.core.CloneProfileLifecycleCallback");
+                Object callback = callbackImpl.getConstructor(Context.class)
+                        .newInstance(context.getApplicationContext());
+                Method add = core.getClass().getMethod("addAppLifecycleCallback", callbackBase);
+                add.invoke(core, callback);
+                profileLifecycleCallbackRegistered = true;
+                profileLifecycleDiagnostic = "REGISTERED";
+                return true;
+            } catch (Throwable error) {
+                profileLifecycleDiagnostic = "REGISTRATION_FAILED: "
+                        + error.getClass().getSimpleName();
+                return false;
+            }
+        }
+    }
+
+    public static String getProfileLifecycleDiagnostic() {
+        return profileLifecycleDiagnostic;
+    }
+
     private static volatile String lastInstallDiagnostic = "No install attempt has been made.";
 
     /** A bounded, non-sensitive explanation of the most recent install failure. */

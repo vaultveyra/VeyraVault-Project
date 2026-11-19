@@ -27,6 +27,9 @@ public class VaultApp extends Application {
         Engine.doOnCreate(this);
         // Additive import only: preserve legacy clone preferences and session lifecycle.
         ProfileStore.migrateLegacyLocationSettings(this);
+        // Register per-clone locale/time-zone application after additive profile migration.
+        // The callback runs inside the virtual package/user process, not the host UI process.
+        Engine.registerCloneProfileLifecycleCallback(this);
         VirtualHookManager.installProcessHooks(this);
         CloneStore.syncAllHooks(this);
     }

@@ -38,6 +38,9 @@ jobs:
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
 
+      - name: Test clone profile runtime hook contract
+        run: python3 scripts/test_profile_runtime_hook_contract.py
+
       - name: Test security credential contract
         run: python3 scripts/test_security_credentials.py
 
