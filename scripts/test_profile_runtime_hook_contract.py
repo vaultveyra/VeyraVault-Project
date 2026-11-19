@@ -21,7 +21,8 @@ assert "packageName.equals(appContext.getPackageName())" in callback
 assert "Resources.getSystem().getConfiguration().locale" in applier
 assert "Locale.setDefault(locale)" in applier
 assert "TimeZone.setDefault(TimeZone.getTimeZone(profile.timeZoneId))" in applier
-assert "packageContext.getResources().updateConfiguration" in applier
+assert "Resources resources = packageContext.getResources()" in applier
+assert "resources.updateConfiguration(configuration, resources.getDisplayMetrics())" in applier
 assert "readCloneOverrideStrict(context, packageName, userId)" in store
 assert "readGlobalStrict(context)" in store
 
