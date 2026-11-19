@@ -41,6 +41,9 @@ jobs:
       - name: Test clone profile runtime hook contract
         run: python3 scripts/test_profile_runtime_hook_contract.py
 
+      - name: Test strict location profile hook contract
+        run: python3 scripts/test_profile_location_hook_contract.py
+
       - name: Test security credential contract
         run: python3 scripts/test_security_credentials.py
 
