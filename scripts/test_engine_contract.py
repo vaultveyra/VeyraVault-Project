@@ -58,7 +58,8 @@ assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_ui
 assert "Engine.isCloneConfirmedAbsent" in add_ui and "releaseReservationAfterEngineAbsence" in add_ui
 assert "repository.allocateNextUserId" not in main_ui + add_ui
 assert "repository.upsertClone(copy" not in main_ui and "repository.upsertClone(entry" not in add_ui
-assert "boolean launched = Engine.launchClone(MainActivity.this, item);" in main_ui
+assert "launchRepository.launchClone(item.packageName, item.userId" in main_ui
+assert "Engine.launchClone(MainActivity.this, item)" not in main_ui
 print("Clone creation UI failure handling: PASS")
 
 uninstall = method_body("public static boolean uninstallClone(")
