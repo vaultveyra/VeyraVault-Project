@@ -169,3 +169,13 @@ GitHub Actions runs `:app:connectedDebugAndroidTest` before the unsigned release
 - Physical-device validation of clone launch latency, lifecycle behavior, third-party app location observations, and actual process isolation remains outstanding. CI emulator success does not establish those physical-device behaviors.
 - The synchronous Engine compatibility wrapper remains available for non-UI callers; a full caller audit/migration is still required before removing it.
 - SharedPreferences/CloneStore remains the active runtime source of truth. Room remains inactive; no migration/cutover occurred. No Clone registry/session/account data was intentionally modified by this stage.
+
+
+### Stage 8.3.1 — Production Clone-launch call-site audit (2026-11-19)
+
+- Audited all 58 Java source files under `app/src/main/java` from immutable branch head `92360877fe0dac84bc16b00d19be2c6f70cf69b1`. The complete production source-path inventory came from the recursive Git tree for that exact commit; every listed source file was fetched and searched for direct `Engine.launchClone`, `.launchClone(`, and `launchApk(` call patterns.
+- The only production launch-related call sites found were: `MainActivity.java` shortcut path calling `AsyncCloneLaunchRepository.launchClone`; `MainActivity.java` clone-icon path calling the same repository; and `AsyncCloneLaunchRepository.java` worker calling `Engine.launchCloneDetailed`.
+- No in-repository production caller of the synchronous `Engine.launchClone` compatibility wrapper was found. The wrapper remains in place for compatibility; this audit does not justify removing a public method that may be used by code outside this app source tree.
+- The only in-app reflective `launchApk` invocation is inside `Engine.launchCloneDetailed`, after location-hook synchronization. The two MainActivity paths dispatch through the serialized single-thread worker. Completion callbacks are posted to the main looper; the Activity callback paths check finishing/destroyed state. The clone-icon path disables its clickable frame while the launch is pending.
+- This was a static source audit, not a new runtime test. It does not inspect opaque runtime-generated calls, external consumers of the public compatibility wrapper, or the pinned engine's internal implementation. CI emulator evidence remains the existing Stage 8.3 evidence; physical-device launch/lifecycle/process-isolation and third-party location-observation validation remain outstanding.
+- No runtime source, CloneStore payload, Clone/session/account data, manifest, or engine dependency was changed by this audit. No Room migration/cutover was performed.
