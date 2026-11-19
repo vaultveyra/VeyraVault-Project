@@ -69,6 +69,7 @@ A timeout or age-based cleanup is unsafe: it could release an identity while a v
 - [Unsigned build and audit artifact](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44397505197/artifacts/14471299891) — artifact ID `14471299891`, SHA-256 ZIP `1ba33b5c7a27d176691e9641f9b2197b5f5e6dddec221d3d236b9184fcd000a9`.
 - Isolated signing verified APK signature schemes v1, v2 and v3 and uploaded the signed artifact. The log also emitted META-INF signature-coverage warnings for build/dependency metadata entries; these were warnings, not CI failures, and should remain visible in release review.
 - Runs #500–#502 remain recorded as diagnostic attempts preceding the harness fix; the authoritative passing validation is #508/#509 above.
+- Documentation-head validation: CI #511 (run ID `44432122052`) on commit `5acfa24b9b155be4b860c5e9da1ef1fb6d55a74b` also passed **39/39 Emulator tests, 0 skipped, 0 failed**, Source Audit, unsigned Release compilation and APK Audit. [Unsigned build/audit artifact](https://github.com/vaultveyra/VeyraVault-Project/actions/runs/44432122052/artifacts/14488041877) — artifact ID `14488041877`, ZIP SHA-256 `a9cb965de858850ace3fb2c3c96c4e300ab2ef68e02baf2d60c65a3909ed9598`. Signing was skipped for this PR-triggered run; the signed artifact from #508 remains the signed build for the same Android source commit.
 
 ## Explicit non-goals
 
