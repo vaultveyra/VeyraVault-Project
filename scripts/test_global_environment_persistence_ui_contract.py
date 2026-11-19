@@ -19,6 +19,10 @@ assert "profileLoaded && locationProfileLoaded && masterGpsLoaded && !loadFailed
 assert "Both global coordinates are required when global location is enabled." in source
 assert "parseOptionalCoordinate" in source
 assert "Clear Global location defaults (inherit System)" in source
+assert "Inherit safe System default (no Global override)" in source
+assert "globalProfile.locationEnabled == null" in source
+assert "globalLocationInherit.isChecked()" in source
+assert "Boolean.TRUE.equals(locationEnabled)" in source
 
 profile_save = source.index("repository.saveGlobalEnvironment(updated, profileResult ->")
 profile_success = source.index("if (!profileResult.isSuccess())", profile_save)
