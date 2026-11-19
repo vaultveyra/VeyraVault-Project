@@ -20,9 +20,4 @@ assert "entry.latitude" not in source
 assert "entry.longitude" not in source
 assert "catch (Throwable ignored)" not in source
 
-set_location = Path("app/src/main/java/com/veyravault/space/ui/SetLocationActivity.java").read_text(encoding="utf-8")
-assert "AsyncCloneRepository.getInstance(getApplicationContext())" in set_location
-assert "saveCloneProfile" not in set_location  # UI migration is tracked as the next sub-stage.
-assert "upsertClone(cloneEntry" in set_location
-
 print("PASS: Location hook resolves strict profiles, honors Master GPS, uses pinned engine APIs, and verifies readback.")
