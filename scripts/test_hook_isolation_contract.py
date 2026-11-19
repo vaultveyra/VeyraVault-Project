@@ -39,7 +39,7 @@ assert "failClosedAfterEnableFailure" in location_method
 assert "catch (Throwable ignored)" not in hooks
 
 # Startup synchronization must not attempt to apply unsupported device-profile APIs.
-sync_method = store.split("public static void syncAllHooks", 1)[1]
+sync_method = store.split("syncAllHooks(Context c)", 1)[1]
 assert "VirtualHookManager.syncAllClones(c)" in sync_method
 assert "CloneStore.readAllStrict(context)" in hooks
 assert "SyncSummary" in hooks
