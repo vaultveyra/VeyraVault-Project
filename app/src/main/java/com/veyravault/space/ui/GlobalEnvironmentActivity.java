@@ -27,6 +27,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
     private boolean loadFailed;
     private CloneStore.GlobalEnvConfig config;
     private ProfileSettings globalProfile;
+    private CheckBox globalLocationInherit;
     private CheckBox globalLocationEnabled;
     private EditText globalLatitudeEt;
     private EditText globalLongitudeEt;
@@ -145,9 +146,18 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 : "Per-field priority: Clone override, then this Global profile, then the safe system default. Master Mock GPS remains the global kill switch.");
         root.addView(locationDesc);
 
+        globalLocationInherit = new CheckBox(this);
+        globalLocationInherit.setText(fa ? "استفاده از پیش‌فرض امن سیستم (بدون Override سراسری)" :
+                "Inherit safe System default (no Global override)");
+        globalLocationInherit.setOnCheckedChangeListener((button, checked) -> updateGlobalLocationControls());
+        root.addView(globalLocationInherit);
+
         globalLocationEnabled = new CheckBox(this);
         globalLocationEnabled.setText(fa ? "فعال‌سازی پیش‌فرض موقعیت برای کلون‌های بدون Override" :
                 "Enable location by default for clones without an override");
+        globalLocationEnabled.setOnCheckedChangeListener((button, checked) -> {
+            if (checked && globalLocationInherit.isChecked()) globalLocationInherit.setChecked(false);
+        });
         root.addView(globalLocationEnabled);
 
         globalLatitudeEt = new EditText(this);
@@ -225,9 +235,11 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 return;
             }
             globalProfile = result.getValue();
+            globalLocationInherit.setChecked(globalProfile.locationEnabled == null);
             globalLocationEnabled.setChecked(Boolean.TRUE.equals(globalProfile.locationEnabled));
             globalLatitudeEt.setText(globalProfile.latitude == null ? "" : String.valueOf(globalProfile.latitude));
             globalLongitudeEt.setText(globalProfile.longitude == null ? "" : String.valueOf(globalProfile.longitude));
+            updateGlobalLocationControls();
             locationProfileLoaded = true;
             finishLoadingIfReady();
         });
@@ -267,7 +279,8 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         updated.simOperator = simOpEt.getText().toString().trim();
         updated.simOperatorName = config.simOperatorName;
         final boolean masterGpsEnabled = masterGps.isChecked();
-        final Boolean locationEnabled = globalLocationEnabled.isChecked();
+        final Boolean locationEnabled = globalLocationInherit.isChecked()
+                ? null : Boolean.valueOf(globalLocationEnabled.isChecked());
         final Double latitude;
         final Double longitude;
         try {
@@ -278,7 +291,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             showSaveFailure(invalid.getMessage());
             return;
         }
-        if (locationEnabled && (latitude == null || longitude == null)) {
+        if (Boolean.TRUE.equals(locationEnabled) && (latitude == null || longitude == null)) {
             saveButton.setEnabled(true);
             showSaveFailure(fa ? "برای فعال‌سازی پیش‌فرض موقعیت، هر دو مختصات لازم است." :
                     "Both global coordinates are required when global location is enabled.");
@@ -324,6 +337,13 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         });
     }
 
+    private void updateGlobalLocationControls() {
+        boolean editable = !globalLocationInherit.isChecked();
+        if (globalLocationEnabled != null) globalLocationEnabled.setEnabled(editable && !loadFailed);
+        if (globalLatitudeEt != null) globalLatitudeEt.setEnabled(editable && !loadFailed);
+        if (globalLongitudeEt != null) globalLongitudeEt.setEnabled(editable && !loadFailed);
+    }
+
     private Double parseOptionalCoordinate(String raw, double min, double max) {
         String value = raw == null ? "" : raw.trim();
         if (value.isEmpty()) return null;
@@ -358,9 +378,11 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             globalProfile.locationEnabled = null;
             globalProfile.latitude = null;
             globalProfile.longitude = null;
+            globalLocationInherit.setChecked(true);
             globalLocationEnabled.setChecked(false);
             globalLatitudeEt.setText("");
             globalLongitudeEt.setText("");
+            updateGlobalLocationControls();
             CloneStore.syncAllHooks(getApplicationContext());
             Toast.makeText(this, fa
                     ? "پیش‌فرض‌های موقعیت سراسری پاک شدند؛ کلون‌ها به اولویت بعدی بازمی‌گردند."
