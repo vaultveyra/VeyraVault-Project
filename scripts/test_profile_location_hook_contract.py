@@ -20,4 +20,10 @@ assert "entry.latitude" not in source
 assert "entry.longitude" not in source
 assert "catch (Throwable ignored)" not in source
 
-print("PASS: Location hook resolves strict profiles, honors Master GPS, uses pinned engine APIs, and verifies readback.")
+store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").read_text(encoding="utf-8")
+assert "clearCloneLocationOverrides(" in store
+assert "legacyLocationCleared" in store
+assert "optBoolean(KEY_LEGACY_LOCATION_CLEARED, false)" in store
+assert "out.remove(KEY_LEGACY_LOCATION_CLEARED)" in store
+
+print("PASS: Location hook resolves strict profiles, honors Master GPS, verifies pinned-engine readback, and preserves explicit inheritance resets.")
