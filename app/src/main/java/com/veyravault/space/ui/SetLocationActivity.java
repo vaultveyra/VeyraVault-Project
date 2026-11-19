@@ -48,6 +48,7 @@ public class SetLocationActivity extends BaseActivity {
     private Button saveButton;
     private TextView resetButton;
     private TextView sourceTv;
+    private TextView citiesButton;
     private boolean locationPointSelected;
 
     @Override
@@ -84,15 +85,16 @@ public class SetLocationActivity extends BaseActivity {
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setPadding(36, 28, 36, 28);
 
-        TextView btnCities = new TextView(this);
-        btnCities.setText(fa ? "🌍 انتخاب سریع شهر / مختصات" : "🌍 Quick Cities / Coords");
-        btnCities.setTextColor(Color.parseColor("#2563EB"));
-        btnCities.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        btnCities.setPadding(28, 14, 28, 14);
-        btnCities.setOnClickListener(new View.OnClickListener() {
+        citiesButton = new TextView(this);
+        citiesButton.setText(fa ? "🌍 انتخاب سریع شهر / مختصات" : "🌍 Quick Cities / Coords");
+        citiesButton.setTextColor(Color.parseColor("#2563EB"));
+        citiesButton.setBackgroundResource(R.drawable.bg_pill_lightblue);
+        citiesButton.setPadding(28, 14, 28, 14);
+        citiesButton.setEnabled(false);
+        citiesButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showCitiesDialog(); }
         });
-        topBar.addView(btnCities);
+        topBar.addView(citiesButton);
 
         TextView title = new TextView(this);
         title.setText(getString(R.string.set_location));
@@ -127,11 +129,13 @@ public class SetLocationActivity extends BaseActivity {
         MapEventsOverlay eventsOverlay = new MapEventsOverlay(new MapEventsReceiver() {
             @Override
             public boolean singleTapConfirmedHelper(GeoPoint p) {
+                if (!cloneProfileLoaded || !globalProfileLoaded) return false;
                 updateSelectedPoint(p.getLatitude(), p.getLongitude());
                 return true;
             }
             @Override
             public boolean longPressHelper(GeoPoint p) {
+                if (!cloneProfileLoaded || !globalProfileLoaded) return false;
                 updateSelectedPoint(p.getLatitude(), p.getLongitude());
                 return true;
             }
@@ -293,6 +297,7 @@ public class SetLocationActivity extends BaseActivity {
                 : effective.latitudeSource + " / " + effective.longitudeSource;
         sourceTv.setText(fa ? "وضعیت مؤثر: " + state + "؛ منبع مختصات: " + coordinates
                 : "Effective enabled: " + state + "; coordinate source: " + coordinates);
+        citiesButton.setEnabled(true);
         saveButton.setEnabled(locationPointSelected);
         resetButton.setEnabled(true);
     }
