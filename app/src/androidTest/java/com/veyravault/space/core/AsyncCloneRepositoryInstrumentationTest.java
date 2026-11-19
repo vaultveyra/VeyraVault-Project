@@ -196,6 +196,48 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void invalidPersistedProfileValuesFallBackIndependently() throws Exception {
+        profilePreferences.edit().putString("profiles_json",
+                "{\\"schemaVersion\\":1,"
+                + "\\"global\\":{\\"localeTag\\":\\"fr-FR\\",\\"timeZoneId\\":\\"Europe/Paris\\",\\"latitude\\":48.0,\\"longitude\\":2.0},"
+                + "\\"clones\\":{\\"com.example.profile#7\\":{"
+                + "\\"localeTag\\":\\"invalid locale\\",\\"timeZoneId\\":\\"Mars/Olympus\\","
+                + "\\"latitude\\":999.0,\\"longitude\\":45.0,\\"locationEnabled\\":false}}}")
+                .commit();
+
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch loaded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<ProfileSettings>> cloneResult = new AtomicReference<>();
+        repository.loadCloneProfile("com.example.profile", 7,
+                result -> { cloneResult.set(result); loaded.countDown(); });
+        assertTrue(loaded.await(10, TimeUnit.SECONDS));
+        assertTrue("Invalid semantic values must not fail the whole profile read",
+                cloneResult.get().isSuccess());
+        ProfileSettings parsed = cloneResult.get().getValue();
+        assertNull(parsed.localeTag);
+        assertNull(parsed.timeZoneId);
+        assertNull(parsed.latitude);
+        assertEquals(Double.valueOf(45.0), parsed.longitude);
+        assertEquals(Boolean.FALSE, parsed.locationEnabled);
+
+        ProfileResolver.ResolvedProfile effective = ProfileStore.resolve(
+                context, "com.example.profile", 7, new ProfileSettings());
+        assertEquals("fr-FR", effective.localeTag);
+        assertEquals(ProfileResolver.Source.GLOBAL, effective.localeSource);
+        assertEquals("Europe/Paris", effective.timeZoneId);
+        assertEquals(ProfileResolver.Source.GLOBAL, effective.timeZoneSource);
+        assertEquals(Double.valueOf(48.0), effective.latitude);
+        assertEquals(ProfileResolver.Source.GLOBAL, effective.latitudeSource);
+        assertEquals(Double.valueOf(45.0), effective.longitude);
+        assertEquals(ProfileResolver.Source.CLONE, effective.longitudeSource);
+        assertEquals(Boolean.FALSE, effective.locationEnabled);
+        assertEquals(ProfileResolver.Source.CLONE, effective.locationEnabledSource);
+
+        // Reading/resolving must not rewrite or erase the original persisted payload.
+        assertTrue(profilePreferences.getString("profiles_json", "").contains("\\"invalid locale\\""));
+        repository.close();
+    }
+
     @Test public void activeLaunchMarkerRequiresAndReturnsExistingClone() throws Exception {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         CloneStore.CloneEntry entry = cloneEntry("com.example.active", 2);
