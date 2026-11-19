@@ -14,7 +14,7 @@ assert "CloneStore.getGlobalEnv" not in source
 assert "CloneStore.isMasterMockGpsEnabled" not in source
 assert "CloneStore.saveGlobalEnv" not in source
 assert "CloneStore.setMasterMockGpsEnabled" not in source
-assert "CloneStore.syncAllHooks(getApplicationContext())" in source
+assert "repository.syncAllCloneLocationHooks(syncResult ->" in source
 assert "formatSyncSummary(summary)" in source
 assert "summary.registryReadable" in source
 assert "summary.unsupported" in source and "summary.failed" in source
