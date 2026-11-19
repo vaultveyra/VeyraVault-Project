@@ -149,3 +149,23 @@ The importer is not called from VaultApp, CloneStore, Activities or normal runti
 Added AndroidX instrumentation tests against the actual Room database on an API 34 x86_64 emulator. Coverage includes populated import/parity, repeat-import idempotence, row-tamper detection, SQLite-trigger-induced transaction rollback across all tables, disk close/reopen durability, empty snapshots and absent/stale active markers. A debug-only test Application prevents the virtual-app engine from starting in the test process; debug packaging excludes native engine libraries and explicitly selects `x86_64` to match the CI emulator. The production release Application, manifest, ARM ABI filters and runtime persistence path are unchanged.
 
 GitHub Actions runs `:app:connectedDebugAndroidTest` before the unsigned release build. The first completed emulator attempt identified an ABI mismatch (`No compatible devices connected`): the generated app inherited ARM-only ABI filters while the CI emulator was x86_64. The Debug-only ABI override and a source-contract assertion were added; the next run must confirm that instrumentation now reaches the five test methods. This stage adds no runtime migration wiring and does not modify CloneStore, legacy preferences, virtual package data, account/session data, or user clones. Emulator results must pass before treating Stage 7.4 as validated; physical-device upgrade, backup/restore and process-death testing remain required before any separately approved cutover.
+
+
+## Stage 8.3 — Asynchronous Clone launch orchestration (validated on current implementation head; 2026-11-19)
+
+- Added `AsyncCloneLaunchRepository`: strict CloneStore registry lookup, install-state check/install, location-hook synchronization, engine launch and active-launch marker persistence execute on one serialized worker.
+- Added `Engine.launchCloneDetailed` so engine launch success/failure and the typed location-hook outcome are reported separately. The synchronous `Engine.launchClone` remains as a compatibility wrapper; MainActivity dashboard and shortcut UI use the asynchronous repository.
+- MainActivity receives launch callbacks on the main thread. Feedback distinguishes engine launch failure from a launched app whose location hook is FAILED or UNSUPPORTED.
+- Removed synchronous location-hook IPC from the per-clone metadata editor because metadata edits do not change location settings.
+- Added `scripts/test_async_clone_launch_contract.py` and CI wiring; updated engine and MainActivity contract checks.
+- Validated implementation head: `58a00fc1b5441f94b3e503cde2cacce4a06116ae`.
+- Push CI run #686 (run ID `44561153783`): **46/46 Android Emulator instrumentation tests completed, 0 skipped, 0 failed**. All source/contract checks passed, source audit passed, unsigned Release APK compiled, APK audit passed, and isolated signing job succeeded.
+- PR CI run #687 (run ID `44561170843`): **46/46 Android Emulator instrumentation tests completed, 0 skipped, 0 failed**. All source/contract checks passed, source audit passed, unsigned Release APK compiled and APK audit passed. Signing was skipped for the pull_request event as configured.
+- The emulator bootstrap initially produced repeated ADB connection retries and an emulator-console warning; the instrumentation task subsequently completed all 46 tests successfully in both runs. The transient startup messages are not test failures.
+- APK audit reported **0 forbidden remote log endpoints**.
+- Push unsigned artifact ID `14552140234`, ZIP SHA-256 `c6ef4903640ffb16ae19dd254608f106cd621085f7457494ea6eb347fcb53b79`.
+- Push signed artifact ID `14551755945`, ZIP SHA-256 `405203263125b69999e235cd2e574956e8dab96a341322bd255b90ac3714e291`. APK signature verification: v2=true, v3=true; v3.1/v3.2/v4=false.
+- PR unsigned artifact ID `14550543052`, ZIP SHA-256 `7888f5a9107b503558907e88e4145558263ce8cb6eb2f2938c2591500e0f584d`.
+- Physical-device validation of clone launch latency, lifecycle behavior, third-party app location observations, and actual process isolation remains outstanding. CI emulator success does not establish those physical-device behaviors.
+- The synchronous Engine compatibility wrapper remains available for non-UI callers; a full caller audit/migration is still required before removing it.
+- SharedPreferences/CloneStore remains the active runtime source of truth. Room remains inactive; no migration/cutover occurred. No Clone registry/session/account data was intentionally modified by this stage.
