@@ -148,19 +148,24 @@ public final class VirtualHookManager {
             Object stored = invoke(service, "getLocation",
                     new Class<?>[]{int.class, String.class}, userId, packageName);
             if (!(pattern instanceof Integer) || ((Integer) pattern) != 2 || stored == null) {
-                return result(LocationStatus.FAILED, "LOCATION_ENABLE_READBACK_MISMATCH", resolved);
+                return failClosedAfterEnableFailure(packageName, userId,
+                        "LOCATION_ENABLE_READBACK_MISMATCH", resolved);
             }
             double actualLat = ((Number) invoke(stored, "getLatitude", new Class<?>[0])).doubleValue();
             double actualLng = ((Number) invoke(stored, "getLongitude", new Class<?>[0])).doubleValue();
             if (Math.abs(actualLat - latitude) > 0.000001d
                     || Math.abs(actualLng - longitude) > 0.000001d) {
-                return result(LocationStatus.FAILED, "LOCATION_COORDINATE_READBACK_MISMATCH", resolved);
+                return failClosedAfterEnableFailure(packageName, userId,
+                        "LOCATION_COORDINATE_READBACK_MISMATCH", resolved);
             }
             return result(LocationStatus.APPLIED, "OWN_MODE_AND_COORDINATES_READ_BACK", resolved);
         } catch (ClassNotFoundException | NoSuchMethodException unsupported) {
+            LocationApplyResult disabled = disableEngineLocationHook(
+                    packageName, userId, resolved.locationEnabledSource,
+                    resolved.latitudeSource, resolved.longitudeSource);
             return result(LocationStatus.UNSUPPORTED,
-                    "PINNED_ENGINE_LOCATION_API_UNAVAILABLE:" + unsupported.getClass().getSimpleName(),
-                    resolved);
+                    "PINNED_ENGINE_LOCATION_API_UNAVAILABLE:" + unsupported.getClass().getSimpleName()
+                            + "; fail-closed disable=" + disabled.status, resolved);
         } catch (Exception failure) {
             // A partially configured hook is closed before returning a failure.
             LocationApplyResult disabled = disableEngineLocationHook(
@@ -170,6 +175,16 @@ public final class VirtualHookManager {
                     "LOCATION_ENABLE_FAILED:" + rootCauseName(failure)
                             + "; fail-closed disable=" + disabled.status, resolved);
         }
+    }
+
+    private static LocationApplyResult failClosedAfterEnableFailure(
+            String packageName, int userId, String reason,
+            ProfileResolver.ResolvedProfile resolved) {
+        LocationApplyResult disabled = disableEngineLocationHook(
+                packageName, userId, resolved.locationEnabledSource,
+                resolved.latitudeSource, resolved.longitudeSource);
+        return result(LocationStatus.FAILED,
+                reason + "; fail-closed disable=" + disabled.status, resolved);
     }
 
     private static Object resolveLocationService() throws Exception {
