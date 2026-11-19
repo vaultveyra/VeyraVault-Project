@@ -383,10 +383,11 @@ public class MainActivity extends BaseActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundResource(R.drawable.bg_card_rounded);
-        card.setPadding(32, 28, 32, 28);
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        card.setElevation(dp(2));
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardLp.bottomMargin = 28;
+        cardLp.bottomMargin = dp(14);
         card.setLayoutParams(cardLp);
 
         LinearLayout header = new LinearLayout(this);
@@ -395,9 +396,9 @@ public class MainActivity extends BaseActivity {
 
         TextView chevron = new TextView(this);
         chevron.setText(collapsed ? "⌄" : "⌃");
-        chevron.setTextSize(22f);
+        chevron.setTextSize(20f);
         chevron.setTextColor(Color.parseColor("#6B7280"));
-        chevron.setPadding(12, 0, 20, 0);
+        chevron.setPadding(dp(8), 0, dp(12), 0);
         header.addView(chevron);
 
         LinearLayout previewBox = new LinearLayout(this);
@@ -408,14 +409,14 @@ public class MainActivity extends BaseActivity {
             for (int i = 0; i < maxIcons; i++) {
                 ImageView mini = new ImageView(this);
                 mini.setImageDrawable(loadAppIcon(clones.get(i).packageName));
-                LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(68, 68);
+                LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(28), dp(28));
                 if (i > 0) mlp.setMargins(-18, 0, 0, 0);
                 previewBox.addView(mini, mlp);
             }
             TextView countPill = makePillChip(clones.size() + "+", "#E5E7EB", "#4B5563");
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            clp.setMargins(12, 0, 12, 0);
+            clp.setMargins(dp(8), 0, dp(8), 0);
             previewBox.addView(countPill, clp);
         }
         header.addView(previewBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -436,7 +437,7 @@ public class MainActivity extends BaseActivity {
             }
         });
         LinearLayout.LayoutParams gmlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gmlp.setMargins(12, 0, 12, 0);
+        gmlp.setMargins(dp(8), 0, dp(8), 0);
         header.addView(gmsChip, gmlp);
 
         TextView badge = makePillChip(String.valueOf(spaceNum), "#2563EB", "#FFFFFF");
@@ -475,9 +476,9 @@ public class MainActivity extends BaseActivity {
                 card.addView(emptyTv);
             } else {
                 GridLayout grid = new GridLayout(this);
-                grid.setColumnCount(4);
-                grid.setPadding(0, 24, 0, 8);
-                int cellWidth = (getResources().getDisplayMetrics().widthPixels - 160) / 4;
+                grid.setColumnCount(3);
+                grid.setPadding(0, dp(16), 0, dp(6));
+                int cellWidth = (getResources().getDisplayMetrics().widthPixels - dp(64)) / 3;
                 for (final CloneStore.CloneEntry item : clones) {
                     grid.addView(buildCloneCell(item, cellWidth));
                 }
@@ -491,13 +492,13 @@ public class MainActivity extends BaseActivity {
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER_HORIZONTAL);
-        cell.setPadding(8, 16, 8, 16);
+        cell.setPadding(dp(6), dp(10), dp(6), dp(10));
         cell.setLayoutParams(new ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout iconFrame = new FrameLayout(this);
         ImageView iconIv = new ImageView(this);
         iconIv.setImageDrawable(loadAppIcon(item.packageName));
-        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(126, 126, Gravity.CENTER);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER);
         iconFrame.addView(iconIv, iconLp);
 
         TextView spaceBadge = new TextView(this);
@@ -506,7 +507,7 @@ public class MainActivity extends BaseActivity {
         spaceBadge.setTextSize(10f);
         spaceBadge.setTypeface(Typeface.DEFAULT_BOLD);
         spaceBadge.setBackgroundResource(R.drawable.bg_pill_blue);
-        spaceBadge.setPadding(14, 2, 14, 2);
+        spaceBadge.setPadding(dp(8), dp(2), dp(8), dp(2));
         FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
         iconFrame.addView(spaceBadge, badgeLp);
@@ -537,14 +538,14 @@ public class MainActivity extends BaseActivity {
         LinearLayout labelRow = new LinearLayout(this);
         labelRow.setOrientation(LinearLayout.HORIZONTAL);
         labelRow.setGravity(Gravity.CENTER);
-        labelRow.setPadding(0, 10, 0, 0);
+        labelRow.setPadding(0, dp(7), 0, 0);
 
         TextView dots = new TextView(this);
         dots.setText("⋮");
         dots.setTextSize(17f);
         dots.setTypeface(Typeface.DEFAULT_BOLD);
         dots.setTextColor(Color.parseColor("#6B7280"));
-        dots.setPadding(10, 0, 10, 0);
+        dots.setPadding(dp(8), 0, dp(8), 0);
         dots.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
