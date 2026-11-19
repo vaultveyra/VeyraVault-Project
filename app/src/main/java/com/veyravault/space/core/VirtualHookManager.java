@@ -120,12 +120,14 @@ public final class VirtualHookManager {
         }
 
         if (!masterEnabled) {
-            return remember(disableEngineLocationHook(entry.packageName, entry.userId,
-                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource));
+            LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
+                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
+            return remember(withReason(closed, "MASTER_MOCK_GPS_KILL_SWITCH_DISABLED"));
         }
         if (!Boolean.TRUE.equals(resolved.locationEnabled)) {
-            return remember(disableEngineLocationHook(entry.packageName, entry.userId,
-                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource));
+            LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
+                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
+            return remember(withReason(closed, "RESOLVED_LOCATION_PROFILE_DISABLED"));
         }
         if (resolved.latitude == null || resolved.longitude == null) {
             LocationApplyResult disabled = disableEngineLocationHook(entry.packageName, entry.userId,
@@ -139,6 +141,11 @@ public final class VirtualHookManager {
 
         return remember(applyEngineLocationHook(entry.packageName, entry.userId,
                 resolved.latitude, resolved.longitude, resolved));
+    }
+
+    private static LocationApplyResult withReason(LocationApplyResult result, String reason) {
+        return new LocationApplyResult(result.status, reason + "; " + result.detail,
+                result.enabledSource, result.latitudeSource, result.longitudeSource);
     }
 
     private static LocationApplyResult disableEngineLocationHook(
