@@ -40,6 +40,7 @@ public class SetLocationActivity extends BaseActivity {
     private CloneStore.CloneEntry cloneEntry;
     private boolean fa;
     private com.veyravault.space.core.AsyncCloneRepository repository;
+    private com.veyravault.space.core.AsyncLocationHookRepository hookRepository;
     private ProfileSettings cloneProfile;
     private ProfileSettings globalProfile;
     private boolean cloneProfileLoaded;
@@ -71,6 +72,7 @@ public class SetLocationActivity extends BaseActivity {
             return;
         }
         repository = com.veyravault.space.core.AsyncCloneRepository.getInstance(getApplicationContext());
+        hookRepository = com.veyravault.space.core.AsyncLocationHookRepository.getInstance(getApplicationContext());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -297,17 +299,17 @@ public class SetLocationActivity extends BaseActivity {
     }
 
     private void syncSavedCloneLocation() {
-        repository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId, result -> {
+        hookRepository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId, (hookResult, error) -> {
             if (isFinishing() || isDestroyed()) return;
-            if (!result.isSuccess()) {
+            if (error != null || hookResult == null) {
                 saveButton.setEnabled(true);
                 resetButton.setEnabled(true);
                 Toast.makeText(this, (fa ? "ذخیره انجام شد اما اجرای همگام‌سازی ناموفق بود: " :
-                        "Profile saved, but hook synchronization could not run: ") + result.getMessage(),
-                        Toast.LENGTH_LONG).show();
+                        "Profile saved, but hook synchronization could not run: ")
+                        + (error == null ? "No hook result" : error), Toast.LENGTH_LONG).show();
                 return;
             }
-            showHookResult(result.getValue());
+            showHookResult(hookResult);
         });
     }
 
