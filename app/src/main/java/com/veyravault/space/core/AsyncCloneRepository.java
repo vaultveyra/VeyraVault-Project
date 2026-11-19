@@ -381,6 +381,23 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Atomically replaces only global location fields; locale/time-zone defaults are preserved. */
+    public void saveGlobalLocationProfile(Boolean enabled, Double latitude, Double longitude,
+                                          Callback<Boolean> callback) {
+        if (!ProfileSettings.isLatitudeValid(latitude) || !ProfileSettings.isLongitudeValid(longitude)
+                || (Boolean.TRUE.equals(enabled) && (latitude == null || longitude == null))) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT,
+                    "Enabled global location requires valid latitude and longitude"));
+            return;
+        }
+        enqueue(() -> {
+            ProfileStore.readGlobalStrict(appContext);
+            if (!ProfileStore.saveGlobalLocationOverrides(appContext, enabled, latitude, longitude))
+                throw new PersistenceFailureException("Global location profile was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
     /** Clears global location defaults atomically without changing locale/time-zone defaults. */
     public void clearGlobalLocationOverrides(Callback<Boolean> callback) {
         enqueue(() -> {
