@@ -33,7 +33,7 @@ store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").re
 assert "clearCloneLocationOverrides(" in store
 assert "KEY_LEGACY_LOCATION_CLEARED" in store
 assert "legacyLocationCleared" in store
-assert "legacyLocationCleared" in store[store.index("migrateLegacyLocationSettings"):]
+assert "KEY_LEGACY_LOCATION_CLEARED" in store[store.index("migrateLegacyLocationSettings"):]
 
 repository = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneRepository.java").read_text(encoding="utf-8")
 assert "clearCloneLocationOverrides(" in repository
