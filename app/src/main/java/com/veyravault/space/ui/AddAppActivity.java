@@ -296,13 +296,15 @@ public class AddAppActivity extends BaseActivity {
                 if (!Engine.installPackageAsUser(entry.packageName, entry.userId)) {
                     boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
                     if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
-                    showCloneError(fa
+                    String diagnostic = Engine.getLastInstallDiagnostic();
+                    showCloneError((fa
                             ? (absent
                                 ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
                                 : "نصب کلون ناموفق بود؛ وضعیت موتور نامشخص است و شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
                             : (absent
                                 ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
-                                : "Clone installation failed and Engine absence is unconfirmed; the ID remains reserved to prevent collision."));
+                                : "Clone installation failed and Engine absence is unconfirmed; the ID remains reserved to prevent collision."))
+                            + "\\n" + diagnostic);
                     callback.onComplete(false);
                     return;
                 }

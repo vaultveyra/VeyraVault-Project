@@ -86,17 +86,60 @@ public class Engine {
         } catch (Throwable ignored) {}
     }
 
+    private static volatile String lastInstallDiagnostic = "No install attempt has been made.";
+
+    /** A bounded, non-sensitive explanation of the most recent install failure. */
+    public static String getLastInstallDiagnostic() {
+        return lastInstallDiagnostic;
+    }
+
+    private static String safeEngineMessage(String message) {
+        if (message == null) return "";
+        StringBuilder safe = new StringBuilder();
+        for (int i = 0; i < message.length() && safe.length() < 180; i++) {
+            char c = message.charAt(i);
+            if (c >= 32 && c != 127) safe.append(c == '\\t' ? ' ' : c);
+        }
+        return safe.toString().trim();
+    }
+
     public static boolean installPackageAsUser(String pkg, int userId) {
+        lastInstallDiagnostic = "INSTALL_STARTED";
         try {
             Object core = getCore();
-            if (core == null) return false;
+            if (core == null) {
+                lastInstallDiagnostic = "ENGINE_UNAVAILABLE: core could not be resolved";
+                return false;
+            }
             Method m = core.getClass().getMethod("installPackageAsUser", String.class, int.class);
             Object res = m.invoke(core, pkg, userId);
-            if (res == null) return false;
+            if (res == null) {
+                lastInstallDiagnostic = "ENGINE_INVALID_RESULT: install returned null";
+                return false;
+            }
             Field success = res.getClass().getField("success");
-            return success.getBoolean(res);
-        } catch (Throwable t) {
-            // Never report an engine/reflection failure as a successful installation.
+            boolean installed = success.getBoolean(res);
+            if (installed) {
+                lastInstallDiagnostic = "INSTALL_SUCCEEDED";
+                return true;
+            }
+            String detail = "";
+            try {
+                Field message = res.getClass().getField("msg");
+                Object value = message.get(res);
+                if (value instanceof String) detail = safeEngineMessage((String) value);
+            } catch (Throwable ignored) {
+                // Some engine versions do not expose a diagnostic message.
+            }
+            lastInstallDiagnostic = detail.isEmpty()
+                    ? "ENGINE_REJECTED_INSTALL: engine reported success=false"
+                    : "ENGINE_REJECTED_INSTALL: " + detail;
+            return false;
+        } catch (Throwable error) {
+            Throwable cause = error.getCause();
+            String type = error.getClass().getSimpleName();
+            if (cause != null) type += " (cause: " + cause.getClass().getSimpleName() + ")";
+            lastInstallDiagnostic = "ENGINE_INSTALL_EXCEPTION: " + type;
             return false;
         }
     }
