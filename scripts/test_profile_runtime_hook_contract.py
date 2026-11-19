@@ -31,7 +31,7 @@ assert "Binder.getCallingUid() != Process.myUid()" in provider
 assert "ProcessUtils.isMainProcess(this)" in vault
 assert "ProfileStore.migrateLegacyLocationSettings(this)" in vault
 assert "Application.getProcessName()" in process
-assert "ActivityManager.getRunningAppProcesses" in process
+assert "getRunningAppProcesses()" in process
 assert "ProfileRuntimeApplier.initializeSystemFallback(this)" in vault
 assert "ProfileRuntimeApplier.restoreSystemDefaults(packageContext)" in callback
 assert "packageName.equals(appContext.getPackageName())" in callback

@@ -40,7 +40,7 @@ public final class ProfileRuntimeApplier {
                 synchronized (ProfileRuntimeApplier.class) {
                     if (Intent.ACTION_TIMEZONE_CHANGED.equals(intent.getAction())) {
                         String zone = intent.getStringExtra(Intent.EXTRA_TIMEZONE);
-                        if (ProfileSettings.isTimeZoneIdValid(zone)) {
+                        if (zone != null && ProfileSettings.isTimeZoneIdValid(zone)) {
                             systemTimeZoneId = zone;
                             if (lastAppliedSystemTimeZone) {
                                 TimeZone.setDefault(TimeZone.getTimeZone(zone));
