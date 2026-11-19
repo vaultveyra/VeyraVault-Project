@@ -237,9 +237,7 @@ public class SetLocationActivity extends BaseActivity {
                     cloneProfile.locationEnabled = null;
                     cloneProfile.latitude = null;
                     cloneProfile.longitude = null;
-                    VirtualHookManager.LocationApplyResult applied =
-                            VirtualHookManager.syncCloneHooks(getApplicationContext(), cloneEntry);
-                    showHookResult(applied);
+                    syncSavedCloneLocation();
                 });
             }
         });
