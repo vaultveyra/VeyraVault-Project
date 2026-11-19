@@ -36,7 +36,9 @@ repository = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneReposit
 assert "clearCloneLocationOverrides(" in repository
 assert "saveGlobalLocationProfile(" in repository
 assert "clearGlobalLocationOverrides(" in repository
-assert "syncCloneLocationHook(" in repository
-assert "syncAllCloneLocationHooks(" in repository
+hook_repository = Path("app/src/main/java/com/veyravault/space/core/AsyncLocationHookRepository.java").read_text(encoding="utf-8")
+assert "syncCloneLocationHook(" in hook_repository
+assert "syncAllCloneLocationHooks(" in hook_repository
+assert "CloneStore.readAllStrict(appContext)" in hook_repository
 
 print("PASS: Location hook resolves strict profiles, honors Master GPS, verifies pinned-engine readback, and preserves explicit inheritance resets.")
