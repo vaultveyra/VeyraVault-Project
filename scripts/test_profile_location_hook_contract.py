@@ -2,6 +2,9 @@ from pathlib import Path
 
 source = Path("app/src/main/java/com/veyravault/space/core/VirtualHookManager.java").read_text(encoding="utf-8")
 assert "enum LocationStatus { APPLIED, DISABLED, UNSUPPORTED, FAILED }" in source
+assert "class SyncSummary" in source
+assert "syncAllClones(Context context)" in source
+assert "CloneStore.readAllStrict(context)" in source
 assert "ProfileStore.resolveStrict(context, entry.packageName, entry.userId" in source
 assert "CloneStore.readMasterMockGpsEnabledStrict(context)" in source
 assert "if (!masterEnabled)" in source
