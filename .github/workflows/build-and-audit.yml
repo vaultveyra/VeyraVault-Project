@@ -70,6 +70,8 @@ jobs:
 
       - name: Test MainActivity async clone mutations contract
         run: python3 scripts/test_main_activity_clone_mutations_async_contract.py
+      - name: Test compact Spaces bottom navigation UI contract
+        run: python3 scripts/test_spaces_bottom_navigation_ui_contract.py
       - name: Test AddApp and Dashboard async persistence contract
         run: python3 scripts/test_add_app_dashboard_async_persistence_contract.py
 
