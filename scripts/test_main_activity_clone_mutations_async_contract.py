@@ -17,9 +17,8 @@ for forbidden in (
 shortcut_start = source.index("private void handleShortcutLaunch")
 shortcut_end = source.index("@Override", shortcut_start)
 shortcut = source[shortcut_start:shortcut_end]
-assert "repository.loadClones" in shortcut
-assert "if (!result.isSuccess()" in shortcut
-assert "Engine.launchClone(this, entry)" in shortcut
+assert "launchRepository.launchClone(pkg, uid" in shortcut
+assert "Engine.launchClone(this, entry)" not in shortcut
 
 # Duplication keeps the Engine install before registry persistence and cleans up on failed save.
 duplicate_start = source.index('makeSheetActionBtn("⊞+"')
