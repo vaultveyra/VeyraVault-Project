@@ -26,7 +26,8 @@ assert "catch (Throwable ignored)" not in source
 store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").read_text(encoding="utf-8")
 assert "clearCloneLocationOverrides(" in store
 assert "legacyLocationCleared" in store
-assert "optBoolean(KEY_LEGACY_LOCATION_CLEARED, false)" in store
+assert "legacyLocationCleared is invalid" in store
+assert "Boolean.TRUE.equals(tombstone)" in store
 assert "out.remove(KEY_LEGACY_LOCATION_CLEARED)" in store
 assert "saveGlobalLocationOverrides(" in store
 assert "clearGlobalLocationOverrides(" in store
