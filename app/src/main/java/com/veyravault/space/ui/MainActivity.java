@@ -917,7 +917,6 @@ public class MainActivity extends BaseActivity {
                                         Toast.LENGTH_LONG).show();
                                 return;
                             }
-                            VirtualHookManager.syncCloneHooks(MainActivity.this, item);
                             refreshSpaces();
                             Toast.makeText(MainActivity.this,
                                     fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند."
