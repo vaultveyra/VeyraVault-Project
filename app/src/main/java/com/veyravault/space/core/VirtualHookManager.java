@@ -35,6 +35,25 @@ public final class VirtualHookManager {
         public boolean isDisabled() { return status == LocationStatus.DISABLED; }
     }
 
+    public static final class SyncSummary {
+        public final boolean registryReadable;
+        public final int applied;
+        public final int disabled;
+        public final int unsupported;
+        public final int failed;
+        public final String detail;
+
+        private SyncSummary(boolean registryReadable, int applied, int disabled,
+                            int unsupported, int failed, String detail) {
+            this.registryReadable = registryReadable;
+            this.applied = applied;
+            this.disabled = disabled;
+            this.unsupported = unsupported;
+            this.failed = failed;
+            this.detail = detail;
+        }
+    }
+
     private static volatile LocationApplyResult lastResult =
             new LocationApplyResult(LocationStatus.UNSUPPORTED, "NOT_ATTEMPTED",
                     ProfileResolver.Source.UNSET, ProfileResolver.Source.UNSET,
@@ -43,6 +62,32 @@ public final class VirtualHookManager {
     private VirtualHookManager() { }
 
     public static LocationApplyResult getLastLocationResult() { return lastResult; }
+
+    /** Strictly reads the clone registry and returns every per-clone hook outcome. */
+    public static SyncSummary syncAllClones(Context context) {
+        if (context == null) return new SyncSummary(false, 0, 0, 0, 0, "INVALID_CONTEXT");
+        final java.util.List<CloneStore.CloneEntry> clones;
+        try {
+            clones = CloneStore.readAllStrict(context);
+        } catch (Exception error) {
+            return new SyncSummary(false, 0, 0, 0, 0,
+                    "CLONE_REGISTRY_UNREADABLE:" + error.getClass().getSimpleName());
+        }
+        int applied = 0;
+        int disabled = 0;
+        int unsupported = 0;
+        int failed = 0;
+        for (CloneStore.CloneEntry clone : clones) {
+            LocationApplyResult outcome = syncCloneHooks(context, clone);
+            switch (outcome.status) {
+                case APPLIED: applied++; break;
+                case DISABLED: disabled++; break;
+                case UNSUPPORTED: unsupported++; break;
+                case FAILED: failed++; break;
+            }
+        }
+        return new SyncSummary(true, applied, disabled, unsupported, failed, "COMPLETE");
+    }
 
     public static void installProcessHooks(Context context) {
         if (context == null) return;
