@@ -217,28 +217,65 @@ public class Engine {
         return getCloneInstallState(pkg, userId) == CloneInstallState.ABSENT;
     }
 
-    public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
+    public static final class CloneLaunchResult {
+        public final boolean launched;
+        public final String failure;
+        public final VirtualHookManager.LocationApplyResult locationResult;
+
+        private CloneLaunchResult(boolean launched, String failure,
+                VirtualHookManager.LocationApplyResult locationResult) {
+            this.launched = launched;
+            this.failure = failure;
+            this.locationResult = locationResult;
+        }
+    }
+
+    /**
+     * Performs the complete launch sequence. Call from a worker thread: installation checks,
+     * profile/engine hook IPC, launch reflection and active-launch persistence are synchronous.
+     * Hook outcome is reported separately and does not change the historical launch policy.
+     */
+    public static CloneLaunchResult launchCloneDetailed(Context ctx, CloneStore.CloneEntry entry) {
+        if (ctx == null || entry == null || entry.packageName == null
+                || entry.packageName.trim().isEmpty() || entry.userId < 0) {
+            return new CloneLaunchResult(false, "INVALID_CLONE_IDENTITY", null);
+        }
         if (!isInstalledAsUser(entry.packageName, entry.userId)
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
-            return false;
+            return new CloneLaunchResult(false, lastInstallDiagnostic, null);
         }
-        // Apply per-clone engine configuration before starting the virtual app process.
-        VirtualHookManager.syncCloneHooks(ctx, entry);
+
+        VirtualHookManager.LocationApplyResult hookResult;
+        try {
+            // Preserve the required hook-before-launch ordering.
+            hookResult = VirtualHookManager.syncCloneHooks(ctx, entry);
+        } catch (Throwable hookFailure) {
+            hookResult = VirtualHookManager.getLastLocationResult();
+        }
+
         try {
             Object core = getCore();
-            if (core == null) return false;
+            if (core == null) return new CloneLaunchResult(false, "ENGINE_UNAVAILABLE", hookResult);
             Method m = core.getClass().getMethod("launchApk", String.class, int.class);
-            Object r = m.invoke(core, entry.packageName, entry.userId);
-            boolean launched = Boolean.TRUE.equals(r);
-            if (!launched) return false;
+            Object value = m.invoke(core, entry.packageName, entry.userId);
+            if (!Boolean.TRUE.equals(value)) {
+                return new CloneLaunchResult(false, "ENGINE_REJECTED_LAUNCH", hookResult);
+            }
 
             // Persist only a confirmed successful launch; failed attempts must not replace
             // the last-known successful clone in the host-side active-launch marker.
             CloneStore.recordActiveLaunch(ctx, entry);
-            return true;
-        } catch (Throwable t) {
-            return false;
+            return new CloneLaunchResult(true, null, hookResult);
+        } catch (Throwable failure) {
+            String detail = failure.getClass().getSimpleName();
+            if (failure.getCause() != null) detail += ":" + failure.getCause().getClass().getSimpleName();
+            return new CloneLaunchResult(false, "ENGINE_LAUNCH_EXCEPTION:" + detail, hookResult);
         }
+    }
+
+    /** Synchronous compatibility wrapper. UI callers should use AsyncCloneLaunchRepository. */
+    public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
+        return launchCloneDetailed(ctx, entry).launched;
     }
 
     public static void stopClone(String pkg, int userId) {
