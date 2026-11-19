@@ -40,7 +40,10 @@ assert "catch (Throwable ignored)" not in hooks
 
 # Startup synchronization must not attempt to apply unsupported device-profile APIs.
 sync_method = store.split("public static void syncAllHooks", 1)[1]
-assert "VirtualHookManager.syncCloneHooks(c, e)" in sync_method
+assert "VirtualHookManager.syncAllClones(c)" in sync_method
+assert "CloneStore.readAllStrict(context)" in hooks
+assert "SyncSummary" in hooks
+assert "registryReadable" in hooks
 assert "applyDeviceProperties" not in store
 
 # UI must not claim that the unsupported device/SIM metadata is applied to clones.
