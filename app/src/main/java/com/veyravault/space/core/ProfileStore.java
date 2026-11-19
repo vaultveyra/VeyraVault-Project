@@ -191,6 +191,32 @@ public final class ProfileStore {
         }
     }
 
+    /** Atomically replaces the global location fields while preserving locale/time-zone defaults. */
+    public static synchronized boolean saveGlobalLocationOverrides(
+            Context context, Boolean enabled, Double latitude, Double longitude) {
+        if (!ProfileSettings.isLatitudeValid(latitude) || !ProfileSettings.isLongitudeValid(longitude)) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(enabled) && (latitude == null || longitude == null)) return false;
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) return false;
+        try {
+            JSONObject global = root.optJSONObject("global");
+            if (global == null) global = new JSONObject();
+            if (enabled == null) global.remove("locationEnabled");
+            else global.put("locationEnabled", enabled);
+            if (latitude == null) global.remove("latitude");
+            else global.put("latitude", latitude);
+            if (longitude == null) global.remove("longitude");
+            else global.put("longitude", longitude);
+            if (global.length() == 0) root.remove("global");
+            else root.put("global", global);
+            return writeRoot(context, root);
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
     /** Clears the three global location fields together while preserving locale/time-zone defaults. */
     public static synchronized boolean clearGlobalLocationOverrides(Context context) {
         JSONObject root = readRoot(context);
