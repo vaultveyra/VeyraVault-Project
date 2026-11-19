@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -22,14 +23,13 @@ public class ProfileLocationMigrationInstrumentationTest {
 
     @Test public void explicitResetToGlobalDoesNotReimportLegacyCloneLocation() throws Exception {
         Context context = ApplicationProvider.getApplicationContext();
-        SharedPreferences clonePrefs = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE);
         SharedPreferences profilePrefs = context.getSharedPreferences("veyravault_profiles_v1", Context.MODE_PRIVATE);
-        Map<String, ?> cloneSnapshot = clonePrefs.getAll();
         Map<String, ?> profileSnapshot = profilePrefs.getAll();
         String packageName = "com.example.location.migration.fixture";
         int userId = 987654;
 
         try {
+            profilePrefs.edit().clear().commit();
             CloneStore.CloneEntry legacy = new CloneStore.CloneEntry();
             legacy.packageName = packageName;
             legacy.userId = userId;
@@ -38,9 +38,9 @@ public class ProfileLocationMigrationInstrumentationTest {
             legacy.latitude = 40.7128d;
             legacy.longitude = -74.0060d;
             legacy.deniedPermissions = new HashSet<String>();
-            assertTrue("fixture clone must be stored", CloneStore.upsertClone(context, legacy));
+            java.util.List<CloneStore.CloneEntry> legacySnapshot = Collections.singletonList(legacy);
             assertTrue("legacy GPS profile import must succeed",
-                    ProfileStore.migrateLegacyLocationSettings(context));
+                    ProfileStore.importLegacyLocationSettings(context, legacySnapshot));
 
             ProfileSettings imported = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
             assertEquals(Boolean.TRUE, imported.locationEnabled);
@@ -50,7 +50,7 @@ public class ProfileLocationMigrationInstrumentationTest {
             assertTrue("reset must commit", ProfileStore.clearCloneLocationOverrides(
                     context, packageName, userId));
             assertTrue("subsequent legacy scan must remain safe",
-                    ProfileStore.migrateLegacyLocationSettings(context));
+                    ProfileStore.importLegacyLocationSettings(context, legacySnapshot));
 
             ProfileSettings inherited = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
             assertNull("explicit reset must not be resurrected from legacy CloneStore",
@@ -69,7 +69,6 @@ public class ProfileLocationMigrationInstrumentationTest {
             assertEquals(Double.valueOf(51.5074d), saved.latitude);
             assertEquals(Double.valueOf(-0.1278d), saved.longitude);
         } finally {
-            restore(clonePrefs, cloneSnapshot);
             restore(profilePrefs, profileSnapshot);
         }
     }
