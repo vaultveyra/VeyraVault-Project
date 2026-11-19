@@ -15,6 +15,7 @@ public final class ProfileStore {
     private static final String PREFS = "veyravault_profiles_v1";
     private static final String KEY_DATA = "profiles_json";
     private static final String KEY_MIGRATED = "legacy_location_import_v1";
+    private static final String KEY_LEGACY_LOCATION_CLEARED = "legacyLocationCleared";
     private static final int SCHEMA_VERSION = 1;
 
     private ProfileStore() { }
@@ -140,6 +141,34 @@ public final class ProfileStore {
                 || "longitude".equals(field);
     }
 
+    /**
+     * Clears all clone location fields in one profile commit and records an import tombstone.
+     * The tombstone prevents a later additive legacy scan from resurrecting the old CloneStore
+     * location after the user explicitly chose inheritance from the Global/System profile.
+     */
+    public static synchronized boolean clearCloneLocationOverrides(
+            Context context, String packageName, int userId) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) return false;
+        JSONObject root = readRoot(context);
+        if (!isCompatibleRoot(root)) return false;
+        try {
+            JSONObject clones = root.optJSONObject("clones");
+            if (clones == null) clones = new JSONObject();
+            String key = cloneKey(packageName, userId);
+            JSONObject profile = clones.optJSONObject(key);
+            if (profile == null) profile = new JSONObject();
+            profile.remove("locationEnabled");
+            profile.remove("latitude");
+            profile.remove("longitude");
+            profile.put(KEY_LEGACY_LOCATION_CLEARED, true);
+            clones.put(key, profile);
+            root.put("clones", clones);
+            return writeRoot(context, root);
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
     /** Remove one clone override only; all other fields and other clones are retained. */
     public static synchronized boolean clearCloneOverrideField(Context context, String packageName,
                                                                  int userId, String field) {
@@ -245,6 +274,8 @@ public final class ProfileStore {
                         || entry.userId < 0 || !entry.mockGpsEnabled) continue;
                 String key = cloneKey(entry.packageName, entry.userId);
                 Object existingValue = clones.opt(key);
+                if (existingValue instanceof JSONObject
+                        && ((JSONObject) existingValue).optBoolean(KEY_LEGACY_LOCATION_CLEARED, false)) continue;
                 if (existingValue != null && !(existingValue instanceof JSONObject)) return false;
                 JSONObject existing = existingValue instanceof JSONObject
                         ? (JSONObject) existingValue : null;
@@ -294,6 +325,9 @@ public final class ProfileStore {
         if (settings.locationEnabled != null) out.put("locationEnabled", settings.locationEnabled);
         if (settings.latitude != null) out.put("latitude", settings.latitude);
         if (settings.longitude != null) out.put("longitude", settings.longitude);
+        if (settings.locationEnabled != null || settings.latitude != null || settings.longitude != null) {
+            out.remove(KEY_LEGACY_LOCATION_CLEARED);
+        }
         return out;
     }
 
