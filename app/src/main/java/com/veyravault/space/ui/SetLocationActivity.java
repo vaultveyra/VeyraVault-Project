@@ -240,6 +240,7 @@ public class SetLocationActivity extends BaseActivity {
                     cloneProfile.locationEnabled = null;
                     cloneProfile.latitude = null;
                     cloneProfile.longitude = null;
+                    locationPointSelected = false;
                     applyLoadedProfilesIfReady();
                     syncSavedCloneLocation();
                 });
@@ -283,8 +284,7 @@ public class SetLocationActivity extends BaseActivity {
                 cloneProfile, globalProfile, ProfileRuntimeApplier.systemFallback());
         if (effective.latitude != null && effective.longitude != null) {
             updateSelectedPoint(effective.latitude, effective.longitude);
-        } else {
-            locationPointSelected = false;
+        } else if (!locationPointSelected) {
             saveButton.setEnabled(false);
         }
         String state = String.valueOf(effective.locationEnabled) + " (" + effective.locationEnabledSource + ")";
