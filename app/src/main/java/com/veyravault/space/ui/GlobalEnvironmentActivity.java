@@ -73,7 +73,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         desc.setPadding(0, 12, 0, 28);
         desc.setText(fa
                 ? "توجه: مدل دستگاه، کشور و اپراتور در این نسخه فقط به‌عنوان اطلاعات پروفایل ذخیره می‌شوند و توسط موتور فعلی روی کلون‌ها اعمال نمی‌شوند. موقعیت مکانی هر کلون جداگانه از طریق API محدود به بسته و کاربر مجازی موتور تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
-                : "Note: device model, country and operator values are saved as profile metadata only. The pinned engine version does not expose a verified package/user-scoped API to apply these values to clones. Clone locations are configured separately through the engine's package- and virtual-user-scoped location API. This setting does not bypass third-party regional restrictions.");
+                : "Note: device model, country and operator values are saved as profile metadata only and are not applied to clones. The pinned engine version does not expose a verified package/user-scoped API to apply these values. Clone locations are configured separately through the engine's package- and virtual-user-scoped location API. This setting does not bypass third-party regional restrictions.");
         root.addView(desc);
 
         enableGlobal = new CheckBox(this);
