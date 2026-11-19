@@ -21,6 +21,7 @@ import com.veyravault.space.core.VirtualHookManager;
 
 public class GlobalEnvironmentActivity extends BaseActivity {
     private AsyncCloneRepository repository;
+    private com.veyravault.space.core.AsyncLocationHookRepository hookRepository;
     private boolean fa;
     private boolean profileLoaded;
     private boolean locationProfileLoaded;
@@ -46,6 +47,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
         repository = AsyncCloneRepository.getInstance(getApplicationContext());
+        hookRepository = com.veyravault.space.core.AsyncLocationHookRepository.getInstance(getApplicationContext());
         config = new CloneStore.GlobalEnvConfig();
         buildContent();
         setContentView(contentView);
@@ -329,17 +331,17 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                         return;
                     }
                     // All three independent commits are confirmed before requesting hook synchronization.
-                    repository.syncAllCloneLocationHooks(syncResult -> {
+                    hookRepository.syncAllCloneLocationHooks((summary, error) -> {
                         if (isFinishing() || isDestroyed()) return;
-                        if (!syncResult.isSuccess()) {
+                        if (error != null || summary == null) {
                             saveButton.setEnabled(true);
                             showSaveFailure(fa
-                                    ? "تنظیمات ذخیره شدند اما همگام‌سازی کلون‌ها اجرا نشد: " + syncResult.getMessage()
+                                    ? "تنظیمات ذخیره شدند اما همگام‌سازی کلون‌ها اجرا نشد: "
+                                            + (error == null ? "No hook summary" : error)
                                     : "Settings were saved, but clone hook synchronization could not run: "
-                                            + syncResult.getMessage());
+                                            + (error == null ? "No hook summary" : error));
                             return;
                         }
-                        VirtualHookManager.SyncSummary summary = syncResult.getValue();
                         Toast.makeText(this, fa
                                 ? "اطلاعات و تنظیمات ذخیره شدند. نتیجه Hookها: " + formatSyncSummary(summary)
                                         + " مشخصات دستگاه/سیم‌کارت فقط اطلاعات هستند."
@@ -412,17 +414,16 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             globalLatitudeEt.setText("");
             globalLongitudeEt.setText("");
             updateGlobalLocationControls();
-            repository.syncAllCloneLocationHooks(syncResult -> {
+            hookRepository.syncAllCloneLocationHooks((summary, error) -> {
                 if (isFinishing() || isDestroyed()) return;
-                if (!syncResult.isSuccess()) {
+                if (error != null || summary == null) {
                     resetGlobalLocationButton.setEnabled(true);
                     saveButton.setEnabled(true);
                     showSaveFailure((fa ? "پیش‌فرض‌ها پاک شدند اما همگام‌سازی اجرا نشد: " :
                             "Global defaults were cleared, but hook synchronization could not run: ")
-                            + syncResult.getMessage());
+                            + (error == null ? "No hook summary" : error));
                     return;
                 }
-                VirtualHookManager.SyncSummary summary = syncResult.getValue();
                 Toast.makeText(this, fa
                         ? "پیش‌فرض‌های موقعیت سراسری پاک شدند. نتیجه Hookها: " + formatSyncSummary(summary)
                         : "Global location defaults cleared. Hook outcomes: " + formatSyncSummary(summary),
