@@ -295,21 +295,25 @@ public final class ProfileStore {
      * is not imported because the old model cannot distinguish "off" from "unset".
      * The old preferences remain untouched; repeated calls are safe.
      */
-    public static synchronized boolean migrateLegacyLocationSettings(Context context) {
-        SharedPreferences p = prefs(context);
-        // Re-scan on later launches as new clones may be added after the first import.
-        // Existing profile fields are never overwritten, so this remains idempotent.
-
+    public static boolean migrateLegacyLocationSettings(Context context) {
         // Strictly validate the entire legacy registry before importing anything.
-        // This rejects semantic errors (wrong field types, duplicate identities and
-        // invalid enabled coordinates) instead of treating them as an empty registry.
         final List<CloneStore.CloneEntry> legacy;
         try {
             legacy = CloneStore.readAllStrict(context);
         } catch (Exception invalidLegacyData) {
             return false;
         }
+        return importLegacyLocationSettings(context, legacy);
+    }
 
+    /**
+     * Applies an already validated legacy snapshot. Package-private for instrumentation so
+     * migration semantics can be tested without writing to the CloneStore preference namespace.
+     */
+    static synchronized boolean importLegacyLocationSettings(
+            Context context, List<CloneStore.CloneEntry> legacy) {
+        if (context == null || legacy == null) return false;
+        SharedPreferences p = prefs(context);
         JSONObject root = readRoot(context);
         if (!isCompatibleRoot(root)) return false;
         try {
