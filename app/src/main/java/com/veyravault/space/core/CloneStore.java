@@ -621,11 +621,10 @@ public class CloneStore {
         catch (Exception ignored) { return null; }
     }
 
-    public static void syncAllHooks(Context c) {
-        // Location settings are applied through engine APIs scoped to each package and virtual user.
-        // Device/SIM profile fields remain stored as metadata until a supported scoped engine API exists.
-        for (CloneEntry e : getAll(c)) {
-            VirtualHookManager.syncCloneHooks(c, e);
-        }
+    public static VirtualHookManager.SyncSummary syncAllHooks(Context c) {
+        // Location settings are applied through verified engine APIs scoped to each package/user.
+        // Strict registry reads prevent corrupt data from being reported as an empty successful sync.
+        // Device/SIM profile fields remain metadata until a supported scoped engine API exists.
+        return VirtualHookManager.syncAllClones(c);
     }
 }
