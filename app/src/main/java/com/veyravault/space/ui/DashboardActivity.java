@@ -4,11 +4,13 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.TextClock;
 import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
@@ -46,6 +48,26 @@ public class DashboardActivity extends BaseActivity {
         second.setMargins(dp(10),0,0,0);
         stats.addView(spaceCard, second);
         root.addView(stats);
+
+        // Live city clocks use Android TextClock and explicit IANA time zones.
+        LinearLayout clocks = new LinearLayout(this);
+        clocks.setOrientation(LinearLayout.HORIZONTAL);
+        clocks.setPadding(0, dp(14), 0, dp(4));
+        clocks.addView(clockCard(fa ? "تهران" : "Tehran", "Asia/Tehran", fa),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams nyLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        nyLp.setMargins(dp(10), 0, 0, 0);
+        clocks.addView(clockCard(fa ? "نیویورک" : "New York", "America/New_York", fa), nyLp);
+        root.addView(clocks);
+
+        TextView deviceInfo = new TextView(this);
+        deviceInfo.setText((fa ? "دستگاه: " : "Device: ") + Build.MANUFACTURER + " " + Build.MODEL
+                + "  •  Android " + Build.VERSION.RELEASE);
+        deviceInfo.setTextSize(12);
+        deviceInfo.setTextColor(Color.rgb(75,85,99));
+        deviceInfo.setPadding(0, dp(12), 0, dp(4));
+        root.addView(deviceInfo);
+
         final TextView registryStatus = new TextView(this);
         registryStatus.setTextSize(12);
         registryStatus.setTextColor(Color.rgb(185,28,28));
@@ -80,6 +102,38 @@ public class DashboardActivity extends BaseActivity {
         zone.setTextSize(12); zone.setTextColor(Color.rgb(107,114,128)); zone.setPadding(0,dp(18),0,0); root.addView(zone);
         setContentView(scroll);
     }
+    private View clockCard(String city, String zoneId, boolean fa) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+        TextView label = new TextView(this);
+        label.setText(city);
+        label.setTextSize(12);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setTextColor(Color.rgb(75,85,99));
+        card.addView(label);
+        TextClock clock = new TextClock(this);
+        clock.setFormat24Hour("HH:mm:ss");
+        clock.setFormat12Hour("hh:mm:ss a");
+        clock.setTimeZone(zoneId);
+        clock.setTextSize(25);
+        clock.setTypeface(Typeface.DEFAULT_BOLD);
+        clock.setTextColor(Color.rgb(37,99,235));
+        clock.setPadding(0, dp(5), 0, 0);
+        card.addView(clock);
+        TextView zone = new TextView(this);
+        zone.setText(zoneId);
+        zone.setTextSize(10);
+        zone.setTextColor(Color.rgb(107,114,128));
+        card.addView(zone);
+        return card;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private View statCard(String label,String value) {
         LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16),dp(18),dp(16),dp(18)); card.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
