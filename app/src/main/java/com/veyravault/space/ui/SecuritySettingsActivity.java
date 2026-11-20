@@ -10,17 +10,29 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.security.AppLockPolicy;
 import com.veyravault.space.security.SecurityManager;
 import com.veyravault.space.security.VaultDeviceAdminReceiver;
 
 public class SecuritySettingsActivity extends BaseActivity {
 
     private CheckBox antiUninstallSwitch;
+    private RadioGroup backgroundTimeoutChoices;
+    private final int[] backgroundTimeoutValues = {
+            AppLockPolicy.TIMEOUT_IMMEDIATELY,
+            AppLockPolicy.TIMEOUT_30_SECONDS,
+            AppLockPolicy.TIMEOUT_1_MINUTE,
+            AppLockPolicy.TIMEOUT_5_MINUTES
+    };
+    private final int[] backgroundTimeoutIds = new int[4];
+    private boolean updatingBackgroundTimeoutChoices;
     private boolean fa;
 
     @Override
@@ -119,6 +131,59 @@ public class SecuritySettingsActivity extends BaseActivity {
             }
         });
         cardLock.addView(btnDisableLock);
+
+        TextView timeoutTitle = new TextView(this);
+        timeoutTitle.setText(fa ? "قفل خودکار هنگام خروج از برنامه" : "Automatic lock when leaving the app");
+        timeoutTitle.setTextSize(15f);
+        timeoutTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        timeoutTitle.setTextColor(UiPalette.textPrimary(this));
+        timeoutTitle.setPadding(0, dp(18), 0, dp(4));
+        cardLock.addView(timeoutTitle);
+
+        TextView timeoutDescription = new TextView(this);
+        timeoutDescription.setText(fa
+                ? "زمان از وقتی شروع می‌شود که آخرین صفحهٔ VeyraVault از پیش‌زمینه خارج شود. با بازگشت پیش از پایان زمان، شمارش متوقف می‌شود. این گزینه فقط با PIN یا Pattern فعال اثر قفل دارد."
+                : "The timer starts when the last VeyraVault screen leaves the foreground. Returning before it expires cancels the timer. Locking takes effect only when a PIN or Pattern is configured.");
+        timeoutDescription.setTextSize(12f);
+        timeoutDescription.setTextColor(UiPalette.textSecondary(this));
+        timeoutDescription.setPadding(0, 0, 0, dp(8));
+        cardLock.addView(timeoutDescription);
+
+        backgroundTimeoutChoices = new RadioGroup(this);
+        backgroundTimeoutChoices.setOrientation(RadioGroup.VERTICAL);
+        String[] timeoutLabels = fa
+                ? new String[] {"بلافاصله", "پس از ۳۰ ثانیه", "پس از ۱ دقیقه", "پس از ۵ دقیقه"}
+                : new String[] {"Immediately", "After 30 seconds", "After 1 minute", "After 5 minutes"};
+        for (int i = 0; i < backgroundTimeoutValues.length; i++) {
+            RadioButton option = new RadioButton(this);
+            backgroundTimeoutIds[i] = View.generateViewId();
+            option.setId(backgroundTimeoutIds[i]);
+            option.setText(timeoutLabels[i]);
+            option.setTextSize(13f);
+            option.setTextColor(UiPalette.textPrimary(this));
+            backgroundTimeoutChoices.addView(option);
+        }
+        backgroundTimeoutChoices.setOnCheckedChangeListener((group, checkedId) -> {
+            if (updatingBackgroundTimeoutChoices) return;
+            int selectedIndex = -1;
+            for (int i = 0; i < backgroundTimeoutIds.length; i++) {
+                if (backgroundTimeoutIds[i] == checkedId) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            if (selectedIndex < 0) return;
+            if (!AppLockPolicy.setBackgroundTimeoutSeconds(
+                    SecuritySettingsActivity.this, backgroundTimeoutValues[selectedIndex])) {
+                Toast.makeText(SecuritySettingsActivity.this,
+                        fa ? "ذخیره زمان قفل خودکار ناموفق بود."
+                           : "Could not save the automatic lock timeout.",
+                        Toast.LENGTH_LONG).show();
+                refreshBackgroundTimeoutChoices();
+            }
+        });
+        refreshBackgroundTimeoutChoices();
+        cardLock.addView(backgroundTimeoutChoices);
         root.addView(cardLock);
 
         LinearLayout cardDisguise = makeCard();
@@ -155,6 +220,22 @@ public class SecuritySettingsActivity extends BaseActivity {
         if (antiUninstallSwitch != null) {
             antiUninstallSwitch.setChecked(VaultDeviceAdminReceiver.isAntiUninstallActive(this));
         }
+        refreshBackgroundTimeoutChoices();
+    }
+
+    private void refreshBackgroundTimeoutChoices() {
+        if (backgroundTimeoutChoices == null) return;
+        int saved = AppLockPolicy.getBackgroundTimeoutSeconds(this);
+        int selectedId = backgroundTimeoutIds[0];
+        for (int i = 0; i < backgroundTimeoutValues.length; i++) {
+            if (backgroundTimeoutValues[i] == saved) {
+                selectedId = backgroundTimeoutIds[i];
+                break;
+            }
+        }
+        updatingBackgroundTimeoutChoices = true;
+        backgroundTimeoutChoices.check(selectedId);
+        updatingBackgroundTimeoutChoices = false;
     }
 
     private LinearLayout makeCard() {
