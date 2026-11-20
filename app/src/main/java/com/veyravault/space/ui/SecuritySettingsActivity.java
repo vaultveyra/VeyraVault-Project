@@ -15,7 +15,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
 import com.veyravault.space.core.LocaleHelper;
-import com.veyravault.space.security.AppDisguiseManager;
 import com.veyravault.space.security.SecurityManager;
 import com.veyravault.space.security.VaultDeviceAdminReceiver;
 
@@ -124,35 +123,27 @@ public class SecuritySettingsActivity extends BaseActivity {
 
         LinearLayout cardDisguise = makeCard();
         TextView disTitle = new TextView(this);
-        disTitle.setText(fa ? "🎭 تغییر آیکون و نام برنامه در صفحه گوشی" : "🎭 Change App Icon & Name (Disguise)");
+        disTitle.setText(fa ? "آیکون و نام لانچر" : "Launcher Icon & Label");
         disTitle.setTypeface(Typeface.DEFAULT_BOLD);
         disTitle.setTextSize(16f);
+        disTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         cardDisguise.addView(disTitle);
 
-        String[] disguiseLabels = {
-            fa ? "۱. پیش‌فرض (VeyraVault)" : "1. Default (VeyraVault)",
-            fa ? "۲. ماشین‌حساب (Calculator)" : "2. Calculator",
-            fa ? "۳. تقویم (Calendar)" : "3. Calendar",
-            fa ? "۴. یادداشت‌ها (Notes)" : "4. Notes",
-            fa ? "۵. آب‌وهوا (Weather)" : "5. Weather"
-        };
+        TextView disDescription = new TextView(this);
+        disDescription.setText(fa
+                ? "مدیریت گزینه‌های آیکون و نام موجود در صفحه مستقل تنظیمات."
+                : "Manage the available launcher icon and label options in the dedicated settings screen.");
+        disDescription.setTextSize(12f);
+        disDescription.setTextColor(UiPalette.textSecondary(getApplicationContext()));
+        disDescription.setPadding(0, dp(6), 0, dp(10));
+        cardDisguise.addView(disDescription);
 
-        for (int i = 0; i < disguiseLabels.length; i++) {
-            final int idx = i;
-            Button b = new Button(this);
-            b.setAllCaps(false);
-            b.setText(disguiseLabels[i]);
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    AppDisguiseManager.applyDisguise(SecuritySettingsActivity.this, idx);
-                    Toast.makeText(SecuritySettingsActivity.this,
-                            fa ? "آیکون و نام برنامه تغییر کرد!" : "App icon and name updated!",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-            cardDisguise.addView(b);
-        }
+        Button openLauncherOptions = new Button(this);
+        openLauncherOptions.setAllCaps(false);
+        openLauncherOptions.setText(fa ? "انتخاب آیکون و نام" : "Choose Icon & Label");
+        openLauncherOptions.setOnClickListener(v ->
+                startActivity(new Intent(SecuritySettingsActivity.this, AppIconNameActivity.class)));
+        cardDisguise.addView(openLauncherOptions);
         root.addView(cardDisguise);
 
         setContentView(sv);
