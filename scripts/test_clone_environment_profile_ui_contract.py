@@ -22,7 +22,7 @@ assert "next clone launch" in activity
 assert "Engine.stopClone" not in activity
 assert "Engine.clearCloneData" not in activity
 assert "Engine.uninstallClone" not in activity
-assert "repository.saveCloneProfile" in repository
+assert "ProfileStore.saveCloneOverride" in repository
 assert "ProfileStore.readCloneOverrideStrict" in repository
 assert "ProfileStore.clearCloneOverrideField" in repository
 assert "CloneEnvironmentProfileActivity.class" in main
