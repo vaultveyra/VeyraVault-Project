@@ -9,7 +9,7 @@
 
 ## Runtime behavior
 - The controller counts started Activities and schedules a lock only after the last host Activity stops.
-- Returning to the foreground cancels an unexpired lock timer. The immediate option has a 250 ms main-loop grace so Activity recreation (for example, a language/theme recreation) is not mistaken for leaving the app.
+- Returning to the foreground cancels an unexpired lock timer. Activity configuration recreation (rotation, locale/theme recreation) is explicitly excluded from background transitions; the immediate option also has a 250 ms main-loop grace.
 - The deadline uses `SystemClock.elapsedRealtime()` so elapsed time remains meaningful across device deep sleep; a deadline already passed is enforced before `BaseActivity.onResume()` decides whether to show the existing authenticated lock screen.
 - A pending timer re-checks that the app is still backgrounded and that a credential remains configured before calling `SecurityManager.lockSession()`.
 - The existing PIN/Pattern screen remains the sole unlock path.
