@@ -11,6 +11,16 @@ manifest = (root / "AndroidManifest.xml").read_text(encoding="utf-8")
 instrumentation = Path("app/src/androidTest/java/com/veyravault/space/security/AppDisguiseManagerInstrumentationTest.java").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
 
+# Programmatic layouts use local density conversion helpers; the BaseActivity helper is private.
+for path in (
+    java / "ui/AppIconNameActivity.java",
+    java / "ui/SettingsHubActivity.java",
+    java / "ui/SecuritySettingsActivity.java",
+    java / "ui/AboutActivity.java",
+):
+    source = path.read_text(encoding="utf-8")
+    assert "private int dp(int value)" in source, f"Missing local density helper in {path.name}"
+
 # Launcher options must be exactly the five aliases declared by the application manifest.
 aliases = (
     "com.veyravault.space.AliasDefault",
