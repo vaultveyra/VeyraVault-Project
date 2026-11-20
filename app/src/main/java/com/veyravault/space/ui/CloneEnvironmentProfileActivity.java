@@ -71,14 +71,14 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(20), dp(24), dp(20), dp(36));
-        root.setBackgroundColor(Color.rgb(243, 245, 249));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
         scroll.addView(root);
 
         TextView title = new TextView(this);
         title.setText(fa ? "محیط اختصاصی کلون" : "Clone Environment Profile");
         title.setTextSize(22f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.rgb(17, 24, 39));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         root.addView(title);
 
         TextView intro = new TextView(this);
@@ -86,7 +86,7 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
                 ? "زبان و منطقه زمانی فقط برای همین بسته و شناسه مجازی تنظیم می‌شوند. اولویت هر فیلد: کلون ← سراسری ← سیستم. تغییرات پس از اجرای بعدی کلون اعمال می‌شوند؛ این صفحه نشست فعال را متوقف نمی‌کند."
                 : "Locale and time zone are scoped to this virtual package and user. Each field resolves Clone → Global → System. Saved changes apply on the next clone launch; this screen does not stop an active session.");
         intro.setTextSize(13f);
-        intro.setTextColor(Color.rgb(75, 85, 99));
+        intro.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         intro.setPadding(0, dp(10), 0, dp(18));
         root.addView(intro);
 
@@ -110,12 +110,12 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
                 : (fa ? "منطقه زمانی (Time Zone)" : "Time Zone"));
         heading.setTextSize(17f);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
-        heading.setTextColor(Color.rgb(31, 41, 55));
+        heading.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         card.addView(heading);
 
         TextView effective = new TextView(this);
         effective.setTextSize(13f);
-        effective.setTextColor(Color.rgb(55, 65, 81));
+        effective.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         effective.setPadding(0, dp(8), 0, dp(8));
         card.addView(effective);
         if (locale) localeEffective = effective; else timeZoneEffective = effective;
