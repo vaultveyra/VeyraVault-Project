@@ -24,7 +24,7 @@
 
 ## Automated verification
 - `scripts/test_appearance_preferences_quick_lock_contract.py` checks accepted modes, persistence wiring, DayNight palette resources, and that quick lock reuses the existing credential mechanism without touching CloneStore or Engine.
-- `AppearanceManagerInstrumentationTest` tests default System behavior, Light/Dark persistence and AppCompat mode application, System reset, invalid-value rejection, and restores the original preference after each test.
+- `AppearanceManagerInstrumentationTest` tests default System behavior, Light/Dark persistence and AppCompat mode application, System reset, invalid-value rejection, malformed preference-type fallback, and restores the original preference after each test.
 - Both checks are part of the feature branch CI; Android Instrumentation and Release/Audit must pass before this stage is CI-verified.
 
 ## Not yet verified
