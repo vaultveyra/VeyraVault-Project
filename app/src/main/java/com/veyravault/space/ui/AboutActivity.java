@@ -29,12 +29,12 @@ public class AboutActivity extends BaseActivity {
         title.setText("VeyraVault v2.0 Enterprise");
         title.setTextSize(22f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#2563EB"));
+        title.setTextColor(UiPalette.accent(getApplicationContext()));
         root.addView(title);
 
         TextView body = new TextView(this);
         body.setTextSize(14f);
-        body.setTextColor(Color.parseColor("#374151"));
+        body.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         body.setPadding(0, 24, 0, 32);
         body.setText(fa
                 ? "برنامه شخصی، امن و بدون تبلیغات برای ساخت فضاهای مجازی چندگانه (Clones)، مدیریت موقعیت مکانی مجزا برای هر برنامه، مدیریت هویت دستگاه، پشتیبانی از گوگل‌پلی (GMS)، تغییر آیکون و محافظت در برابر حذف.\n\n"
