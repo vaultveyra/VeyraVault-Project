@@ -13,7 +13,9 @@ import org.junit.runner.RunWith;
 
 import static org.junit.Assert.*;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @RunWith(AndroidJUnit4.class)
@@ -89,6 +91,23 @@ public class AppLockPolicyInstrumentationTest {
                 context, AppLockPolicy.TIMEOUT_1_MINUTE));
         assertFalse(AppLockPolicy.setBackgroundTimeoutSeconds(context, 17));
         assertEquals(AppLockPolicy.TIMEOUT_1_MINUTE, preferences.getInt(KEY, -1));
+    }
+
+    @Test
+    public void unsupportedNumericTimeoutFallsBackToImmediateLock() {
+        assertTrue(preferences.edit().putInt(KEY, 17).commit());
+        assertEquals(AppLockPolicy.TIMEOUT_IMMEDIATELY,
+                AppLockPolicy.getBackgroundTimeoutSeconds(context));
+    }
+
+    @Test
+    public void policyUpdateDoesNotModifyCredentialPreferences() {
+        SharedPreferences credentials = context.getSharedPreferences(
+                "veyra_security_prefs", Context.MODE_PRIVATE);
+        Map<String, ?> before = new HashMap<>(credentials.getAll());
+        assertTrue(AppLockPolicy.setBackgroundTimeoutSeconds(
+                context, AppLockPolicy.TIMEOUT_30_SECONDS));
+        assertEquals(before, credentials.getAll());
     }
 
     @Test
