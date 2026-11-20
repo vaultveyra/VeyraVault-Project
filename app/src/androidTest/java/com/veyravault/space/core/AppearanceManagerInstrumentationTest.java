@@ -100,6 +100,9 @@ public class AppearanceManagerInstrumentationTest {
     public void malformedPreferenceTypeFallsBackToSystem() {
         assertTrue(preferences.edit().putBoolean(KEY_THEME_MODE, true).commit());
         assertEquals(AppearanceManager.MODE_SYSTEM, AppearanceManager.getThemeMode(context));
+        AppearanceManager.apply(context);
+        assertEquals(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
+                AppCompatDelegate.getDefaultNightMode());
     }
 
     @Test
