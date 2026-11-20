@@ -13,6 +13,9 @@ import org.junit.runner.RunWith;
 
 import static org.junit.Assert.*;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @RunWith(AndroidJUnit4.class)
 public class AppLockPolicyInstrumentationTest {
     private static final String PREFS = "veyra_security_policy_prefs";
@@ -46,6 +49,12 @@ public class AppLockPolicyInstrumentationTest {
             editor.putLong(KEY, (Long) originalValue);
         } else if (originalValue instanceof Float) {
             editor.putFloat(KEY, (Float) originalValue);
+        } else if (originalValue instanceof Set<?>) {
+            Set<String> values = new HashSet<>();
+            for (Object item : (Set<?>) originalValue) {
+                if (item instanceof String) values.add((String) item);
+            }
+            editor.putStringSet(KEY, values);
         } else {
             editor.remove(KEY);
         }
