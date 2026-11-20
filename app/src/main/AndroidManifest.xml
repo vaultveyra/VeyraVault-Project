@@ -111,6 +111,7 @@
             </intent-filter>
         </activity-alias>
 
+        <activity android:name=".ui.AppIconNameActivity" android:exported="false" />
         <activity android:name=".ui.SecurityLockActivity" android:exported="false" />
         <activity android:name=".ui.AddAppActivity" android:exported="false" />
         <activity android:name=".ui.CloneEnvironmentProfileActivity" android:exported="false" />        <activity android:name=".ui.SetLocationActivity" android:exported="false" />
