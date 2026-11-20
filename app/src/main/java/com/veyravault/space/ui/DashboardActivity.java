@@ -23,6 +23,7 @@ import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileSettings;
 import com.veyravault.space.core.ProfileResolver;
 import com.veyravault.space.core.ProfileRuntimeApplier;
+import com.veyravault.space.core.DashboardDateFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -76,11 +77,11 @@ public class DashboardActivity extends BaseActivity {
         LinearLayout clocks = new LinearLayout(this);
         clocks.setOrientation(LinearLayout.HORIZONTAL);
         clocks.setPadding(0, dp(14), 0, dp(4));
-        clocks.addView(clockCard(fa ? "تهران" : "Tehran", "Asia/Tehran", fa),
+        clocks.addView(clockCard(fa ? "تهران" : "Tehran", "Asia/Tehran", fa, true),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams nyLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         nyLp.setMargins(dp(10), 0, 0, 0);
-        clocks.addView(clockCard(fa ? "نیویورک" : "New York", "America/New_York", fa), nyLp);
+        clocks.addView(clockCard(fa ? "نیویورک" : "New York", "America/New_York", fa, false), nyLp);
         root.addView(clocks);
 
         TextView deviceInfo = new TextView(this);
@@ -411,7 +412,7 @@ public class DashboardActivity extends BaseActivity {
         return value == null || value.trim().isEmpty() ? "—" : value.trim();
     }
 
-    private View clockCard(String city, String zoneId, boolean fa) {
+    private View clockCard(String city, String zoneId, boolean fa, boolean jalaliDate) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -422,8 +423,10 @@ public class DashboardActivity extends BaseActivity {
         label.setTypeface(Typeface.DEFAULT_BOLD);
         label.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         card.addView(label);
+
         TextClock clock = new TextClock(this);
-        clock.setFormat24Hour("HH:mm:ss");
+        // Both format branches intentionally use 12-hour time to match the product specification.
+        clock.setFormat24Hour("hh:mm:ss a");
         clock.setFormat12Hour("hh:mm:ss a");
         clock.setTimeZone(zoneId);
         clock.setTextSize(25);
@@ -431,6 +434,24 @@ public class DashboardActivity extends BaseActivity {
         clock.setTextColor(UiPalette.accent(getApplicationContext()));
         clock.setPadding(0, dp(5), 0, 0);
         card.addView(clock);
+
+        TextView date = new TextView(this);
+        date.setTextSize(11);
+        date.setTextColor(UiPalette.muted(getApplicationContext()));
+        date.setPadding(0, dp(4), 0, 0);
+        Runnable updateDate = () -> {
+            long now = System.currentTimeMillis();
+            String formatted = jalaliDate
+                    ? DashboardDateFormatter.formatTehranJalaliDate(now, fa)
+                    : DashboardDateFormatter.formatNewYorkGregorianDate(now, fa);
+            date.setText((jalaliDate
+                    ? (fa ? "تاریخ شمسی: " : "Jalali date: ")
+                    : (fa ? "تاریخ میلادی: " : "Gregorian date: ")) + formatted);
+        };
+        updateDate.run();
+        clock.setOnTimeChangedListener(view -> updateDate.run());
+        card.addView(date);
+
         TextView zone = new TextView(this);
         zone.setText(zoneId);
         zone.setTextSize(10);

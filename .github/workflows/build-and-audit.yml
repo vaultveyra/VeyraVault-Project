@@ -89,6 +89,9 @@ jobs:
 
       - name: Test Dashboard five-destination navigation contract
         run: python3 scripts/test_dashboard_bottom_navigation_contract.py
+
+      - name: Test Dashboard Tehran Jalali and New York Gregorian dates
+        run: python3 scripts/test_dashboard_date_format_contract.py
       - name: Test appearance preferences and immediate lock contract
         run: python3 scripts/test_appearance_preferences_quick_lock_contract.py
       - name: Test main-process app-lock lifecycle contract
