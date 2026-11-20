@@ -78,6 +78,8 @@ for marker in (
     "COMPONENT_ENABLED_STATE_DISABLED",
     "previousStates",
     "getActiveDisguiseIndex(context) == targetIndex",
+    "restorePreviousStates(context, manager, previousStates);",
+    "private static void restorePreviousStates(",
     "return false;",
 ):
     assert marker in manager, f"Missing safe launcher transition behavior: {marker}"
