@@ -168,4 +168,9 @@ public class SecuritySettingsActivity extends BaseActivity {
         card.setLayoutParams(lp);
         return card;
     }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
 }
