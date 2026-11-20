@@ -1064,7 +1064,7 @@ public class MainActivity extends BaseActivity {
         label.setGravity(Gravity.CENTER);
         label.setTextSize(10f);
         label.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-        label.setTextColor(Color.parseColor(active ? "#2563EB" : "#6B7280"));
+        label.setTextColor((active ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext())));
         label.setPadding(0, dp(3), 0, 0);
         item.addView(label);
         item.setOnClickListener(listener);
