@@ -10,6 +10,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -24,12 +26,22 @@ import com.veyravault.space.core.ProfileSettings;
 import com.veyravault.space.core.ProfileResolver;
 import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.DashboardDateFormatter;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
 
 public class DashboardActivity extends BaseActivity {
+    private final Handler dateRefreshHandler = new Handler(Looper.getMainLooper());
+    private final List<Runnable> dateRefreshTasks = new ArrayList<>();
+
+    @Override protected void onDestroy() {
+        for (Runnable task : dateRefreshTasks) dateRefreshHandler.removeCallbacks(task);
+        dateRefreshTasks.clear();
+        super.onDestroy();
+    }
+
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         final boolean fa = LocaleHelper.isPersian(this);
@@ -449,7 +461,17 @@ public class DashboardActivity extends BaseActivity {
                     : (fa ? "تاریخ میلادی: " : "Gregorian date: ")) + formatted);
         };
         updateDate.run();
-        clock.setOnTimeChangedListener(view -> updateDate.run());
+        // TextClock has no OnTimeChangedListener API. Refresh the date once per minute
+        // on the main thread so midnight/time-zone changes are reflected without leaks.
+        Runnable refreshTask = new Runnable() {
+            @Override public void run() {
+                if (isFinishing() || isDestroyed()) return;
+                updateDate.run();
+                dateRefreshHandler.postDelayed(this, 60_000L);
+            }
+        };
+        dateRefreshTasks.add(refreshTask);
+        dateRefreshHandler.postDelayed(refreshTask, 60_000L);
         card.addView(date);
 
         TextView zone = new TextView(this);
