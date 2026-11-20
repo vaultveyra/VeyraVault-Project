@@ -61,7 +61,16 @@ public final class AppLockLifecycleController implements Application.ActivityLif
     @Override
     public void onActivityStopped(Activity activity) {
         if (startedActivityCount > 0) startedActivityCount--;
-        if (startedActivityCount == 0) scheduleBackgroundLock();
+        if (startedActivityCount == 0) {
+            if (activity != null && activity.isChangingConfigurations()) {
+                // Rotation, locale/theme recreation, and other configuration changes
+                // are not genuine exits from the app.
+                cancelPendingLock();
+                backgroundDeadlineElapsedRealtime = -1L;
+            } else {
+                scheduleBackgroundLock();
+            }
+        }
     }
 
     private void scheduleBackgroundLock() {
