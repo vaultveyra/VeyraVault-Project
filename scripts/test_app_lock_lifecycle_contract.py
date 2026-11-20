@@ -39,6 +39,7 @@ for marker in (
     "implements Application.ActivityLifecycleCallbacks",
     "onActivityStarted(Activity activity)",
     "onActivityStopped(Activity activity)",
+    "activity.isChangingConfigurations()",
     "startedActivityCount == 0",
     "mainHandler.postDelayed",
     "mainHandler.removeCallbacks",
