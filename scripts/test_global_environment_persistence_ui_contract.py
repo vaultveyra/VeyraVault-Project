@@ -43,4 +43,39 @@ assert "Master GPS was not" in gps_partial_failure
 assert "hooks were not synchronized" in gps_partial_failure
 assert "setControlsEnabled(false)" in source
 
-print("PASS: Global environment and location profiles load/save asynchronously, report partial commits, and sync only after all three commits succeed.")
+profile_store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").read_text(encoding="utf-8")
+repository = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneRepository.java").read_text(encoding="utf-8")
+
+# Global Locale/Time Zone defaults are independent profile fields, not device or GPS metadata.
+for marker in (
+    "buildGlobalLocaleTimeZoneSection()",
+    "buildGlobalProfileField(true)",
+    "buildGlobalProfileField(false)",
+    "repository.saveGlobalProfile(update, result ->",
+    "repository.clearGlobalProfileField(field, result ->",
+    "ProfileResolver.resolve(",
+    "ProfileRuntimeApplier.systemFallback()",
+    "ProfileSettings.isLocaleTagValid(value)",
+    "ProfileSettings.isTimeZoneIdValid(value)",
+    "next clone launch",
+    "Clone-specific values always take precedence",
+    "Reset to System",
+):
+    assert marker in source, f"Missing Global Locale/Time Zone UI behavior: {marker}"
+
+assert "repository.saveCloneProfile" not in source, "Global defaults UI must not write clone overrides"
+assert "repository.clearCloneProfileField" not in source, "Global defaults UI must not clear clone overrides"
+assert "repository.setMasterMockGpsEnabled" not in source[source.index("private void saveGlobalProfileField"):source.index("private void showGlobalProfilePresets")], \
+    "Locale/Time Zone save must not change Master GPS"
+assert "hookRepository.syncAllCloneLocationHooks" not in source[source.index("private void saveGlobalProfileField"):source.index("private void showGlobalProfilePresets")], \
+    "Locale/Time Zone changes must not trigger location hook synchronization"
+
+assert "ProfileStore.clearGlobalField(appContext, field)" in repository
+assert 'return "localeTag".equals(field) || "timeZoneId".equals(field)' in repository
+assert 'if (settings.localeTag != null) out.put("localeTag", settings.localeTag);' in profile_store
+assert 'if (settings.timeZoneId != null) out.put("timeZoneId", settings.timeZoneId);' in profile_store
+assert "public static synchronized boolean clearGlobalField" in profile_store
+assert "if (settings.localeTag != null) out.put" in profile_store, \
+    "Partial Global profile saves must preserve unspecified sibling fields"
+
+print("PASS: Global metadata/location persistence remains safe; independent Global Locale/Time Zone defaults use validated async field-level save/reset and preserve clone overrides.")
