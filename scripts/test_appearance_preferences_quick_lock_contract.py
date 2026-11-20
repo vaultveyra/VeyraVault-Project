@@ -6,6 +6,8 @@ palette = (root / "java/com/veyravault/space/ui/UiPalette.java").read_text(encod
 base = (root / "java/com/veyravault/space/ui/BaseActivity.java").read_text(encoding="utf-8")
 app = (root / "java/com/veyravault/space/VaultApp.java").read_text(encoding="utf-8")
 settings = (root / "java/com/veyravault/space/ui/SettingsHubActivity.java").read_text(encoding="utf-8")
+app_icon = (root / "java/com/veyravault/space/ui/AppIconNameActivity.java").read_text(encoding="utf-8")
+about = (root / "java/com/veyravault/space/ui/AboutActivity.java").read_text(encoding="utf-8")
 main = (root / "java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 dashboard = (root / "java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
 security = (root / "java/com/veyravault/space/security/SecurityManager.java").read_text(encoding="utf-8")
@@ -57,7 +59,7 @@ assert "if (!(this instanceof SecurityLockActivity) && !SecurityManager.isSessio
 assert "public static void lockSession()" in security
 assert "SecurityManager.isSessionUnlocked(this)" in base
 # The language control and lock switch share the top header on all primary screens.
-for screen in (settings, main, dashboard):
+for screen in (settings, main, dashboard, app_icon, about):
     assert "createLanguageAction(fa)" in screen
     assert "createImmediateLockSwitch(fa)" in screen
 assert "addLanguageSection(root, fa)" not in settings
