@@ -43,6 +43,7 @@ for marker in (
     "mainHandler.postDelayed",
     "mainHandler.removeCallbacks",
     "SystemClock.elapsedRealtime()",
+    "IMMEDIATE_LOCK_TRANSITION_GRACE_MILLIS = 250L",
     "SecurityManager.isLockEnabled(appContext)",
     "SecurityManager.lockSession()",
     "AppLockPolicy.getBackgroundTimeoutSeconds(appContext)",
