@@ -201,4 +201,9 @@ public class AppIconNameActivity extends BaseActivity {
         title.setTextColor(UiPalette.textPrimary(this));
         return title;
     }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
 }
