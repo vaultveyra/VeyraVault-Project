@@ -23,7 +23,6 @@ public class AppearanceManagerInstrumentationTest {
     private SharedPreferences preferences;
     private boolean hadOriginalValue;
     private String originalValue;
-    private int originalDelegateMode;
 
     @Before
     public void setUp() {
@@ -31,7 +30,6 @@ public class AppearanceManagerInstrumentationTest {
         preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         hadOriginalValue = preferences.contains(KEY_THEME_MODE);
         originalValue = preferences.getString(KEY_THEME_MODE, null);
-        originalDelegateMode = AppCompatDelegate.getDefaultNightMode();
     }
 
     @After
@@ -44,12 +42,9 @@ public class AppearanceManagerInstrumentationTest {
         }
         assertTrue("Appearance test preference restoration failed", editor.commit());
         AppearanceManager.apply(context);
-        if (!hadOriginalValue) {
-            assertEquals(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
-                    AppCompatDelegate.getDefaultNightMode());
-        } else {
-            AppCompatDelegate.setDefaultNightMode(originalDelegateMode);
-        }
+        String restoredMode = hadOriginalValue && originalValue != null
+                ? originalValue : AppearanceManager.MODE_SYSTEM;
+        assertEquals(restoredMode, AppearanceManager.getThemeMode(context));
     }
 
     @Test
