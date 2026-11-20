@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.TextClock;
 import com.veyravault.space.core.AsyncCloneRepository;
@@ -31,12 +32,18 @@ public class DashboardActivity extends BaseActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         final boolean fa = LocaleHelper.isPersian(this);
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(UiPalette.page(getApplicationContext()));
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(24),dp(28),dp(24),dp(32));
         root.setBackgroundColor(UiPalette.page(getApplicationContext()));
         scroll.addView(root);
+        shell.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -137,7 +144,80 @@ public class DashboardActivity extends BaseActivity {
         TextView zone = new TextView(this);
         zone.setText((fa ? "منطقه زمانی دستگاه: " : "Device time zone: ") + TimeZone.getDefault().getID());
         zone.setTextSize(12); zone.setTextColor(UiPalette.muted(getApplicationContext())); zone.setPadding(0,dp(18),0,0); root.addView(zone);
-        setContentView(scroll);
+        LinearLayout bottomBar = createBottomNavigation(fa, scroll);
+        LinearLayout.LayoutParams bottomParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bottomParams.setMargins(dp(16), dp(6), dp(16), dp(14));
+        shell.addView(bottomBar, bottomParams);
+        setContentView(shell);
+    }
+
+    private LinearLayout createBottomNavigation(boolean fa, final ScrollView scroll) {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(android.view.Gravity.CENTER);
+        bar.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+        bar.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+        bar.addView(makeNavButton(fa ? "داشبورد" : "Dashboard",
+                android.R.drawable.ic_menu_view, true,
+                v -> scroll.smoothScrollTo(0, 0)),
+                new LinearLayout.LayoutParams(0, dp(54), 1f));
+        bar.addView(makeNavButton(fa ? "فضاها" : "Spaces",
+                android.R.drawable.ic_menu_agenda, false,
+                v -> startActivity(new Intent(DashboardActivity.this, MainActivity.class))),
+                new LinearLayout.LayoutParams(0, dp(54), 1f));
+
+        ImageView add = new ImageView(this);
+        add.setImageResource(android.R.drawable.ic_input_add);
+        add.setColorFilter(Color.WHITE);
+        add.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        add.setContentDescription(fa ? "افزودن برنامه" : "Add app");
+        add.setBackgroundResource(com.veyravault.space.R.drawable.bg_pill_blue);
+        add.setClickable(true);
+        add.setFocusable(true);
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        addParams.setMargins(dp(8), 0, dp(8), 0);
+        add.setOnClickListener(v -> startActivity(
+                new Intent(DashboardActivity.this, AddAppActivity.class)));
+        bar.addView(add, addParams);
+
+        bar.addView(makeNavButton("VPN", android.R.drawable.ic_menu_compass, false,
+                v -> startActivity(new Intent(DashboardActivity.this, VpnStatusActivity.class))),
+                new LinearLayout.LayoutParams(0, dp(54), 1f));
+        bar.addView(makeNavButton(fa ? "تنظیمات" : "Settings",
+                android.R.drawable.ic_menu_preferences, false,
+                v -> startActivity(new Intent(DashboardActivity.this, SettingsHubActivity.class))),
+                new LinearLayout.LayoutParams(0, dp(54), 1f));
+        return bar;
+    }
+
+    private View makeNavButton(String title, int iconRes, boolean active,
+                               View.OnClickListener listener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(android.view.Gravity.CENTER);
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(title);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(active ? UiPalette.accent(getApplicationContext())
+                : UiPalette.muted(getApplicationContext()));
+        item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
+
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setGravity(android.view.Gravity.CENTER);
+        label.setTextSize(10f);
+        label.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        label.setTextColor(active ? UiPalette.accent(getApplicationContext())
+                : UiPalette.muted(getApplicationContext()));
+        label.setPadding(0, dp(3), 0, 0);
+        item.addView(label);
+        item.setOnClickListener(listener);
+        return item;
     }
 
     private TextView addSummaryCard(LinearLayout root, String heading, String initialValue) {
