@@ -734,6 +734,16 @@ public class MainActivity extends BaseActivity {
             }
         }));
 
+        actionGrid.addView(makeSheetActionBtn("🌐", fa ? "محیط کلون" : "Clone Environment", btnW, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                sheet.dismiss();
+                Intent intent = new Intent(MainActivity.this, CloneEnvironmentProfileActivity.class);
+                intent.putExtra("pkg", item.packageName);
+                intent.putExtra("uid", item.userId);
+                startActivity(intent);
+            }
+        }));
+
         actionGrid.addView(makeSheetActionBtn("🛡️", getString(R.string.permissions), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
