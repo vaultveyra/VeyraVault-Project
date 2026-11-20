@@ -6,7 +6,7 @@
 - Add light/night color resources and a semantic UiPalette for programmatic screens.
 - Update primary screens and card/pill drawables to resolve colors from current day/night resources.
 - Add System/Light/Dark selection to Settings while preserving language, About/Compatibility, Security, Permissions, Global Environment, and Pending Reservations entries.
-- Add a quick-lock action to Dashboard, Spaces, and Settings headers.
+- Add a shared quick-lock header control to Dashboard, Spaces, and Settings; this was subsequently refined to an explicit ON/OFF switch beside the language control (see Stage 8.7.3).
 
 ## Security contract
 - Quick Lock uses the existing SecurityManager lock state and existing SecurityLockActivity PIN/Pattern verification flow.
