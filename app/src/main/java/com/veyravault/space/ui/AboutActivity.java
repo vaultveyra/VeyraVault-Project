@@ -190,4 +190,9 @@ public class AboutActivity extends BaseActivity {
         params.topMargin = dp(10);
         return params;
     }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
 }
