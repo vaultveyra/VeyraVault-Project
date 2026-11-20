@@ -144,16 +144,8 @@ public class MainActivity extends BaseActivity {
         brandTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         topBar.addView(brandTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView btnLang = makePillChip(getString(R.string.lang_switch), "#DBEAFE", "#2563EB");
-        btnLang.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                LocaleHelper.toggleLanguage(MainActivity.this);
-                recreate();
-            }
-        });
-        topBar.addView(createImmediateLockAction(fa));
-        topBar.addView(btnLang);
+        topBar.addView(createLanguageAction(fa));
+        topBar.addView(createImmediateLockSwitch(fa));
         root.addView(topBar);
 
         LinearLayout banner = new LinearLayout(this);
