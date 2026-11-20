@@ -52,7 +52,7 @@ assert "SecurityManager.isLockEnabled(this)" in base
 assert "SecurityManager.lockSession();" in base
 assert "new Intent(this, SecurityLockActivity.class)" in base
 assert "new Intent(this, SecuritySettingsActivity.class)" in base
-assert "if (!SecurityManager.isSessionUnlocked(this))" in base
+assert "if (!(this instanceof SecurityLockActivity) && !SecurityManager.isSessionUnlocked(this))" in base
 assert "public static void lockSession()" in security
 assert "SecurityManager.isSessionUnlocked(this)" in base
 assert "createImmediateLockAction(fa)" in settings
