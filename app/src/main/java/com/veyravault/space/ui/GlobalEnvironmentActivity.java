@@ -79,12 +79,12 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         title.setText(fa ? "پروفایل سراسری دستگاه (اطلاعات ذخیره‌شده)" : "Global Device Profile (Saved Metadata)");
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         root.addView(title);
 
         TextView desc = new TextView(this);
         desc.setTextSize(13f);
-        desc.setTextColor(Color.parseColor("#4B5563"));
+        desc.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         desc.setPadding(0, 12, 0, 28);
         desc.setText(fa
                 ? "توجه: مدل دستگاه، کشور و اپراتور در این نسخه فقط به‌عنوان اطلاعات پروفایل ذخیره می‌شوند و توسط موتور فعلی روی کلون‌ها اعمال نمی‌شوند. موقعیت مکانی هر کلون جداگانه از طریق API محدود به بسته و کاربر مجازی موتور تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
@@ -157,7 +157,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
 
         TextView locationDesc = new TextView(this);
         locationDesc.setTextSize(13f);
-        locationDesc.setTextColor(Color.parseColor("#4B5563"));
+        locationDesc.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         locationDesc.setText(fa
                 ? "اولویت هر فیلد: تنظیم اختصاصی کلون، سپس این پروفایل سراسری، سپس مقدار امن سیستم. Master Mock GPS کلید قطع‌کننده اصلی است."
                 : "Per-field priority: Clone override, then this Global profile, then the safe system default. Master Mock GPS remains the global kill switch.");
@@ -196,7 +196,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         resetGlobalLocationButton = new TextView(this);
         resetGlobalLocationButton.setText(fa ? "پاک‌کردن پیش‌فرض‌های موقعیت سراسری و بازگشت به سیستم" :
                 "Clear Global location defaults (inherit System)");
-        resetGlobalLocationButton.setTextColor(Color.parseColor("#2563EB"));
+        resetGlobalLocationButton.setTextColor(UiPalette.accent(getApplicationContext()));
         resetGlobalLocationButton.setPadding(0, 12, 0, 18);
         resetGlobalLocationButton.setOnClickListener(v -> resetGlobalLocation());
         root.addView(resetGlobalLocationButton);
@@ -223,12 +223,12 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 : "Global Locale & Time Zone Defaults");
         title.setTextSize(18f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         section.addView(title);
 
         TextView description = new TextView(this);
         description.setTextSize(13f);
-        description.setTextColor(Color.parseColor("#4B5563"));
+        description.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         description.setPadding(0, 8, 0, 12);
         description.setText(fa
                 ? "این مقادیر برای کلون‌هایی استفاده می‌شوند که Override اختصاصی ندارند. مقدار اختصاصی هر کلون همیشه اولویت دارد. پاک‌کردن یک فیلد سراسری فقط همان پیش‌فرض را حذف می‌کند و مقدار سیستم جایگزین می‌شود."
@@ -255,12 +255,12 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 : (fa ? "منطقه زمانی پیش‌فرض (Time Zone)" : "Default Time Zone"));
         heading.setTextSize(16f);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
-        heading.setTextColor(Color.parseColor("#1F2937"));
+        heading.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         card.addView(heading);
 
         TextView effective = new TextView(this);
         effective.setTextSize(12f);
-        effective.setTextColor(Color.parseColor("#4B5563"));
+        effective.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         effective.setPadding(0, 6, 0, 8);
         card.addView(effective);
         if (locale) globalLocaleEffective = effective;
