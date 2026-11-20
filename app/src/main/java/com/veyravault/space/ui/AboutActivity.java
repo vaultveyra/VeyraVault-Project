@@ -40,7 +40,8 @@ public class AboutActivity extends BaseActivity {
         title.setTextColor(UiPalette.textPrimary(this));
         header.addView(title, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(createImmediateLockAction(fa));
+        header.addView(createLanguageAction(fa));
+        header.addView(createImmediateLockSwitch(fa));
         root.addView(header);
 
         addSection(root, fa ? "اطلاعات نسخه" : "Build Information",
