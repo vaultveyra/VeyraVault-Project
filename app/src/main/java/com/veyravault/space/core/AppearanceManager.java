@@ -23,8 +23,11 @@ public final class AppearanceManager {
     }
 
     public static String getThemeMode(Context context) {
-        String stored = preferences(context).getString(KEY_THEME_MODE, MODE_SYSTEM);
-        return isValidMode(stored) ? stored : MODE_SYSTEM;
+        if (context == null) return MODE_SYSTEM;
+        Object stored = preferences(context).getAll().get(KEY_THEME_MODE);
+        if (!(stored instanceof String)) return MODE_SYSTEM;
+        String mode = (String) stored;
+        return isValidMode(mode) ? mode : MODE_SYSTEM;
     }
 
     public static boolean isValidMode(String mode) {
