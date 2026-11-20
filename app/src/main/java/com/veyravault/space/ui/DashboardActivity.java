@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.TimeZone;
 
 public class DashboardActivity extends BaseActivity {
-    private int dp(int n) { return (int)(n * getResources().getDisplayMetrics().density + 0.5f); }
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         final boolean fa = LocaleHelper.isPersian(this);
