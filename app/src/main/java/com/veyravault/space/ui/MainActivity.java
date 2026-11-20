@@ -152,6 +152,7 @@ public class MainActivity extends BaseActivity {
                 recreate();
             }
         });
+        topBar.addView(createImmediateLockAction(fa));
         topBar.addView(btnLang);
         root.addView(topBar);
 
