@@ -9,6 +9,7 @@ settings = (root / "java/com/veyravault/space/ui/SettingsHubActivity.java").read
 main = (root / "java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 dashboard = (root / "java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
 security = (root / "java/com/veyravault/space/security/SecurityManager.java").read_text(encoding="utf-8")
+lock_activity = (root / "java/com/veyravault/space/ui/SecurityLockActivity.java").read_text(encoding="utf-8")
 styles = (root / "res/values/styles.xml").read_text(encoding="utf-8")
 night_colors = (root / "res/values-night/colors.xml").read_text(encoding="utf-8")
 card_drawable = (root / "res/drawable/bg_card_rounded.xml").read_text(encoding="utf-8")
@@ -66,7 +67,7 @@ assert 'setTextOn(fa ? "قفل" : "Locked")' in base
 assert 'setTextOff(fa ? "باز" : "Open")' in base
 assert "if (!isChecked)" in base
 assert "SecurityManager.lockSession();" in base
-assert "SecurityManager.verifyCredential" in security
+assert "SecurityManager.verifyCredential" in lock_activity
 assert "setImmediateLockSwitchChecked(SecurityManager.isLockEnabled(this)" in base
 assert "new Intent(BaseActivity.this, SecurityLockActivity.class)" in base
 
