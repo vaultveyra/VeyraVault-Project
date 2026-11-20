@@ -1,7 +1,7 @@
 # Stage 8.7.3 — Shared language and immediate-lock header switch
 
 ## User-facing behavior
-- The language control and immediate-lock switch are placed together in the top header on Spaces, Dashboard, and Settings.
+- The language control and immediate-lock switch are placed together in the top header on Spaces, Dashboard, Settings, Launcher Icon & Label, and About.
 - Settings no longer places language selection at the bottom of the page.
 - The switch has explicit localized states: Persian «باز / قفل» and English «Open / Locked».
 - The switch reflects the effective app-session lock state when the screen resumes.
@@ -20,5 +20,5 @@
 
 ## Verification
 - Extended scripts/test_appearance_preferences_quick_lock_contract.py to require the shared header controls, localized switch states, existing credential verification, lock-state refresh, and the absence of a language section at the bottom of Settings.
-- CI Android instrumentation, source audit, unsigned release compilation, APK audit, and artifact upload remain required before considering the refinement CI-verified.
+- The original CI attempt exposed stale quick-lock method calls in Launcher Icon & Label and About. Both screens are now migrated to the shared header controls, and the static contract includes all five headers. Android instrumentation, source audit, unsigned release compilation, APK audit, and artifact upload remain required.
 - Physical-device layout and touch-flow validation in Persian RTL and English LTR remain outstanding.
