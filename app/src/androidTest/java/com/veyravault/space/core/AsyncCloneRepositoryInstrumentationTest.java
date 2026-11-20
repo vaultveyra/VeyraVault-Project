@@ -196,6 +196,77 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+
+    @Test public void globalLocaleAndTimeZoneDefaultsAreFieldScopedAndPreserveCloneOverrides() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        try {
+            ProfileSettings cloneOverride = new ProfileSettings();
+            cloneOverride.localeTag = "de-DE";
+            cloneOverride.timeZoneId = "Europe/Berlin";
+            AsyncCloneRepository.Result<Boolean> cloneSaved = awaitResult(
+                    callback -> repository.saveCloneProfile("com.example.globaldefaults", 7,
+                            cloneOverride, callback));
+            assertTrue(cloneSaved.isSuccess());
+
+            ProfileSettings globalLocale = new ProfileSettings();
+            globalLocale.localeTag = "fr-FR";
+            AsyncCloneRepository.Result<Boolean> localeSaved = awaitResult(
+                    callback -> repository.saveGlobalProfile(globalLocale, callback));
+            assertTrue(localeSaved.isSuccess());
+
+            ProfileSettings globalTimeZone = new ProfileSettings();
+            globalTimeZone.timeZoneId = "Europe/Paris";
+            AsyncCloneRepository.Result<Boolean> timeZoneSaved = awaitResult(
+                    callback -> repository.saveGlobalProfile(globalTimeZone, callback));
+            assertTrue(timeZoneSaved.isSuccess());
+
+            AsyncCloneRepository.Result<ProfileSettings> globalRead = awaitResult(
+                    repository::loadGlobalProfile);
+            AsyncCloneRepository.Result<ProfileSettings> cloneRead = awaitResult(
+                    callback -> repository.loadCloneProfile("com.example.globaldefaults", 7, callback));
+            assertTrue(globalRead.isSuccess());
+            assertTrue(cloneRead.isSuccess());
+            assertEquals("fr-FR", globalRead.getValue().localeTag);
+            assertEquals("Europe/Paris", globalRead.getValue().timeZoneId);
+            assertEquals("de-DE", cloneRead.getValue().localeTag);
+            assertEquals("Europe/Berlin", cloneRead.getValue().timeZoneId);
+
+            ProfileSettings system = new ProfileSettings();
+            system.localeTag = "en-US";
+            system.timeZoneId = "UTC";
+            ProfileResolver.ResolvedProfile cloneEffective =
+                    ProfileResolver.resolve(cloneRead.getValue(), globalRead.getValue(), system);
+            assertEquals("de-DE", cloneEffective.localeTag);
+            assertEquals(ProfileResolver.Source.CLONE, cloneEffective.localeSource);
+            assertEquals("Europe/Berlin", cloneEffective.timeZoneId);
+            assertEquals(ProfileResolver.Source.CLONE, cloneEffective.timeZoneSource);
+
+            AsyncCloneRepository.Result<Boolean> localeCleared = awaitResult(
+                    callback -> repository.clearGlobalProfileField("localeTag", callback));
+            assertTrue(localeCleared.isSuccess());
+
+            AsyncCloneRepository.Result<ProfileSettings> globalAfterReset = awaitResult(
+                    repository::loadGlobalProfile);
+            AsyncCloneRepository.Result<ProfileSettings> cloneAfterReset = awaitResult(
+                    callback -> repository.loadCloneProfile("com.example.globaldefaults", 7, callback));
+            assertTrue(globalAfterReset.isSuccess());
+            assertTrue(cloneAfterReset.isSuccess());
+            assertNull(globalAfterReset.getValue().localeTag);
+            assertEquals("Europe/Paris", globalAfterReset.getValue().timeZoneId);
+            assertEquals("de-DE", cloneAfterReset.getValue().localeTag);
+            assertEquals("Europe/Berlin", cloneAfterReset.getValue().timeZoneId);
+
+            ProfileResolver.ResolvedProfile globalFallback =
+                    ProfileResolver.resolve(new ProfileSettings(), globalAfterReset.getValue(), system);
+            assertEquals("en-US", globalFallback.localeTag);
+            assertEquals(ProfileResolver.Source.SYSTEM, globalFallback.localeSource);
+            assertEquals("Europe/Paris", globalFallback.timeZoneId);
+            assertEquals(ProfileResolver.Source.GLOBAL, globalFallback.timeZoneSource);
+        } finally {
+            repository.close();
+        }
+    }
+
     @Test public void invalidPersistedProfileValuesFallBackIndependently() throws Exception {
         profilePreferences.edit().putString("profiles_json",
                 "{\"schemaVersion\":1,"
@@ -574,6 +645,24 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals(clones, preferences.getString("clones_json", null));
         assertEquals(journal, preferences.getString("pending_clone_reservations_json", null));
         repository.close();
+    }
+
+
+    private interface AsyncRepositoryOperation<T> {
+        void execute(AsyncCloneRepository.Callback<T> callback);
+    }
+
+    private static <T> AsyncCloneRepository.Result<T> awaitResult(
+            AsyncRepositoryOperation<T> operation) throws Exception {
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<T>> result = new AtomicReference<>();
+        operation.execute(value -> {
+            result.set(value);
+            done.countDown();
+        });
+        assertTrue("Asynchronous repository operation timed out", done.await(10, TimeUnit.SECONDS));
+        assertNotNull("Repository callback returned no result", result.get());
+        return result.get();
     }
 
     private static CloneStore.CloneEntry cloneEntry(String packageName, int userId) {
