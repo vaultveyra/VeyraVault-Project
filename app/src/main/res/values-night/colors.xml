@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_page">#0B1220</color>
+    <color name="bg_card">#1F2937</color>
+    <color name="bg_surface_secondary">#334155</color>
+    <color name="primary_blue">#2563EB</color>
+    <color name="primary_blue_light">#1E3A5F</color>
+    <color name="text_primary">#F9FAFB</color>
+    <color name="text_secondary">#CBD5E1</color>
+</resources>
