@@ -46,7 +46,8 @@ public class DashboardActivity extends BaseActivity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(UiPalette.textPrimary(this));
         header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(createImmediateLockAction(fa));
+        header.addView(createLanguageAction(fa));
+        header.addView(createImmediateLockSwitch(fa));
         root.addView(header);
         TextView subtitle = new TextView(this);
         subtitle.setText(fa ? "مرکز مدیریت فضاهای شما" : "Your multi-space control center");
