@@ -16,8 +16,8 @@ public class CompatibilityReportActivity extends BaseActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         boolean fa = LocaleHelper.isPersian(this);
-        int ink = Color.rgb(31, 41, 55);
-        int muted = Color.rgb(75, 85, 99);
+        int ink = UiPalette.textPrimary(getApplicationContext());
+        int muted = UiPalette.textSecondary(getApplicationContext());
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(48, 40, 48, 40);
@@ -45,7 +45,7 @@ public class CompatibilityReportActivity extends BaseActivity {
             row.setTextSize(14);
             row.setTextColor(ink);
             row.setPadding(24, 20, 24, 20);
-            row.setBackgroundColor(Color.rgb(243, 244, 246));
+            row.setBackgroundColor(UiPalette.surfaceSecondary(getApplicationContext()));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.bottomMargin = 16;
