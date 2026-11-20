@@ -63,7 +63,8 @@ public class AppIconNameActivity extends BaseActivity {
         title.setTextColor(UiPalette.textPrimary(this));
         header.addView(title, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(createImmediateLockAction(fa));
+        header.addView(createLanguageAction(fa));
+        header.addView(createImmediateLockSwitch(fa));
         root.addView(header);
 
         TextView explanation = new TextView(this);
