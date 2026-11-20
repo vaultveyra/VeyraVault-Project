@@ -85,6 +85,7 @@ assert 'excludes += ["**/*.so"]' in prepare
 assert "releaseImplementation project(':Bcore')" in prepare and "debugCompileOnly project(':Bcore')" in prepare
 assert 'abiFilters "x86_64"' in prepare
 assert "reactivecircus/android-emulator-runner@v2" in workflow
+assert 'ANDROID_I_WANT_MY_TCG: "yes"' in workflow, "Hosted Linux emulator must explicitly allow TCG when KVM is unavailable"
 assert ":app:connectedDebugAndroidTest" in workflow
 assert ":app:assembleDebug :app:assembleDebugAndroidTest" in workflow
 assert "DEBUG APK NATIVE LIBRARIES" in workflow and "ANDROID TEST APK NATIVE LIBRARIES" in workflow
