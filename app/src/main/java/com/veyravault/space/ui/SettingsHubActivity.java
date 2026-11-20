@@ -209,4 +209,9 @@ public class SettingsHubActivity extends BaseActivity {
                 startActivity(new Intent(SettingsHubActivity.this, target)));
         root.addView(card, params);
     }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
 }
