@@ -68,6 +68,8 @@ for marker in (
     "missingPreferenceDefaultsToImmediateLock",
     "supportedTimeoutsPersistIndependently",
     "unsupportedTimeoutDoesNotOverwriteSavedValue",
+    "unsupportedNumericTimeoutFallsBackToImmediateLock",
+    "policyUpdateDoesNotModifyCredentialPreferences",
     "malformedPreferenceFallsBackToImmediateLock",
     "App lock policy preference restoration failed",
 ):
