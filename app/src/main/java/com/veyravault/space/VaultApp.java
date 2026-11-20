@@ -5,6 +5,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.veyravault.space.core.AsyncLocationHookRepository;
+import com.veyravault.space.core.AppearanceManager;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileStore;
@@ -28,6 +29,7 @@ public class VaultApp extends Application {
         super.onCreate();
         instance = this;
         LocaleHelper.applyLocale(this);
+        AppearanceManager.apply(this);
         // Capture the actual system baseline before any virtual app can override process defaults.
         ProfileRuntimeApplier.initializeSystemFallback(this);
         Engine.doOnCreate(this);
