@@ -11,6 +11,7 @@ import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileStore;
 import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.ProcessUtils;
+import com.veyravault.space.security.AppLockLifecycleController;
 
 public class VaultApp extends Application {
     private static final String TAG = "VeyraVault";
@@ -37,6 +38,8 @@ public class VaultApp extends Application {
         // SharedPreferences migration and bulk hook reconciliation belong to the default process.
         // Virtual :pN processes must not race writes or redundantly synchronize every clone.
         if (ProcessUtils.isMainProcess(this)) {
+            // App-lock lifecycle belongs only to the main host process, never clone processes.
+            AppLockLifecycleController.initialize(this);
             ProfileStore.migrateLegacyLocationSettings(this);
             AsyncLocationHookRepository.getInstance(this).syncAllCloneLocationHooks((summary, error) -> {
                 if (error != null) {
