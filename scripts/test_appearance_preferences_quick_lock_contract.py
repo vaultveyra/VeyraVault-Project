@@ -50,8 +50,8 @@ for method in ("page(", "surface(", "textPrimary(", "textSecondary(", "muted(", 
 # Quick Lock reuses the existing credential-verified lock state and current lock Activity.
 assert "SecurityManager.isLockEnabled(this)" in base
 assert "SecurityManager.lockSession();" in base
-assert "new Intent(this, SecurityLockActivity.class)" in base
-assert "new Intent(this, SecuritySettingsActivity.class)" in base
+assert "new Intent(BaseActivity.this, SecurityLockActivity.class)" in base
+assert "new Intent(BaseActivity.this, SecuritySettingsActivity.class)" in base
 assert "if (!(this instanceof SecurityLockActivity) && !SecurityManager.isSessionUnlocked(this))" in base
 assert "public static void lockSession()" in security
 assert "SecurityManager.isSessionUnlocked(this)" in base
