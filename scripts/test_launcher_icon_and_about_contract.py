@@ -10,6 +10,8 @@ about = (java / "ui/AboutActivity.java").read_text(encoding="utf-8")
 manifest = (root / "AndroidManifest.xml").read_text(encoding="utf-8")
 instrumentation = Path("app/src/androidTest/java/com/veyravault/space/security/AppDisguiseManagerInstrumentationTest.java").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
+english_strings = (root / "res/values-en/strings.xml").read_text(encoding="utf-8")
+persian_strings = (root / "res/values-fa/strings.xml").read_text(encoding="utf-8")
 
 # Programmatic layouts use local density conversion helpers; the BaseActivity helper is private.
 for path in (
@@ -43,6 +45,15 @@ for icon in (
     assert f"R.drawable.{icon}" in selector, f"Missing bundled launcher icon: {icon}"
 
 assert 'android:name=".ui.AppIconNameActivity" android:exported="false"' in manifest
+for name, english, persian in (
+    ("disguise_calc", "Calculator", "ماشین‌حساب"),
+    ("disguise_calendar", "Calendar", "تقویم"),
+    ("disguise_notes", "Notes", "یادداشت‌ها"),
+    ("disguise_weather", "Weather", "آب‌وهوا"),
+):
+    assert f'<string name="{name}">{english}</string>' in english_strings
+    assert f'<string name="{name}">{persian}</string>' in persian_strings
+
 assert "AppIconNameActivity.class" in settings
 assert "AppIconNameActivity.class" in security
 
