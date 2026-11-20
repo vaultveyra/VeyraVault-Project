@@ -67,19 +67,26 @@ public final class AppDisguiseManager {
                         PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                         PackageManager.DONT_KILL_APP);
             }
-            return getActiveDisguiseIndex(context) == targetIndex;
-        } catch (RuntimeException failure) {
-            for (int i = 0; i < ALIASES.length; i++) {
-                try {
-                    manager.setComponentEnabledSetting(
-                            new ComponentName(context, ALIASES[i]),
-                            previousStates[i],
-                            PackageManager.DONT_KILL_APP);
-                } catch (RuntimeException ignored) {
-                    // Best-effort rollback; caller receives false and must not report success.
-                }
-            }
+            if (getActiveDisguiseIndex(context) == targetIndex) return true;
+            restorePreviousStates(context, manager, previousStates);
             return false;
+        } catch (RuntimeException failure) {
+            restorePreviousStates(context, manager, previousStates);
+            return false;
+        }
+    }
+
+    private static void restorePreviousStates(Context context, PackageManager manager,
+                                              int[] previousStates) {
+        for (int i = 0; i < ALIASES.length; i++) {
+            try {
+                manager.setComponentEnabledSetting(
+                        new ComponentName(context, ALIASES[i]),
+                        previousStates[i],
+                        PackageManager.DONT_KILL_APP);
+            } catch (RuntimeException ignored) {
+                // Best-effort rollback; caller receives false and must not report success.
+            }
         }
     }
 }
