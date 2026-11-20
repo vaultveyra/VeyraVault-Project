@@ -78,7 +78,7 @@ public class SetLocationActivity extends BaseActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -87,7 +87,7 @@ public class SetLocationActivity extends BaseActivity {
 
         citiesButton = new TextView(this);
         citiesButton.setText(fa ? "🌍 انتخاب سریع شهر / مختصات" : "🌍 Quick Cities / Coords");
-        citiesButton.setTextColor(Color.parseColor("#2563EB"));
+        citiesButton.setTextColor(UiPalette.accent(getApplicationContext()));
         citiesButton.setBackgroundResource(R.drawable.bg_pill_lightblue);
         citiesButton.setPadding(28, 14, 28, 14);
         citiesButton.setEnabled(false);
@@ -153,7 +153,7 @@ public class SetLocationActivity extends BaseActivity {
         locTitle.setText(fa ? "موقعیت مکانی (Location)" : "Location");
         locTitle.setTextSize(17f);
         locTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        locTitle.setTextColor(Color.parseColor("#111827"));
+        locTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         bottomCard.addView(locTitle);
 
         LinearLayout coordBox = new LinearLayout(this);
@@ -167,20 +167,20 @@ public class SetLocationActivity extends BaseActivity {
         coordsTv = new TextView(this);
         coordsTv.setTextSize(19f);
         coordsTv.setTypeface(Typeface.DEFAULT_BOLD);
-        coordsTv.setTextColor(Color.parseColor("#111827"));
+        coordsTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         coordsTv.setText(String.format("%.4f, %.4f  📍", selectedLat, selectedLng));
         coordBox.addView(coordsTv);
 
         TextView targetTv = new TextView(this);
         targetTv.setTextSize(13f);
-        targetTv.setTextColor(Color.parseColor("#6B7280"));
+        targetTv.setTextColor(UiPalette.muted(getApplicationContext()));
         targetTv.setText(cloneEntry.displayName + " (Space " + cloneEntry.getSpaceNumber() + ")");
         coordBox.addView(targetTv);
         bottomCard.addView(coordBox, cblp);
 
         sourceTv = new TextView(this);
         sourceTv.setTextSize(12f);
-        sourceTv.setTextColor(Color.parseColor("#6B7280"));
+        sourceTv.setTextColor(UiPalette.muted(getApplicationContext()));
         sourceTv.setPadding(0, 10, 0, 0);
         sourceTv.setText(fa ? "در حال خواندن تنظیمات مؤثر..." : "Loading effective profile...");
         coordBox.addView(sourceTv);
@@ -221,7 +221,7 @@ public class SetLocationActivity extends BaseActivity {
         resetButton = new TextView(this);
         resetButton.setText(fa ? "بازگشت تنظیمات موقعیت این کلون به پروفایل سراسری" :
                 "Reset this clone's location to Global profile");
-        resetButton.setTextColor(Color.parseColor("#2563EB"));
+        resetButton.setTextColor(UiPalette.accent(getApplicationContext()));
         resetButton.setGravity(Gravity.CENTER);
         resetButton.setPadding(0, 24, 0, 0);
         resetButton.setEnabled(false);
