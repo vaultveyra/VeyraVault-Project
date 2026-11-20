@@ -130,7 +130,7 @@ public class MainActivity extends BaseActivity {
     private void buildDashboardUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F3F5F9"));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -141,7 +141,7 @@ public class MainActivity extends BaseActivity {
         brandTitle.setText("VeyraVault");
         brandTitle.setTextSize(22f);
         brandTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        brandTitle.setTextColor(Color.parseColor("#111827"));
+        brandTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         topBar.addView(brandTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView btnLang = makePillChip(getString(R.string.lang_switch), "#DBEAFE", "#2563EB");
@@ -172,7 +172,7 @@ public class MainActivity extends BaseActivity {
         banner.addView(bTitle);
 
         TextView bSub = new TextView(this);
-        bSub.setTextColor(Color.parseColor("#DBEAFE"));
+        bSub.setTextColor(UiPalette.accentSurface(getApplicationContext()));
         bSub.setTextSize(12f);
         bSub.setText(fa ? "در حال خواندن پروفایل ذخیره‌شده..." : "Loading saved profile...");
         globalProfileSummary = bSub;
@@ -194,7 +194,7 @@ public class MainActivity extends BaseActivity {
         myClonesTv.setText(getString(R.string.my_clones));
         myClonesTv.setTextSize(18f);
         myClonesTv.setTypeface(Typeface.DEFAULT_BOLD);
-        myClonesTv.setTextColor(Color.parseColor("#111827"));
+        myClonesTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         secRow.addView(myClonesTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView btnToggleAll = makePillChip(fa ? "جمع/باز کردن همه ⊞" : "Collapse/Expand All ⊞", "#FFFFFF", "#374151");
@@ -398,7 +398,7 @@ public class MainActivity extends BaseActivity {
         TextView chevron = new TextView(this);
         chevron.setText(collapsed ? "⌄" : "⌃");
         chevron.setTextSize(20f);
-        chevron.setTextColor(Color.parseColor("#6B7280"));
+        chevron.setTextColor(UiPalette.muted(getApplicationContext()));
         chevron.setPadding(dp(8), 0, dp(12), 0);
         header.addView(chevron);
 
@@ -448,7 +448,7 @@ public class MainActivity extends BaseActivity {
         spaceTitle.setText("  " + getString(R.string.space_label));
         spaceTitle.setTextSize(17f);
         spaceTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        spaceTitle.setTextColor(Color.parseColor("#111827"));
+        spaceTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         header.addView(spaceTitle);
 
         header.setOnClickListener(v -> {
@@ -472,7 +472,7 @@ public class MainActivity extends BaseActivity {
             if (clones.isEmpty()) {
                 TextView emptyTv = new TextView(this);
                 emptyTv.setText(fa ? "هنوز برنامه‌ای در این فضا نیست. دکمه + پایین را بزنید." : "No apps in this space yet. Tap + below to add.");
-                emptyTv.setTextColor(Color.parseColor("#9CA3AF"));
+                emptyTv.setTextColor(UiPalette.muted(getApplicationContext()));
                 emptyTv.setPadding(16, 32, 16, 16);
                 card.addView(emptyTv);
             } else {
@@ -545,7 +545,7 @@ public class MainActivity extends BaseActivity {
         dots.setText("⋮");
         dots.setTextSize(17f);
         dots.setTypeface(Typeface.DEFAULT_BOLD);
-        dots.setTextColor(Color.parseColor("#6B7280"));
+        dots.setTextColor(UiPalette.muted(getApplicationContext()));
         dots.setPadding(dp(8), 0, dp(8), 0);
         dots.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -558,7 +558,7 @@ public class MainActivity extends BaseActivity {
         TextView nameTv = new TextView(this);
         nameTv.setText(item.displayName);
         nameTv.setTextSize(12f);
-        nameTv.setTextColor(Color.parseColor("#374151"));
+        nameTv.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         nameTv.setSingleLine(true);
         nameTv.setEllipsize(TextUtils.TruncateAt.END);
         labelRow.addView(nameTv);
@@ -612,12 +612,12 @@ public class MainActivity extends BaseActivity {
         titleTv.setText(item.displayName);
         titleTv.setTextSize(17f);
         titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         infoCol.addView(titleTv);
 
         TextView locSub = new TextView(this);
         locSub.setTextSize(12f);
-        locSub.setTextColor(item.mockGpsEnabled ? Color.parseColor("#2563EB") : Color.parseColor("#9CA3AF"));
+        locSub.setTextColor(item.mockGpsEnabled ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext()));
         locSub.setText(item.mockGpsEnabled
                 ? String.format("📍 %.4f, %.4f", item.latitude, item.longitude)
                 : (getString(R.string.no_location_set) + " 📍"));
@@ -626,7 +626,7 @@ public class MainActivity extends BaseActivity {
         if (item.customDeviceEnabled && !item.deviceModel.isEmpty()) {
             TextView devSub = new TextView(this);
             devSub.setTextSize(11f);
-            devSub.setTextColor(Color.parseColor("#10B981"));
+            devSub.setTextColor(UiPalette.success(getApplicationContext()));
             devSub.setText((fa ? "📱 پروفایل ذخیره‌شده: " : "📱 Saved profile: ") + item.deviceBrand + " " + item.deviceModel);
             infoCol.addView(devSub);
         }
@@ -642,7 +642,7 @@ public class MainActivity extends BaseActivity {
         cfgHeader.setText(getString(R.string.configuration));
         cfgHeader.setTextSize(16f);
         cfgHeader.setTypeface(Typeface.DEFAULT_BOLD);
-        cfgHeader.setTextColor(Color.parseColor("#111827"));
+        cfgHeader.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         cfgHeader.setPadding(0, 36, 0, 24);
         root.addView(cfgHeader);
 
@@ -823,7 +823,7 @@ public class MainActivity extends BaseActivity {
         TextView tv = new TextView(this);
         tv.setText(label);
         tv.setTextSize(12f);
-        tv.setTextColor(Color.parseColor("#374151"));
+        tv.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, 10, 0, 0);
         wrap.addView(tv);
@@ -1039,9 +1039,9 @@ public class MainActivity extends BaseActivity {
         tv.setText(text);
         tv.setTextSize(12f);
         tv.setTypeface(Typeface.DEFAULT_BOLD);
-        tv.setTextColor(Color.parseColor(fgHex));
+        tv.setTextColor(UiPalette.fromLegacyHex(getApplicationContext(), fgHex));
         tv.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        tv.getBackground().setTint(Color.parseColor(bgHex));
+        tv.getBackground().setTint(UiPalette.fromLegacyHex(getApplicationContext(), bgHex));
         tv.setPadding(28, 12, 28, 12);
         return tv;
     }
@@ -1056,7 +1056,7 @@ public class MainActivity extends BaseActivity {
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
-        icon.setColorFilter(Color.parseColor(active ? "#2563EB" : "#6B7280"));
+        icon.setColorFilter((active ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext())));
         item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
 
         TextView label = new TextView(this);
