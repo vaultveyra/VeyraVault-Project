@@ -65,6 +65,9 @@ jobs:
       - name: Test global environment async persistence UI contract
         run: python3 scripts/test_global_environment_persistence_ui_contract.py
 
+      - name: Test per-clone environment profile UI contract
+        run: python3 scripts/test_clone_environment_profile_ui_contract.py
+
       - name: Test MainActivity async Spaces persistence contract
         run: python3 scripts/test_main_activity_async_spaces_contract.py
 
