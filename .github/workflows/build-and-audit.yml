@@ -116,6 +116,10 @@ jobs:
 
       - name: Run Room Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Current Android Emulator releases require explicit opt-in to TCG
+          # when hosted Linux runners do not expose KVM/hardware acceleration.
+          ANDROID_I_WANT_MY_TCG: "yes"
         with:
           api-level: 34
           target: default
