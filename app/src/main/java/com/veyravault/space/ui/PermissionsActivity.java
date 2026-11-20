@@ -31,7 +31,7 @@ public class PermissionsActivity extends BaseActivity {
         TextView title = new TextView(this);
         title.setTextSize(19f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         title.setText((fa ? "مدیریت مجوزهای کلون: " : "Permissions: ")
                 + (entry != null ? entry.displayName : pkg));
         root.addView(title);
@@ -39,7 +39,7 @@ public class PermissionsActivity extends BaseActivity {
         TextView notice = new TextView(this);
         notice.setText(getString(R.string.permission_policy_notice));
         notice.setTextSize(13f);
-        notice.setTextColor(Color.parseColor("#92400E"));
+        notice.setTextColor(UiPalette.warning(getApplicationContext()));
         notice.setPadding(0, 16, 0, 20);
         root.addView(notice);
 
