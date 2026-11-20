@@ -1,5 +1,6 @@
 package com.veyravault.space.ui;
 
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -17,6 +18,8 @@ import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileSettings;
+import com.veyravault.space.core.ProfileResolver;
+import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.VirtualHookManager;
 
 public class GlobalEnvironmentActivity extends BaseActivity {
@@ -33,6 +36,15 @@ public class GlobalEnvironmentActivity extends BaseActivity {
     private CheckBox globalLocationEnabled;
     private EditText globalLatitudeEt;
     private EditText globalLongitudeEt;
+    private EditText globalLocaleEt;
+    private EditText globalTimeZoneEt;
+    private TextView globalLocaleEffective;
+    private TextView globalTimeZoneEffective;
+    private Button saveGlobalLocaleButton;
+    private Button resetGlobalLocaleButton;
+    private Button saveGlobalTimeZoneButton;
+    private Button resetGlobalTimeZoneButton;
+    private boolean globalProfileFieldsBusy;
     private TextView resetGlobalLocationButton;
     private CheckBox enableGlobal;
     private EditText brandEt;
@@ -78,6 +90,8 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                 ? "توجه: مدل دستگاه، کشور و اپراتور در این نسخه فقط به‌عنوان اطلاعات پروفایل ذخیره می‌شوند و توسط موتور فعلی روی کلون‌ها اعمال نمی‌شوند. موقعیت مکانی هر کلون جداگانه از طریق API محدود به بسته و کاربر مجازی موتور تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
                 : "Note: device model, country and operator values are saved as profile metadata only and are not applied to clones. The pinned engine version does not expose a verified package/user-scoped API to apply these values. Clone locations are configured separately through the engine's package- and virtual-user-scoped location API. This setting does not bypass third-party regional restrictions.");
         root.addView(desc);
+
+        root.addView(buildGlobalLocaleTimeZoneSection());
 
         enableGlobal = new CheckBox(this);
         enableGlobal.setText(fa ? "ذخیره پروفایل سراسری دستگاه (فقط اطلاعات)" : "Save Global Device Profile (Metadata Only)");
@@ -198,6 +212,225 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         contentView = sv;
     }
 
+
+    private View buildGlobalLocaleTimeZoneSection() {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setPadding(0, 0, 0, 16);
+
+        TextView title = new TextView(this);
+        title.setText(fa ? "پیش‌فرض‌های زبان و منطقه زمانی سراسری"
+                : "Global Locale & Time Zone Defaults");
+        title.setTextSize(18f);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(Color.parseColor("#111827"));
+        section.addView(title);
+
+        TextView description = new TextView(this);
+        description.setTextSize(13f);
+        description.setTextColor(Color.parseColor("#4B5563"));
+        description.setPadding(0, 8, 0, 12);
+        description.setText(fa
+                ? "این مقادیر برای کلون‌هایی استفاده می‌شوند که Override اختصاصی ندارند. مقدار اختصاصی هر کلون همیشه اولویت دارد. پاک‌کردن یک فیلد سراسری فقط همان پیش‌فرض را حذف می‌کند و مقدار سیستم جایگزین می‌شود."
+                : "These defaults apply only when a clone has no per-clone override. Clone-specific values always take precedence. Reset clears only the selected Global default and reveals the System value.");
+        section.addView(description);
+
+        section.addView(buildGlobalProfileField(true));
+        section.addView(buildGlobalProfileField(false));
+        return section;
+    }
+
+    private View buildGlobalProfileField(boolean locale) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(16, 12, 16, 16);
+        card.setBackgroundResource(R.drawable.bg_card_rounded);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.bottomMargin = 12;
+        card.setLayoutParams(cardParams);
+
+        TextView heading = new TextView(this);
+        heading.setText(locale ? (fa ? "زبان پیش‌فرض (Locale)" : "Default Locale")
+                : (fa ? "منطقه زمانی پیش‌فرض (Time Zone)" : "Default Time Zone"));
+        heading.setTextSize(16f);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setTextColor(Color.parseColor("#1F2937"));
+        card.addView(heading);
+
+        TextView effective = new TextView(this);
+        effective.setTextSize(12f);
+        effective.setTextColor(Color.parseColor("#4B5563"));
+        effective.setPadding(0, 6, 0, 8);
+        card.addView(effective);
+        if (locale) globalLocaleEffective = effective;
+        else globalTimeZoneEffective = effective;
+
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setTextSize(15f);
+        input.setHint(locale ? "e.g. en-US, fa-IR, de-DE"
+                : "e.g. America/New_York, Asia/Tehran, UTC");
+        card.addView(input);
+        if (locale) globalLocaleEt = input;
+        else globalTimeZoneEt = input;
+
+        Button presets = new Button(this);
+        presets.setAllCaps(false);
+        presets.setText(fa ? "انتخاب مقدار آماده" : "Choose a preset");
+        presets.setOnClickListener(v -> showGlobalProfilePresets(locale));
+        card.addView(presets);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button save = new Button(this);
+        save.setAllCaps(false);
+        save.setText(fa ? "ذخیره پیش‌فرض" : "Save Global default");
+        save.setOnClickListener(v -> saveGlobalProfileField(locale));
+        actions.addView(save, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button reset = new Button(this);
+        reset.setAllCaps(false);
+        reset.setText(fa ? "بازگشت به سیستم" : "Reset to System");
+        reset.setOnClickListener(v -> resetGlobalProfileField(locale));
+        actions.addView(reset, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        card.addView(actions);
+        if (locale) {
+            saveGlobalLocaleButton = save;
+            resetGlobalLocaleButton = reset;
+        } else {
+            saveGlobalTimeZoneButton = save;
+            resetGlobalTimeZoneButton = reset;
+        }
+        return card;
+    }
+
+    private void setGlobalProfileControlsEnabled(boolean enabled) {
+        boolean ready = enabled && profileLoaded && locationProfileLoaded
+                && masterGpsLoaded && !loadFailed && !globalProfileFieldsBusy
+                && globalProfile != null;
+        if (globalLocaleEt != null) globalLocaleEt.setEnabled(ready);
+        if (globalTimeZoneEt != null) globalTimeZoneEt.setEnabled(ready);
+        if (saveGlobalLocaleButton != null) saveGlobalLocaleButton.setEnabled(ready);
+        if (saveGlobalTimeZoneButton != null) saveGlobalTimeZoneButton.setEnabled(ready);
+        if (resetGlobalLocaleButton != null) {
+            resetGlobalLocaleButton.setEnabled(ready && globalProfile.localeTag != null);
+        }
+        if (resetGlobalTimeZoneButton != null) {
+            resetGlobalTimeZoneButton.setEnabled(ready && globalProfile.timeZoneId != null);
+        }
+    }
+
+    private void updateGlobalProfileEffectiveValues() {
+        if (globalProfile == null) return;
+        ProfileResolver.ResolvedProfile effective = ProfileResolver.resolve(
+                new ProfileSettings(), globalProfile, ProfileRuntimeApplier.systemFallback());
+        String localeValue = effective.localeTag == null ? "UNSET" : effective.localeTag;
+        String timeZoneValue = effective.timeZoneId == null ? "UNSET" : effective.timeZoneId;
+        globalLocaleEffective.setText((fa ? "مقدار مؤثر: " : "Effective: ") + localeValue
+                + "  |  " + (fa ? "منبع: " : "Source: ") + effective.localeSource);
+        globalTimeZoneEffective.setText((fa ? "مقدار مؤثر: " : "Effective: ") + timeZoneValue
+                + "  |  " + (fa ? "منبع: " : "Source: ") + effective.timeZoneSource);
+        setGlobalProfileControlsEnabled(!loadFailed);
+    }
+
+    private void saveGlobalProfileField(boolean locale) {
+        if (loadFailed || !locationProfileLoaded || globalProfile == null || globalProfileFieldsBusy) return;
+        String value = (locale ? globalLocaleEt : globalTimeZoneEt).getText().toString().trim();
+        if (value.isEmpty()) {
+            showSaveFailure(fa ? "برای حذف پیش‌فرض از دکمه بازگشت به سیستم استفاده کنید."
+                    : "Use Reset to System to clear this Global default.");
+            return;
+        }
+        if (locale && !ProfileSettings.isLocaleTagValid(value)) {
+            showSaveFailure(fa ? "Locale معتبر نیست؛ نمونه: fa-IR یا en-US."
+                    : "Invalid BCP-47 locale tag; examples: en-US or fa-IR.");
+            return;
+        }
+        if (!locale && !ProfileSettings.isTimeZoneIdValid(value)) {
+            showSaveFailure(fa ? "شناسه منطقه زمانی معتبر نیست؛ از شناسه‌های IANA استفاده کنید."
+                    : "Invalid time-zone ID; use an IANA time-zone identifier.");
+            return;
+        }
+
+        ProfileSettings update = new ProfileSettings();
+        if (locale) update.localeTag = value;
+        else update.timeZoneId = value;
+
+        globalProfileFieldsBusy = true;
+        setGlobalProfileControlsEnabled(false);
+        repository.saveGlobalProfile(update, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                globalProfileFieldsBusy = false;
+                setGlobalProfileControlsEnabled(true);
+                showSaveFailure((fa ? "ذخیره پیش‌فرض سراسری ناموفق بود: "
+                        : "Could not save Global default: ") + result.getMessage());
+                return;
+            }
+            reloadGlobalProfileAfterFieldMutation(locale, false);
+        });
+    }
+
+    private void resetGlobalProfileField(boolean locale) {
+        if (loadFailed || !locationProfileLoaded || globalProfile == null || globalProfileFieldsBusy) return;
+        String field = locale ? "localeTag" : "timeZoneId";
+        globalProfileFieldsBusy = true;
+        setGlobalProfileControlsEnabled(false);
+        repository.clearGlobalProfileField(field, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                globalProfileFieldsBusy = false;
+                setGlobalProfileControlsEnabled(true);
+                showSaveFailure((fa ? "بازنشانی پیش‌فرض سراسری ناموفق بود: "
+                        : "Could not reset Global default: ") + result.getMessage());
+                return;
+            }
+            reloadGlobalProfileAfterFieldMutation(locale, true);
+        });
+    }
+
+    private void reloadGlobalProfileAfterFieldMutation(boolean locale, boolean reset) {
+        repository.loadGlobalProfile(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess() || result.getValue() == null) {
+                failLoading((fa ? "تغییر ذخیره شد اما بازخوانی پروفایل ناموفق بود: "
+                        : "The change was saved, but reloading the Global profile failed: ")
+                        + result.getMessage());
+                return;
+            }
+            globalProfile = result.getValue().copy();
+            globalLocaleEt.setText(globalProfile.localeTag == null ? "" : globalProfile.localeTag);
+            globalTimeZoneEt.setText(globalProfile.timeZoneId == null ? "" : globalProfile.timeZoneId);
+            updateGlobalProfileEffectiveValues();
+            globalProfileFieldsBusy = false;
+            setGlobalProfileControlsEnabled(true);
+            Toast.makeText(this, reset
+                    ? (fa ? "فقط پیش‌فرض همین فیلد حذف شد؛ مقدار سیستم مؤثر است و Override کلون‌ها حفظ شد."
+                            : "Only this Global field was cleared. System now applies; clone overrides are unchanged.")
+                    : (fa ? "پیش‌فرض سراسری ذخیره شد؛ Overrideهای کلون حفظ شدند و در اجرای بعدی اعمال می‌شود."
+                            : "Global default saved. Clone overrides are preserved; the default applies on the next clone launch."),
+                    Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void showGlobalProfilePresets(boolean locale) {
+        final String[] values = locale
+                ? new String[]{"en-US", "en-GB", "fa-IR", "de-DE", "fr-FR", "tr-TR", "ar-AE", "ja-JP"}
+                : new String[]{"UTC", "Asia/Tehran", "America/New_York", "Europe/London",
+                        "Europe/Berlin", "Europe/Istanbul", "Asia/Dubai", "Asia/Tokyo"};
+        new AlertDialog.Builder(this)
+                .setTitle(locale ? (fa ? "انتخاب زبان پیش‌فرض" : "Choose Default Locale")
+                        : (fa ? "انتخاب منطقه زمانی پیش‌فرض" : "Choose Default Time Zone"))
+                .setItems(values, (dialog, which) ->
+                        (locale ? globalLocaleEt : globalTimeZoneEt).setText(values[which]))
+                .show();
+    }
+
     private View contentView;
 
     private void setControlsEnabled(boolean enabled) {
@@ -212,6 +445,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         if (globalLatitudeEt != null) globalLatitudeEt.setEnabled(enabled);
         if (globalLongitudeEt != null) globalLongitudeEt.setEnabled(enabled);
         if (resetGlobalLocationButton != null) resetGlobalLocationButton.setEnabled(enabled);
+        setGlobalProfileControlsEnabled(enabled);
     }
 
     private void loadSettings() {
@@ -237,7 +471,10 @@ public class GlobalEnvironmentActivity extends BaseActivity {
                         "Could not read Global location profile: ") + result.getMessage());
                 return;
             }
-            globalProfile = result.getValue();
+            globalProfile = result.getValue().copy();
+            globalLocaleEt.setText(globalProfile.localeTag == null ? "" : globalProfile.localeTag);
+            globalTimeZoneEt.setText(globalProfile.timeZoneId == null ? "" : globalProfile.timeZoneId);
+            updateGlobalProfileEffectiveValues();
             globalLocationInherit.setChecked(globalProfile.locationEnabled == null);
             globalLocationEnabled.setChecked(Boolean.TRUE.equals(globalProfile.locationEnabled));
             globalLatitudeEt.setText(globalProfile.latitude == null ? "" : String.valueOf(globalProfile.latitude));
