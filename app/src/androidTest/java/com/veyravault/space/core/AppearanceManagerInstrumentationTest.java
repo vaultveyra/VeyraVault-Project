@@ -14,6 +14,9 @@ import org.junit.runner.RunWith;
 
 import static org.junit.Assert.*;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @RunWith(AndroidJUnit4.class)
 public class AppearanceManagerInstrumentationTest {
     private static final String PREFS = "veyra_appearance_prefs";
@@ -22,28 +25,45 @@ public class AppearanceManagerInstrumentationTest {
     private Context context;
     private SharedPreferences preferences;
     private boolean hadOriginalValue;
-    private String originalValue;
+    private Object originalValue;
 
     @Before
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         hadOriginalValue = preferences.contains(KEY_THEME_MODE);
-        originalValue = preferences.getString(KEY_THEME_MODE, null);
+        originalValue = preferences.getAll().get(KEY_THEME_MODE);
     }
 
     @After
     public void tearDown() {
         SharedPreferences.Editor editor = preferences.edit();
-        if (hadOriginalValue) {
-            editor.putString(KEY_THEME_MODE, originalValue);
+        if (!hadOriginalValue) {
+            editor.remove(KEY_THEME_MODE);
+        } else if (originalValue instanceof String) {
+            editor.putString(KEY_THEME_MODE, (String) originalValue);
+        } else if (originalValue instanceof Boolean) {
+            editor.putBoolean(KEY_THEME_MODE, (Boolean) originalValue);
+        } else if (originalValue instanceof Integer) {
+            editor.putInt(KEY_THEME_MODE, (Integer) originalValue);
+        } else if (originalValue instanceof Long) {
+            editor.putLong(KEY_THEME_MODE, (Long) originalValue);
+        } else if (originalValue instanceof Float) {
+            editor.putFloat(KEY_THEME_MODE, (Float) originalValue);
+        } else if (originalValue instanceof Set<?>) {
+            Set<String> values = new HashSet<>();
+            for (Object item : (Set<?>) originalValue) {
+                if (item instanceof String) values.add((String) item);
+            }
+            editor.putStringSet(KEY_THEME_MODE, values);
         } else {
             editor.remove(KEY_THEME_MODE);
         }
         assertTrue("Appearance test preference restoration failed", editor.commit());
         AppearanceManager.apply(context);
-        String restoredMode = hadOriginalValue && originalValue != null
-                ? originalValue : AppearanceManager.MODE_SYSTEM;
+        String restoredMode = originalValue instanceof String
+                && AppearanceManager.isValidMode((String) originalValue)
+                ? (String) originalValue : AppearanceManager.MODE_SYSTEM;
         assertEquals(restoredMode, AppearanceManager.getThemeMode(context));
     }
 
