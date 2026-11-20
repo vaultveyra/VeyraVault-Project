@@ -35,7 +35,7 @@ public class DashboardActivity extends BaseActivity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(24),dp(28),dp(24),dp(32));
-        root.setBackgroundColor(Color.rgb(243,245,249));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
         scroll.addView(root);
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -50,7 +50,7 @@ public class DashboardActivity extends BaseActivity {
         root.addView(header);
         TextView subtitle = new TextView(this);
         subtitle.setText(fa ? "مرکز مدیریت فضاهای شما" : "Your multi-space control center");
-        subtitle.setTextSize(14); subtitle.setTextColor(Color.rgb(107,114,128));
+        subtitle.setTextSize(14); subtitle.setTextColor(UiPalette.muted(getApplicationContext()));
         subtitle.setPadding(0,dp(6),0,dp(20)); root.addView(subtitle);
         LinearLayout stats = new LinearLayout(this);
         stats.setOrientation(LinearLayout.HORIZONTAL);
@@ -79,7 +79,7 @@ public class DashboardActivity extends BaseActivity {
         deviceInfo.setText((fa ? "دستگاه: " : "Device: ") + Build.MANUFACTURER + " " + Build.MODEL
                 + "  •  Android " + Build.VERSION.RELEASE);
         deviceInfo.setTextSize(12);
-        deviceInfo.setTextColor(Color.rgb(75,85,99));
+        deviceInfo.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         deviceInfo.setPadding(0, dp(12), 0, dp(4));
         root.addView(deviceInfo);
 
@@ -102,7 +102,7 @@ public class DashboardActivity extends BaseActivity {
 
         final TextView registryStatus = new TextView(this);
         registryStatus.setTextSize(12);
-        registryStatus.setTextColor(Color.rgb(185,28,28));
+        registryStatus.setTextColor(UiPalette.error(getApplicationContext()));
         registryStatus.setPadding(0,dp(8),0,0);
         registryStatus.setVisibility(View.GONE);
         root.addView(registryStatus);
@@ -135,7 +135,7 @@ public class DashboardActivity extends BaseActivity {
         addAction(root,fa ? "تنظیمات" : "Settings",fa ? "زبان، محیط سراسری، امنیت و گزارش سازگاری" : "Language, global environment, security and diagnostics",new View.OnClickListener(){@Override public void onClick(View v){startActivity(new Intent(DashboardActivity.this,SettingsHubActivity.class));}});
         TextView zone = new TextView(this);
         zone.setText((fa ? "منطقه زمانی دستگاه: " : "Device time zone: ") + TimeZone.getDefault().getID());
-        zone.setTextSize(12); zone.setTextColor(Color.rgb(107,114,128)); zone.setPadding(0,dp(18),0,0); root.addView(zone);
+        zone.setTextSize(12); zone.setTextColor(UiPalette.muted(getApplicationContext())); zone.setPadding(0,dp(18),0,0); root.addView(zone);
         setContentView(scroll);
     }
 
@@ -152,13 +152,13 @@ public class DashboardActivity extends BaseActivity {
         title.setText(heading);
         title.setTextSize(14f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.rgb(31, 41, 55));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         card.addView(title);
 
         TextView value = new TextView(this);
         value.setText(initialValue);
         value.setTextSize(12f);
-        value.setTextColor(Color.rgb(75, 85, 99));
+        value.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         value.setPadding(0, dp(6), 0, 0);
         card.addView(value);
 
@@ -339,7 +339,7 @@ public class DashboardActivity extends BaseActivity {
         label.setText(city);
         label.setTextSize(12);
         label.setTypeface(Typeface.DEFAULT_BOLD);
-        label.setTextColor(Color.rgb(75,85,99));
+        label.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         card.addView(label);
         TextClock clock = new TextClock(this);
         clock.setFormat24Hour("HH:mm:ss");
@@ -347,13 +347,13 @@ public class DashboardActivity extends BaseActivity {
         clock.setTimeZone(zoneId);
         clock.setTextSize(25);
         clock.setTypeface(Typeface.DEFAULT_BOLD);
-        clock.setTextColor(Color.rgb(37,99,235));
+        clock.setTextColor(UiPalette.accent(getApplicationContext()));
         clock.setPadding(0, dp(5), 0, 0);
         card.addView(clock);
         TextView zone = new TextView(this);
         zone.setText(zoneId);
         zone.setTextSize(10);
-        zone.setTextColor(Color.rgb(107,114,128));
+        zone.setTextColor(UiPalette.muted(getApplicationContext()));
         card.addView(zone);
         return card;
     }
@@ -365,15 +365,15 @@ public class DashboardActivity extends BaseActivity {
     private View statCard(String label,String value) {
         LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16),dp(18),dp(16),dp(18)); card.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
-        TextView number=new TextView(this); number.setText(value); number.setTextSize(25); number.setTypeface(Typeface.DEFAULT_BOLD); number.setTextColor(Color.rgb(37,99,235)); card.addView(number);
-        TextView caption=new TextView(this); caption.setText(label); caption.setTextSize(12); caption.setTextColor(Color.rgb(75,85,99)); card.addView(caption); return card;
+        TextView number=new TextView(this); number.setText(value); number.setTextSize(25); number.setTypeface(Typeface.DEFAULT_BOLD); number.setTextColor(UiPalette.accent(getApplicationContext())); card.addView(number);
+        TextView caption=new TextView(this); caption.setText(label); caption.setTextSize(12); caption.setTextColor(UiPalette.textSecondary(getApplicationContext())); card.addView(caption); return card;
     }
     private void addAction(LinearLayout root,String heading,String detail,View.OnClickListener click) {
         LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL); card.setPadding(dp(18),dp(16),dp(18),dp(16));
         card.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT); lp.topMargin=dp(12);
-        TextView h=new TextView(this); h.setText(heading); h.setTextSize(16); h.setTypeface(Typeface.DEFAULT_BOLD); h.setTextColor(Color.rgb(31,41,55)); card.addView(h);
-        TextView d=new TextView(this); d.setText(detail); d.setTextSize(12); d.setTextColor(Color.rgb(107,114,128)); d.setPadding(0,dp(5),0,0); card.addView(d);
+        TextView h=new TextView(this); h.setText(heading); h.setTextSize(16); h.setTypeface(Typeface.DEFAULT_BOLD); h.setTextColor(UiPalette.textPrimary(getApplicationContext())); card.addView(h);
+        TextView d=new TextView(this); d.setText(detail); d.setTextSize(12); d.setTextColor(UiPalette.muted(getApplicationContext())); d.setPadding(0,dp(5),0,0); card.addView(d);
         card.setOnClickListener(click); root.addView(card,lp);
     }
 }
