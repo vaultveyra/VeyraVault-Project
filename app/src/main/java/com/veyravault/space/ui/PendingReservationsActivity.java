@@ -67,14 +67,14 @@ public class PendingReservationsActivity extends BaseActivity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(40, 40, 40, 48);
-        root.setBackgroundColor(Color.rgb(243, 245, 249));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
         scroll.addView(root);
 
         TextView title = new TextView(this);
         title.setText(fa ? "بررسی رزروهای معلق شناسه" : "Pending Clone ID reservations");
         title.setTextSize(22f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.rgb(17, 24, 39));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         root.addView(title);
 
         TextView intro = new TextView(this);
@@ -82,13 +82,13 @@ public class PendingReservationsActivity extends BaseActivity {
                 ? "این بخش فقط رزروهای باقی‌مانده را بررسی می‌کند. برنامه یا داده‌ای حذف نمی‌شود. آزادسازی فقط پس از تأیید دوبارهٔ نبودن بسته در موتور و تأیید شما انجام می‌شود."
                 : "This screen inspects pending reservations only. It never uninstalls an app or changes clone/session data. A reservation can be released only after a fresh Engine check confirms the package is absent and you approve the action.");
         intro.setTextSize(14f);
-        intro.setTextColor(Color.rgb(75, 85, 99));
+        intro.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         intro.setPadding(0, 16, 0, 20);
         root.addView(intro);
 
         status = new TextView(this);
         status.setTextSize(14f);
-        status.setTextColor(Color.rgb(55, 65, 81));
+        status.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         status.setPadding(0, 8, 0, 16);
         root.addView(status);
 
@@ -180,7 +180,7 @@ public class PendingReservationsActivity extends BaseActivity {
                 + item.reservation.getUserId());
         identity.setTextSize(14f);
         identity.setTypeface(Typeface.DEFAULT_BOLD);
-        identity.setTextColor(Color.rgb(31, 41, 55));
+        identity.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         card.addView(identity);
 
         TextView detail = new TextView(this);
@@ -191,19 +191,19 @@ public class PendingReservationsActivity extends BaseActivity {
                 detail.setText(fa
                         ? "موتور صریحاً تأیید می‌کند بسته نصب نیست. می‌توانید این رزرو را به‌صورت دستی آزاد کنید."
                         : "Engine explicitly confirms the package is absent. You may manually release this reservation.");
-                detail.setTextColor(Color.rgb(21, 128, 61));
+                detail.setTextColor(UiPalette.success(getApplicationContext()));
                 break;
             case INSTALLED:
                 detail.setText(fa
                         ? "بسته در موتور نصب است اما رکورد Clone متناظر وجود ندارد. رزرو حفظ می‌شود؛ حذف یا ثبت خودکار انجام نمی‌شود."
                         : "Engine reports the package installed but no matching Clone registry row exists. The reservation stays blocked; no uninstall or automatic registry repair is attempted.");
-                detail.setTextColor(Color.rgb(180, 83, 9));
+                detail.setTextColor(UiPalette.warning(getApplicationContext()));
                 break;
             default:
                 detail.setText(fa
                         ? "وضعیت موتور نامشخص است. برای جلوگیری از تداخل، رزرو آزاد نمی‌شود."
                         : "Engine state is unknown. The reservation remains blocked to prevent an ID collision.");
-                detail.setTextColor(Color.rgb(180, 83, 9));
+                detail.setTextColor(UiPalette.warning(getApplicationContext()));
                 break;
         }
         card.addView(detail);
