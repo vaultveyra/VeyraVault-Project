@@ -7,6 +7,9 @@ java_source = root / "app/src/main/java/com/veyravault/space/core/DashboardDateF
 dashboard_source = (root / "app/src/main/java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
 
 # Verify the Dashboard uses fixed IANA zones, a 12-hour display, and date refresh callbacks.
+assert "Math.floorDiv" not in (root / "app/src/main/java/com/veyravault/space/core/DashboardDateFormatter.java").read_text(encoding="utf-8")
+assert "Math.floorMod" not in (root / "app/src/main/java/com/veyravault/space/core/DashboardDateFormatter.java").read_text(encoding="utf-8")
+
 for marker in (
     'clock.setTimeZone(zoneId)',
     'clock.setFormat24Hour("hh:mm:ss a")',

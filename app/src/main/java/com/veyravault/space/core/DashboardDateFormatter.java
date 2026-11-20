@@ -80,14 +80,14 @@ public final class DashboardDateFormatter {
             int nextBreak = BREAK_YEARS[i];
             jump = nextBreak - previousBreak;
             if (jalaliYear < nextBreak) break;
-            leapJalali += (jump / 33) * 8 + Math.floorMod(jump, 33) / 4;
+            leapJalali += (jump / 33) * 8 + floorMod(jump, 33) / 4;
             previousBreak = nextBreak;
         }
 
         int yearsSinceBreak = jalaliYear - previousBreak;
         leapJalali += (yearsSinceBreak / 33) * 8
-                + (Math.floorMod(yearsSinceBreak, 33) + 3) / 4;
-        if (Math.floorMod(jump, 33) == 4 && jump - yearsSinceBreak == 4) {
+                + (floorMod(yearsSinceBreak, 33) + 3) / 4;
+        if (floorMod(jump, 33) == 4 && jump - yearsSinceBreak == 4) {
             leapJalali++;
         }
 
@@ -99,19 +99,32 @@ public final class DashboardDateFormatter {
         if (jump - adjustedYears < 6) {
             adjustedYears = adjustedYears - jump + (jump + 4) / 33 * 33;
         }
-        int leap = Math.floorMod(Math.floorMod(adjustedYears + 1, 33) - 1, 4);
+        int leap = floorMod(floorMod(adjustedYears + 1, 33) - 1, 4);
         if (leap == -1) leap = 4;
         return new int[] {leap, gregorianYear, march};
     }
 
     private static int gregorianToDayNumber(int year, int month, int day) {
-        int monthOffset = Math.floorDiv(month - 8, 6);
-        int dayNumber = Math.floorDiv(
+        int monthOffset = floorDiv(month - 8, 6);
+        int dayNumber = floorDiv(
                 (year + monthOffset + 100100) * 1461, 4)
-                + Math.floorDiv(153 * Math.floorMod(month + 9, 12) + 2, 5)
+                + floorDiv(153 * floorMod(month + 9, 12) + 2, 5)
                 + day - 34840408;
-        return dayNumber - Math.floorDiv(
-                Math.floorDiv(year + 100100 + monthOffset, 100) * 3, 4) + 752;
+        return dayNumber - floorDiv(
+                floorDiv(year + 100100 + monthOffset, 100) * 3, 4) + 752;
+    }
+
+    // Keep the converter compatible with the app's minSdk 21; Math.floorDiv/floorMod
+    // are not available on every Android API level supported by this project.
+    private static int floorDiv(int dividend, int divisor) {
+        int quotient = dividend / divisor;
+        int remainder = dividend % divisor;
+        if ((dividend ^ divisor) < 0 && remainder != 0) quotient--;
+        return quotient;
+    }
+
+    private static int floorMod(int dividend, int divisor) {
+        return dividend - floorDiv(dividend, divisor) * divisor;
     }
 
     private static String pad(int value, int width) {
