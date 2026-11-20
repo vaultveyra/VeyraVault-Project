@@ -59,7 +59,7 @@ public class AddAppActivity extends BaseActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F4F6FB"));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -68,7 +68,7 @@ public class AddAppActivity extends BaseActivity {
 
         final TextView batchBtn = new TextView(this);
         batchBtn.setText(getString(R.string.batch_clone));
-        batchBtn.setTextColor(Color.parseColor("#2563EB"));
+        batchBtn.setTextColor(UiPalette.accent(getApplicationContext()));
         batchBtn.setBackgroundResource(R.drawable.bg_pill_lightblue);
         batchBtn.setPadding(dp(16), dp(9), dp(16), dp(9));
         batchBtn.setTypeface(Typeface.DEFAULT_BOLD);
@@ -87,14 +87,14 @@ public class AddAppActivity extends BaseActivity {
         title.setText(getString(R.string.my_apps));
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView backBtn = new TextView(this);
         backBtn.setText("→");
         backBtn.setTextSize(24f);
-        backBtn.setTextColor(Color.parseColor("#111827"));
+        backBtn.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         backBtn.setPadding(dp(12), 0, dp(12), 0);
         backBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
@@ -205,9 +205,9 @@ public class AddAppActivity extends BaseActivity {
             card.setLayoutParams(glp);
 
             if (batchMode && batchSelected.contains(app.pkg)) {
-                card.getBackground().setTint(Color.parseColor("#E8EEFF"));
+                card.getBackground().setTint(UiPalette.accentSurface(getApplicationContext()));
             } else {
-                card.getBackground().setTint(Color.parseColor("#FFFFFF"));
+                card.getBackground().setTint(UiPalette.surface(getApplicationContext()));
             }
 
             ImageView iv = new ImageView(this);
@@ -217,7 +217,7 @@ public class AddAppActivity extends BaseActivity {
             TextView tv = new TextView(this);
             tv.setText(app.label);
             tv.setTextSize(12f);
-            tv.setTextColor(Color.parseColor("#1F2937"));
+            tv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
             tv.setSingleLine(true);
             tv.setEllipsize(TextUtils.TruncateAt.END);
             tv.setGravity(Gravity.CENTER);
