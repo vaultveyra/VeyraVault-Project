@@ -82,6 +82,12 @@ public class AppearanceManagerInstrumentationTest {
     }
 
     @Test
+    public void malformedPreferenceTypeFallsBackToSystem() {
+        assertTrue(preferences.edit().putBoolean(KEY_THEME_MODE, true).commit());
+        assertEquals(AppearanceManager.MODE_SYSTEM, AppearanceManager.getThemeMode(context));
+    }
+
+    @Test
     public void invalidModeIsRejectedWithoutOverwritingSavedPreference() {
         assertTrue(AppearanceManager.setThemeMode(context, AppearanceManager.MODE_DARK));
         assertFalse(AppearanceManager.setThemeMode(context, "automatic-or-unknown"));
