@@ -81,6 +81,8 @@ jobs:
         run: python3 scripts/test_dashboard_clocks_device_info_contract.py
       - name: Test verified Dashboard environment summary contract
         run: python3 scripts/test_dashboard_verified_environment_summary.py
+      - name: Test appearance preferences and immediate lock contract
+        run: python3 scripts/test_appearance_preferences_quick_lock_contract.py
       - name: Test Add App picker UI contract
         run: python3 scripts/test_add_app_picker_ui_contract.py
       - name: Test AddApp and Dashboard async persistence contract
