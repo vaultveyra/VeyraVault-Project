@@ -39,7 +39,7 @@ public class SecuritySettingsActivity extends BaseActivity {
         title.setText(fa ? "مرکز امنیت، تغییر آیکون و محافظت از حذف" : "Security, App Disguise & Anti-Uninstall");
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         root.addView(title);
 
         LinearLayout cardAnti = makeCard();
@@ -52,7 +52,7 @@ public class SecuritySettingsActivity extends BaseActivity {
         TextView antiDesc = new TextView(this);
         antiDesc.setText(getString(R.string.anti_uninstall_desc));
         antiDesc.setTextSize(13f);
-        antiDesc.setTextColor(Color.parseColor("#4B5563"));
+        antiDesc.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         antiDesc.setPadding(0, 10, 0, 16);
         cardAnti.addView(antiDesc);
 
