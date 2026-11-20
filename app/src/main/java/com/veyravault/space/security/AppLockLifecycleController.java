@@ -15,6 +15,7 @@ import com.veyravault.space.core.ProcessUtils;
  */
 public final class AppLockLifecycleController implements Application.ActivityLifecycleCallbacks {
     private static volatile AppLockLifecycleController instance;
+    private static final long IMMEDIATE_LOCK_TRANSITION_GRACE_MILLIS = 250L;
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -70,7 +71,10 @@ public final class AppLockLifecycleController implements Application.ActivityLif
             return;
         }
 
-        long timeoutMillis = AppLockPolicy.getBackgroundTimeoutSeconds(appContext) * 1000L;
+        long configuredTimeoutMillis = AppLockPolicy.getBackgroundTimeoutSeconds(appContext) * 1000L;
+        // A tiny main-loop grace avoids treating Activity recreation as an app exit.
+        long timeoutMillis = configuredTimeoutMillis == 0L
+                ? IMMEDIATE_LOCK_TRANSITION_GRACE_MILLIS : configuredTimeoutMillis;
         backgroundDeadlineElapsedRealtime = SystemClock.elapsedRealtime() + timeoutMillis;
         pendingLockTask = new Runnable() {
             @Override
