@@ -59,6 +59,17 @@ assert "createImmediateLockAction(fa)" in settings
 assert "createImmediateLockAction(fa)" in main
 assert "createImmediateLockAction(fa)" in dashboard
 
+instrumentation = Path("app/src/androidTest/java/com/veyravault/space/core/AppearanceManagerInstrumentationTest.java").read_text(encoding="utf-8")
+for test_marker in (
+    "missingPreferenceDefaultsToSystem",
+    "lightAndDarkModesAreCommittedAndApplied",
+    "systemModeIsPersistedAndApplied",
+    "invalidModeIsRejectedWithoutOverwritingSavedPreference",
+    "malformedPreferenceTypeFallsBackToSystem",
+    "Appearance test preference restoration failed",
+):
+    assert test_marker in instrumentation, f"Missing appearance instrumentation scenario: {test_marker}"
+
 # Existing About/Compatibility navigation remains available. No Clone/session data path is touched.
 assert "AboutActivity.class" in settings
 assert "repository." not in settings
