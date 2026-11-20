@@ -42,6 +42,10 @@ public class SettingsHubActivity extends BaseActivity {
         root.addView(header);
 
         addAppearanceSection(root, fa);
+        addRow(root, fa ? "آیکون و نام لانچر" : "Launcher Icon & Label",
+                fa ? "انتخاب از میان گزینه‌های واقعی بسته‌بندی‌شده در برنامه"
+                   : "Choose from the launcher options actually bundled in this app",
+                AppIconNameActivity.class);
         addRow(root, fa ? "محیط و پروفایل سراسری" : "Global Environment",
                 fa ? "مدیریت تنظیمات عمومی محیط" : "Manage global environment preferences",
                 GlobalEnvironmentActivity.class);
