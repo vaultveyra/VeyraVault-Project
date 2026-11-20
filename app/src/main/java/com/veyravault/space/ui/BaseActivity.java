@@ -40,7 +40,7 @@ public abstract class BaseActivity extends AppCompatActivity {
         action.setTextColor(UiPalette.accent(this));
         action.setBackgroundResource(com.veyravault.space.R.drawable.bg_pill_lightblue);
         action.setGravity(android.view.Gravity.CENTER);
-        action.setPadding(dp(14), dp(9), dp(14), dp(9));
+        action.setPadding(lockActionDp(14), lockActionDp(9), lockActionDp(14), lockActionDp(9));
         action.setContentDescription(fa ? "قفل فوری برنامه" : "Lock VeyraVault now");
         action.setOnClickListener(view -> {
             if (!SecurityManager.isLockEnabled(this)) {
@@ -59,7 +59,7 @@ public abstract class BaseActivity extends AppCompatActivity {
         return action;
     }
 
-    protected int dp(int value) {
+    private int lockActionDp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
