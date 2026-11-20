@@ -7,7 +7,7 @@ assert "new TextClock(this)" in source
 assert 'clock.setTimeZone(zoneId)' in source
 assert '"Asia/Tehran"' in source
 assert '"America/New_York"' in source
-assert 'clock.setFormat24Hour("HH:mm:ss")' in source
+assert 'clock.setFormat24Hour("hh:mm:ss a")' in source
 assert 'clock.setFormat12Hour("hh:mm:ss a")' in source
 
 # Device details are sourced from Android Build fields.
