@@ -38,7 +38,8 @@ public class SettingsHubActivity extends BaseActivity {
         title.setTextColor(UiPalette.textPrimary(this));
         header.addView(title, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(createImmediateLockAction(fa));
+        header.addView(createLanguageAction(fa));
+        header.addView(createImmediateLockSwitch(fa));
         root.addView(header);
 
         addAppearanceSection(root, fa);
@@ -63,7 +64,6 @@ public class SettingsHubActivity extends BaseActivity {
                    : "Inspect Engine state and manually release only confirmed-absent reservations",
                 PendingReservationsActivity.class);
         addFutureBackupSection(root, fa);
-        addLanguageSection(root, fa);
         setContentView(scroll);
     }
 
@@ -124,35 +124,6 @@ public class SettingsHubActivity extends BaseActivity {
         });
         card.addView(choices);
         root.addView(card, params);
-    }
-
-    private void addLanguageSection(LinearLayout root, boolean fa) {
-        LinearLayout language = new LinearLayout(this);
-        language.setOrientation(LinearLayout.VERTICAL);
-        language.setPadding(dp(18), dp(16), dp(18), dp(16));
-        language.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(18);
-
-        TextView label = new TextView(this);
-        label.setText(fa ? "زبان برنامه" : "App Language");
-        label.setTextSize(16f);
-        label.setTypeface(Typeface.DEFAULT_BOLD);
-        label.setTextColor(UiPalette.textPrimary(this));
-        language.addView(label);
-
-        TextView toggle = new TextView(this);
-        toggle.setText(fa ? "Switch to English" : "تغییر به فارسی");
-        toggle.setTextSize(14f);
-        toggle.setTextColor(UiPalette.accent(this));
-        toggle.setPadding(0, dp(12), 0, 0);
-        toggle.setOnClickListener(v -> {
-            LocaleHelper.toggleLanguage(SettingsHubActivity.this);
-            recreate();
-        });
-        language.addView(toggle);
-        root.addView(language, params);
     }
 
     private void addFutureBackupSection(LinearLayout root, boolean fa) {
