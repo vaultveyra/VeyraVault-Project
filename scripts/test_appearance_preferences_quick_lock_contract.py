@@ -55,9 +55,20 @@ assert "new Intent(this, SecuritySettingsActivity.class)" in base
 assert "if (!(this instanceof SecurityLockActivity) && !SecurityManager.isSessionUnlocked(this))" in base
 assert "public static void lockSession()" in security
 assert "SecurityManager.isSessionUnlocked(this)" in base
-assert "createImmediateLockAction(fa)" in settings
-assert "createImmediateLockAction(fa)" in main
-assert "createImmediateLockAction(fa)" in dashboard
+# The language control and lock switch share the top header on all primary screens.
+for screen in (settings, main, dashboard):
+    assert "createLanguageAction(fa)" in screen
+    assert "createImmediateLockSwitch(fa)" in screen
+assert "addLanguageSection(root, fa)" not in settings
+assert "createLanguageAction(boolean fa)" in base
+assert "createImmediateLockSwitch(boolean fa)" in base
+assert 'setTextOn(fa ? "قفل" : "Locked")' in base
+assert 'setTextOff(fa ? "باز" : "Open")' in base
+assert "if (!isChecked)" in base
+assert "SecurityManager.lockSession();" in base
+assert "SecurityManager.verifyCredential" in security
+assert "setImmediateLockSwitchChecked(SecurityManager.isLockEnabled(this)" in base
+assert "new Intent(BaseActivity.this, SecurityLockActivity.class)" in base
 
 instrumentation = Path("app/src/androidTest/java/com/veyravault/space/core/AppearanceManagerInstrumentationTest.java").read_text(encoding="utf-8")
 for test_marker in (
@@ -79,4 +90,4 @@ assert "CloneStore." not in base
 assert "Engine." not in base
 assert "scripts/test_appearance_preferences_quick_lock_contract.py" in workflow
 
-print("PASS: System/Light/Dark theme persistence, DayNight resources, semantic UI palette, and authenticated immediate lock contract are present.")
+print("PASS: System/Light/Dark theme persistence, DayNight resources, shared language/header lock switch, authenticated quick-lock behavior, and no-unlock-bypass contract are present.")
