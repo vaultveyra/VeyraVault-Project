@@ -3,8 +3,8 @@ import os
 import re
 import sys
 
-SUSPICIOUS_SDK = re.compile(r'(umeng|appsflyer|adjust\\.sdk|flurry|admob|facebook\\.ads|billingclient)', re.I)
-URL_REGEX = re.compile(r'https?://[^\\s"\\'<>]+')
+SUSPICIOUS_SDK = re.compile(r'(umeng|appsflyer|adjust\.sdk|flurry|admob|facebook\.ads|billingclient)', re.I)
+URL_REGEX = re.compile(r"""https?://[^\s"'<>]+""")
 FORBIDDEN_ENDPOINTS = ("logs-sender-api.vercel.app",)
 
 
