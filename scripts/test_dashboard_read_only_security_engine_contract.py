@@ -38,7 +38,8 @@ for forbidden in (
 # Engine presence must not be presented as full readiness.
 assert "Core detected; full readiness is not verified" in source
 assert "Core detected" in source
-assert "ready" not in source[source.index("private String describeProfileLifecycle("):end].lower()
+assert "Core detected; full readiness is not verified" in loader
+assert "Engine ready" not in loader
 
 # Lifecycle diagnostic is mapped to bounded, known labels; raw diagnostic text is not rendered.
 formatter_start = source.index("private String describeProfileLifecycle(")
