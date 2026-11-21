@@ -4,8 +4,16 @@ root = Path(__file__).resolve().parents[1]
 source = (root / "app/src/main/java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
 security_source = (root / "app/src/main/java/com/veyravault/space/security/SecurityManager.java").read_text(encoding="utf-8")
 
-# The summary is refreshed with Activity lifecycle awareness.
+# The summary is refreshed only in an authenticated session, and is redacted on pause.
 assert "private static volatile boolean sessionUnlocked = false;" in security_source
+resume_start = source.index("    @Override protected void onResume()")
+resume_end = source.index("    @Override protected void onDestroy()", resume_start)
+resume_block = source[resume_start:resume_end]
+assert "SecurityManager.isSessionUnlocked(this)" in resume_block
+assert "refreshReadOnlyPlatformStatus();" in resume_block
+assert "hideReadOnlyPlatformStatus();" in resume_block
+assert "dashboardStatusGeneration++;" in resume_block
+assert "Security and Engine status are hidden while this screen is inactive." in source
 assert "refreshReadOnlyPlatformStatus();" in source
 assert "dashboardStatusExecutor = Executors.newSingleThreadExecutor()" in source
 assert "dashboardStatusExecutor.shutdownNow()" in source
@@ -20,6 +28,8 @@ for marker in (
     "SecurityManager",
     ".isLockEnabled(appContext)",
     ".isSessionUnlocked(appContext)",
+    "appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) == null",
+    "Device Admin service unavailable",
     "VaultDeviceAdminReceiver.isAntiUninstallActive(appContext)",
     "Engine.getCore()",
     "Engine.getProfileLifecycleDiagnostic()",

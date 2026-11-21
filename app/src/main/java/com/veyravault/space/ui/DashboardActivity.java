@@ -45,12 +45,25 @@ public class DashboardActivity extends BaseActivity {
 
     @Override protected void onResume() {
         super.onResume();
-        refreshReadOnlyPlatformStatus();
+        if (com.veyravault.space.security.SecurityManager.isSessionUnlocked(this)) {
+            refreshReadOnlyPlatformStatus();
+        } else {
+            hideReadOnlyPlatformStatus();
+        }
     }
 
     @Override protected void onPause() {
         dashboardStatusGeneration++;
+        hideReadOnlyPlatformStatus();
         super.onPause();
+    }
+
+    private void hideReadOnlyPlatformStatus() {
+        if (platformSecuritySummary == null) return;
+        boolean fa = LocaleHelper.isPersian(this);
+        platformSecuritySummary.setText(fa
+                ? "وضعیت امنیت و موتور برای حفظ حریم خصوصی پنهان شده است."
+                : "Security and Engine status are hidden while this screen is inactive.");
     }
 
     @Override protected void onDestroy() {
@@ -305,9 +318,14 @@ public class DashboardActivity extends BaseActivity {
 
             String deviceAdminState;
             try {
-                deviceAdminState = VaultDeviceAdminReceiver.isAntiUninstallActive(appContext)
-                        ? (fa ? "فعال" : "Active")
-                        : (fa ? "غیرفعال" : "Inactive");
+                if (appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) == null) {
+                    deviceAdminState = fa ? "سرویس مدیر دستگاه در دسترس نیست"
+                            : "Device Admin service unavailable";
+                } else {
+                    deviceAdminState = VaultDeviceAdminReceiver.isAntiUninstallActive(appContext)
+                            ? (fa ? "فعال" : "Active")
+                            : (fa ? "غیرفعال" : "Inactive");
+                }
             } catch (RuntimeException failure) {
                 deviceAdminState = fa ? "وضعیت در دسترس نیست" : "Status unavailable";
             }
