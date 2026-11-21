@@ -15,7 +15,6 @@ import com.veyravault.space.core.ProcessUtils;
  */
 public final class AppLockLifecycleController implements Application.ActivityLifecycleCallbacks {
     private static volatile AppLockLifecycleController instance;
-    private static final long IMMEDIATE_LOCK_TRANSITION_GRACE_MILLIS = 250L;
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -47,8 +46,8 @@ public final class AppLockLifecycleController implements Application.ActivityLif
             // Handler delays use uptime; elapsedRealtime also includes deep sleep.
             // Enforce an expired deadline before BaseActivity.onResume decides whether
             // the existing authenticated lock screen must be shown.
-            if (backgroundDeadlineElapsedRealtime >= 0L
-                    && SystemClock.elapsedRealtime() >= backgroundDeadlineElapsedRealtime
+            if (AppLockDeadline.isExpired(backgroundDeadlineElapsedRealtime,
+                    SystemClock.elapsedRealtime())
                     && SecurityManager.isLockEnabled(appContext)) {
                 SecurityManager.lockSession();
             }
@@ -80,18 +79,21 @@ public final class AppLockLifecycleController implements Application.ActivityLif
             return;
         }
 
-        long configuredTimeoutMillis = AppLockPolicy.getBackgroundTimeoutSeconds(appContext) * 1000L;
-        // A tiny main-loop grace avoids treating Activity recreation as an app exit.
-        long timeoutMillis = configuredTimeoutMillis == 0L
-                ? IMMEDIATE_LOCK_TRANSITION_GRACE_MILLIS : configuredTimeoutMillis;
-        backgroundDeadlineElapsedRealtime = SystemClock.elapsedRealtime() + timeoutMillis;
+        int configuredTimeoutSeconds = AppLockPolicy.getBackgroundTimeoutSeconds(appContext);
+        // A tiny main-loop grace for the immediate option avoids treating an
+        // Activity-to-Activity transition as an app exit.
+        long timeoutMillis = AppLockDeadline.timeoutMillis(configuredTimeoutSeconds);
+        backgroundDeadlineElapsedRealtime = AppLockDeadline.deadlineAfter(
+                SystemClock.elapsedRealtime(), configuredTimeoutSeconds);
         pendingLockTask = new Runnable() {
             @Override
             public void run() {
                 pendingLockTask = null;
                 if (startedActivityCount != 0 || backgroundDeadlineElapsedRealtime < 0L) return;
 
-                long remaining = backgroundDeadlineElapsedRealtime - SystemClock.elapsedRealtime();
+                long remaining = AppLockDeadline.remainingMillis(
+                        backgroundDeadlineElapsedRealtime, SystemClock.elapsedRealtime());
+                if (remaining < 0L) return;
                 if (remaining > 0L) {
                     pendingLockTask = this;
                     mainHandler.postDelayed(this, remaining);
@@ -105,8 +107,7 @@ public final class AppLockLifecycleController implements Application.ActivityLif
             }
         };
 
-        if (timeoutMillis == 0L) mainHandler.post(pendingLockTask);
-        else mainHandler.postDelayed(pendingLockTask, timeoutMillis);
+        mainHandler.postDelayed(pendingLockTask, timeoutMillis);
     }
 
     private void cancelPendingLock() {

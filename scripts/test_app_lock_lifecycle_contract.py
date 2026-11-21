@@ -2,6 +2,7 @@ from pathlib import Path
 
 root = Path("app/src/main")
 policy = (root / "java/com/veyravault/space/security/AppLockPolicy.java").read_text(encoding="utf-8")
+deadline = (root / "java/com/veyravault/space/security/AppLockDeadline.java").read_text(encoding="utf-8")
 lifecycle = (root / "java/com/veyravault/space/security/AppLockLifecycleController.java").read_text(encoding="utf-8")
 application = (root / "java/com/veyravault/space/VaultApp.java").read_text(encoding="utf-8")
 process_utils = (root / "java/com/veyravault/space/core/ProcessUtils.java").read_text(encoding="utf-8")
@@ -35,6 +36,11 @@ assert "CloneStore." not in lifecycle
 assert "Engine." not in lifecycle
 
 # Last-Activity lifecycle, cancellable scheduling, and deep-sleep-safe deadline enforcement.
+assert "AppLockDeadline.deadlineAfter(" in lifecycle
+assert "AppLockDeadline.isExpired(" in lifecycle
+assert "AppLockDeadline.remainingMillis(" in lifecycle
+assert "AppLockDeadline.timeoutMillis(" in lifecycle
+assert "IMMEDIATE_TRANSITION_GRACE_MILLIS = 250L" in deadline
 for marker in (
     "implements Application.ActivityLifecycleCallbacks",
     "onActivityStarted(Activity activity)",
