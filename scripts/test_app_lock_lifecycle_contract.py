@@ -14,16 +14,24 @@ test = Path("app/src/androidTest/java/com/veyravault/space/security/AppLockPolic
 assert 'private static final String PREFS = "veyra_security_policy_prefs"' in policy
 assert 'private static final String KEY_BACKGROUND_TIMEOUT_SECONDS = "background_lock_timeout_seconds"' in policy
 for marker in (
-    "TIMEOUT_IMMEDIATELY = 0",
-    "TIMEOUT_30_SECONDS = 30",
-    "TIMEOUT_1_MINUTE = 60",
-    "TIMEOUT_5_MINUTES = 300",
+    "TIMEOUT_IMMEDIATELY = AppLockDeadline.TIMEOUT_IMMEDIATELY_SECONDS",
+    "TIMEOUT_30_SECONDS = AppLockDeadline.TIMEOUT_30_SECONDS",
+    "TIMEOUT_1_MINUTE = AppLockDeadline.TIMEOUT_1_MINUTE",
+    "TIMEOUT_5_MINUTES = AppLockDeadline.TIMEOUT_5_MINUTES",
     "DEFAULT_BACKGROUND_TIMEOUT_SECONDS = TIMEOUT_IMMEDIATELY",
     "isSupportedTimeout",
     ".commit()",
     "catch (ClassCastException malformedPreference)",
 ):
     assert marker in policy, f"Missing lock policy contract: {marker}"
+
+for marker in (
+    "TIMEOUT_IMMEDIATELY_SECONDS = 0",
+    "TIMEOUT_30_SECONDS = 30",
+    "TIMEOUT_1_MINUTE = 60",
+    "TIMEOUT_5_MINUTES = 300",
+):
+    assert marker in deadline, f"Missing canonical deadline constant: {marker}"
 
 # The lifecycle callback must be registered only in the main host process.
 assert "if (ProcessUtils.isMainProcess(this)) {" in application
