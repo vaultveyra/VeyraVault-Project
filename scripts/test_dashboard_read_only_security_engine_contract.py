@@ -2,8 +2,10 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 source = (root / "app/src/main/java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
+security_source = (root / "app/src/main/java/com/veyravault/space/security/SecurityManager.java").read_text(encoding="utf-8")
 
 # The summary is refreshed with Activity lifecycle awareness.
+assert "private static volatile boolean sessionUnlocked = false;" in security_source
 assert "refreshReadOnlyPlatformStatus();" in source
 assert "dashboardStatusExecutor = Executors.newSingleThreadExecutor()" in source
 assert "dashboardStatusExecutor.shutdownNow()" in source

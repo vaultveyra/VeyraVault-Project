@@ -9,7 +9,9 @@ public final class SecurityManager {
     private static final String PREF = "veyra_security_prefs";
     private static final String KEY_MODE = "lock_mode"; // 0=None, 1=PIN, 2=Pattern
     private static final String KEY_HASH = "lock_hash";
-    private static boolean sessionUnlocked = false;
+    // Dashboard diagnostics read this flag off the UI thread; volatile guarantees
+    // visibility of lock/unlock transitions across the host process threads.
+    private static volatile boolean sessionUnlocked = false;
 
     public static final int MODE_NONE = 0;
     public static final int MODE_PIN = 1;
