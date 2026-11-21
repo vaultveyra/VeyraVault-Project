@@ -2,13 +2,18 @@ name: Build and audit VeyraVault APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feat/veyra-vault-product-foundation" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 
 jobs:
   build:
@@ -35,8 +40,132 @@ jobs:
       - name: Validate staged V3 migration scripts
         run: python3 -c "import ast; [ast.parse(open(p, encoding='utf-8').read(), filename=p) for p in ('scripts/upgrade_v3_part1.py', 'scripts/upgrade_v3_part2.py')]"
 
+      - name: Test profile resolver contract
+        run: python3 scripts/test_profile_resolver.py
+
+      - name: Test clone profile runtime hook contract
+        run: python3 scripts/test_profile_runtime_hook_contract.py
+
+      - name: Test strict location profile hook contract
+        run: python3 scripts/test_profile_location_hook_contract.py
+
+      - name: Test security credential contract
+        run: python3 scripts/test_security_credentials.py
+
+      - name: Test engine install/launch failure contract
+        run: python3 scripts/test_engine_contract.py
+
+      - name: Test fail-closed CloneStore mutations
+        run: python3 scripts/test_clone_store_safe_mutations.py
+
+      - name: Test async CloneStore repository contract
+        run: python3 scripts/test_async_clone_repository_contract.py
+
+      - name: Test async clone launch orchestration contract
+        run: python3 scripts/test_async_clone_launch_contract.py
+
+      - name: Test async location persistence UI contract
+        run: python3 scripts/test_location_persistence_ui_contract.py
+
+      - name: Test global environment async persistence UI contract
+        run: python3 scripts/test_global_environment_persistence_ui_contract.py
+
+      - name: Test per-clone environment profile UI contract
+        run: python3 scripts/test_clone_environment_profile_ui_contract.py
+
+      - name: Test MainActivity async Spaces persistence contract
+        run: python3 scripts/test_main_activity_async_spaces_contract.py
+
+      - name: Test MainActivity async clone mutations contract
+        run: python3 scripts/test_main_activity_clone_mutations_async_contract.py
+      - name: Test compact Spaces bottom navigation UI contract
+        run: python3 scripts/test_spaces_bottom_navigation_ui_contract.py
+      - name: Test Spaces cards UI contract
+        run: python3 scripts/test_spaces_cards_ui_contract.py
+      - name: Test Dashboard clocks and device info contract
+        run: python3 scripts/test_dashboard_clocks_device_info_contract.py
+      - name: Test verified Dashboard environment summary contract
+        run: python3 scripts/test_dashboard_verified_environment_summary.py
+
+      - name: Test Dashboard five-destination navigation contract
+        run: python3 scripts/test_dashboard_bottom_navigation_contract.py
+
+      - name: Test Dashboard Tehran Jalali and New York Gregorian dates
+        run: python3 scripts/test_dashboard_date_format_contract.py
+      - name: Test appearance preferences and immediate lock contract
+        run: python3 scripts/test_appearance_preferences_quick_lock_contract.py
+      - name: Test main-process app-lock lifecycle contract
+        run: python3 scripts/test_app_lock_lifecycle_contract.py
+      - name: Test app-lock deadline math against production Java
+        run: python3 scripts/test_app_lock_deadline_contract.py
+      - name: Test actual Device Admin state contract
+        run: python3 scripts/test_device_admin_state_contract.py
+      - name: Test Dashboard read-only security and Engine summary
+        run: python3 scripts/test_dashboard_read_only_security_engine_contract.py
+      - name: Test launcher icon and truthful About contract
+        run: python3 scripts/test_launcher_icon_and_about_contract.py
+      - name: Test Add App picker UI contract
+        run: python3 scripts/test_add_app_picker_ui_contract.py
+      - name: Test AddApp and Dashboard async persistence contract
+        run: python3 scripts/test_add_app_dashboard_async_persistence_contract.py
+
+      - name: Test atomic clone ID reservation contract
+        run: python3 scripts/test_clone_id_reservation_contract.py
+
+      - name: Test pending reservation recovery contract
+        run: python3 scripts/test_pending_reservation_recovery_contract.py
+
+      - name: Test clone hook isolation contract
+        run: python3 scripts/test_hook_isolation_contract.py
+
+      - name: Test CloneStore migration inventory contract
+        run: python3 scripts/test_clone_store_migration_inventory.py
+
+      - name: Test inactive Room foundation contract
+        run: python3 scripts/test_room_foundation_contract.py
+
+      - name: Test read-only legacy CloneStore snapshot contract
+        run: python3 scripts/test_legacy_clone_snapshot_contract.py
+
+      - name: Test atomic legacy snapshot backup contract
+        run: python3 scripts/test_legacy_clone_snapshot_backup_contract.py
+
+      - name: Test opt-in legacy Room import contract
+        run: python3 scripts/test_legacy_room_import_contract.py
+
+      - name: Test Android Room instrumentation wiring
+        run: python3 scripts/test_room_instrumentation_wiring.py
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
+
+      - name: Run Room Android instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Current Android Emulator releases require explicit opt-in to TCG
+          # when hosted Linux runners do not expose KVM/hardware acceleration.
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 4
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+            echo "=== DEBUG APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== ANDROID TEST APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== MERGED DEBUG NATIVE LIBRARY INPUTS ==="
+            find app/build/intermediates/merged_native_libs/debug -type f -name '*.so' -print 2>/dev/null || true
+            echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt

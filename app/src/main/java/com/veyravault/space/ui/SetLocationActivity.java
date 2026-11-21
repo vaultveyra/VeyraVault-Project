@@ -18,6 +18,9 @@ import android.widget.Toast;
 import com.veyravault.space.R;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.ProfileSettings;
+import com.veyravault.space.core.ProfileResolver;
+import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.VirtualHookManager;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.events.MapEventsReceiver;
@@ -36,6 +39,17 @@ public class SetLocationActivity extends BaseActivity {
     private double selectedLng = 51.3890;
     private CloneStore.CloneEntry cloneEntry;
     private boolean fa;
+    private com.veyravault.space.core.AsyncCloneRepository repository;
+    private com.veyravault.space.core.AsyncLocationHookRepository hookRepository;
+    private ProfileSettings cloneProfile;
+    private ProfileSettings globalProfile;
+    private boolean cloneProfileLoaded;
+    private boolean globalProfileLoaded;
+    private Button saveButton;
+    private TextView resetButton;
+    private TextView sourceTv;
+    private TextView citiesButton;
+    private boolean locationPointSelected;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,31 +59,42 @@ public class SetLocationActivity extends BaseActivity {
         Configuration.getInstance().setUserAgentValue(getPackageName());
 
         String pkg = getIntent().getStringExtra("pkg");
-        int uid = getIntent().getIntExtra("uid", 0);
-        cloneEntry = CloneStore.getClone(this, pkg, uid);
-        if (cloneEntry != null && (cloneEntry.latitude != 0 || cloneEntry.longitude != 0)) {
-            selectedLat = cloneEntry.latitude;
-            selectedLng = cloneEntry.longitude;
+        int uid = getIntent().getIntExtra("uid", -1);
+        if (pkg == null || pkg.trim().isEmpty() || uid < 0) {
+            Toast.makeText(this, fa ? "کلون مقصد معتبر نیست." : "A valid target clone is required.",
+                    Toast.LENGTH_LONG).show();
+            finish();
+            return;
         }
+        cloneEntry = CloneStore.getClone(this, pkg, uid);
+        if (cloneEntry == null) {
+            Toast.makeText(this, fa ? "کلون پیدا نشد یا اطلاعات ذخیره‌شده قابل خواندن نیست." :
+                    "Clone not found or stored data is unreadable.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        repository = com.veyravault.space.core.AsyncCloneRepository.getInstance(getApplicationContext());
+        hookRepository = com.veyravault.space.core.AsyncLocationHookRepository.getInstance(getApplicationContext());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setPadding(36, 28, 36, 28);
 
-        TextView btnCities = new TextView(this);
-        btnCities.setText(fa ? "🌍 انتخاب سریع شهر / مختصات" : "🌍 Quick Cities / Coords");
-        btnCities.setTextColor(Color.parseColor("#2563EB"));
-        btnCities.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        btnCities.setPadding(28, 14, 28, 14);
-        btnCities.setOnClickListener(new View.OnClickListener() {
+        citiesButton = new TextView(this);
+        citiesButton.setText(fa ? "🌍 انتخاب سریع شهر / مختصات" : "🌍 Quick Cities / Coords");
+        citiesButton.setTextColor(UiPalette.accent(getApplicationContext()));
+        citiesButton.setBackgroundResource(R.drawable.bg_pill_lightblue);
+        citiesButton.setPadding(28, 14, 28, 14);
+        citiesButton.setEnabled(false);
+        citiesButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showCitiesDialog(); }
         });
-        topBar.addView(btnCities);
+        topBar.addView(citiesButton);
 
         TextView title = new TextView(this);
         title.setText(getString(R.string.set_location));
@@ -104,11 +129,13 @@ public class SetLocationActivity extends BaseActivity {
         MapEventsOverlay eventsOverlay = new MapEventsOverlay(new MapEventsReceiver() {
             @Override
             public boolean singleTapConfirmedHelper(GeoPoint p) {
+                if (!cloneProfileLoaded || !globalProfileLoaded) return false;
                 updateSelectedPoint(p.getLatitude(), p.getLongitude());
                 return true;
             }
             @Override
             public boolean longPressHelper(GeoPoint p) {
+                if (!cloneProfileLoaded || !globalProfileLoaded) return false;
                 updateSelectedPoint(p.getLatitude(), p.getLongitude());
                 return true;
             }
@@ -126,7 +153,7 @@ public class SetLocationActivity extends BaseActivity {
         locTitle.setText(fa ? "موقعیت مکانی (Location)" : "Location");
         locTitle.setTextSize(17f);
         locTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        locTitle.setTextColor(Color.parseColor("#111827"));
+        locTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         bottomCard.addView(locTitle);
 
         LinearLayout coordBox = new LinearLayout(this);
@@ -140,68 +167,184 @@ public class SetLocationActivity extends BaseActivity {
         coordsTv = new TextView(this);
         coordsTv.setTextSize(19f);
         coordsTv.setTypeface(Typeface.DEFAULT_BOLD);
-        coordsTv.setTextColor(Color.parseColor("#111827"));
+        coordsTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         coordsTv.setText(String.format("%.4f, %.4f  📍", selectedLat, selectedLng));
         coordBox.addView(coordsTv);
 
         TextView targetTv = new TextView(this);
         targetTv.setTextSize(13f);
-        targetTv.setTextColor(Color.parseColor("#6B7280"));
-        targetTv.setText(cloneEntry != null
-                ? (cloneEntry.displayName + " (Space " + cloneEntry.getSpaceNumber() + ")")
-                : "Global Mock GPS");
+        targetTv.setTextColor(UiPalette.muted(getApplicationContext()));
+        targetTv.setText(cloneEntry.displayName + " (Space " + cloneEntry.getSpaceNumber() + ")");
         coordBox.addView(targetTv);
         bottomCard.addView(coordBox, cblp);
 
-        Button btnSave = new Button(this);
-        btnSave.setBackgroundResource(R.drawable.bg_pill_blue);
-        btnSave.setTextColor(Color.WHITE);
-        btnSave.setTextSize(15f);
-        btnSave.setAllCaps(false);
-        btnSave.setText(getString(R.string.set_mock_location));
-        btnSave.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (cloneEntry != null) {
-                    cloneEntry.mockGpsEnabled = true;
-                    cloneEntry.latitude = selectedLat;
-                    cloneEntry.longitude = selectedLng;
-                    CloneStore.upsertClone(SetLocationActivity.this, cloneEntry);
-                    VirtualHookManager.syncCloneHooks(SetLocationActivity.this, cloneEntry);
-                }
-                Toast.makeText(SetLocationActivity.this,
-                        fa ? "موقعیت مکانی مجازی ثبت و فعال شد!" : "Mock location set and activated!",
-                        Toast.LENGTH_SHORT).show();
-                finish();
-            }
-        });
-        bottomCard.addView(btnSave);
+        sourceTv = new TextView(this);
+        sourceTv.setTextSize(12f);
+        sourceTv.setTextColor(UiPalette.muted(getApplicationContext()));
+        sourceTv.setPadding(0, 10, 0, 0);
+        sourceTv.setText(fa ? "در حال خواندن تنظیمات مؤثر..." : "Loading effective profile...");
+        coordBox.addView(sourceTv);
 
-        TextView btnReset = new TextView(this);
-        btnReset.setText(fa ? "غیرفعال کردن موقعیت مجازی برای این برنامه" : "Disable mock location for this clone");
-        btnReset.setTextColor(Color.parseColor("#EF4444"));
-        btnReset.setGravity(Gravity.CENTER);
-        btnReset.setPadding(0, 24, 0, 0);
-        btnReset.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (cloneEntry != null) {
-                    cloneEntry.mockGpsEnabled = false;
-                    CloneStore.upsertClone(SetLocationActivity.this, cloneEntry);
-                    VirtualHookManager.syncCloneHooks(SetLocationActivity.this, cloneEntry);
-                }
-                finish();
+        saveButton = new Button(this);
+        saveButton.setBackgroundResource(R.drawable.bg_pill_blue);
+        saveButton.setTextColor(Color.WHITE);
+        saveButton.setTextSize(15f);
+        saveButton.setAllCaps(false);
+        saveButton.setText(getString(R.string.set_mock_location));
+        saveButton.setEnabled(false);
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (cloneProfile == null || globalProfile == null) return;
+                saveButton.setEnabled(false);
+                resetButton.setEnabled(false);
+                ProfileSettings updated = cloneProfile.copy();
+                updated.locationEnabled = true;
+                updated.latitude = selectedLat;
+                updated.longitude = selectedLng;
+                repository.saveCloneProfile(cloneEntry.packageName, cloneEntry.userId, updated, result -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!result.isSuccess()) {
+                        saveButton.setEnabled(true);
+                        resetButton.setEnabled(true);
+                        Toast.makeText(SetLocationActivity.this,
+                                (fa ? "ذخیره پروفایل موقعیت ناموفق بود: " : "Location profile save failed: ")
+                                        + result.getMessage(), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    cloneProfile = updated;
+                    syncSavedCloneLocation();
+                });
             }
         });
-        bottomCard.addView(btnReset);
+        bottomCard.addView(saveButton);
+
+        resetButton = new TextView(this);
+        resetButton.setText(fa ? "بازگشت تنظیمات موقعیت این کلون به پروفایل سراسری" :
+                "Reset this clone's location to Global profile");
+        resetButton.setTextColor(UiPalette.accent(getApplicationContext()));
+        resetButton.setGravity(Gravity.CENTER);
+        resetButton.setPadding(0, 24, 0, 0);
+        resetButton.setEnabled(false);
+        resetButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                saveButton.setEnabled(false);
+                resetButton.setEnabled(false);
+                repository.clearCloneLocationOverrides(cloneEntry.packageName, cloneEntry.userId, result -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!result.isSuccess()) {
+                        saveButton.setEnabled(true);
+                        resetButton.setEnabled(true);
+                        Toast.makeText(SetLocationActivity.this,
+                                (fa ? "بازنشانی به پروفایل سراسری ناموفق بود: " :
+                                        "Reset to Global profile failed: ") + result.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    if (cloneProfile == null) cloneProfile = new ProfileSettings();
+                    cloneProfile.locationEnabled = null;
+                    cloneProfile.latitude = null;
+                    cloneProfile.longitude = null;
+                    locationPointSelected = false;
+                    applyLoadedProfilesIfReady();
+                    syncSavedCloneLocation();
+                });
+            }
+        });
+        bottomCard.addView(resetButton);
 
         root.addView(bottomCard);
         setContentView(root);
+        loadLocationProfiles();
+    }
+
+    private void loadLocationProfiles() {
+        repository.loadCloneProfile(cloneEntry.packageName, cloneEntry.userId, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                showProfileLoadFailure((fa ? "خواندن تنظیمات کلون ناموفق بود: " :
+                        "Could not read clone profile: ") + result.getMessage());
+                return;
+            }
+            cloneProfile = result.getValue();
+            cloneProfileLoaded = true;
+            applyLoadedProfilesIfReady();
+        });
+        repository.loadGlobalProfile(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                showProfileLoadFailure((fa ? "خواندن پروفایل سراسری ناموفق بود: " :
+                        "Could not read Global profile: ") + result.getMessage());
+                return;
+            }
+            globalProfile = result.getValue();
+            globalProfileLoaded = true;
+            applyLoadedProfilesIfReady();
+        });
+    }
+
+    private void applyLoadedProfilesIfReady() {
+        if (!cloneProfileLoaded || !globalProfileLoaded) return;
+        ProfileResolver.ResolvedProfile effective = ProfileResolver.resolve(
+                cloneProfile, globalProfile, ProfileRuntimeApplier.systemFallback());
+        if (effective.latitude != null && effective.longitude != null) {
+            updateSelectedPoint(effective.latitude, effective.longitude);
+        } else if (!locationPointSelected) {
+            saveButton.setEnabled(false);
+        }
+        String state = String.valueOf(effective.locationEnabled) + " (" + effective.locationEnabledSource + ")";
+        String coordinates = effective.latitude == null || effective.longitude == null
+                ? (fa ? "مختصات مؤثر تنظیم نشده" : "No effective coordinates configured")
+                : effective.latitudeSource + " / " + effective.longitudeSource;
+        sourceTv.setText(fa ? "وضعیت مؤثر: " + state + "؛ منبع مختصات: " + coordinates
+                : "Effective enabled: " + state + "; coordinate source: " + coordinates);
+        citiesButton.setEnabled(true);
+        saveButton.setEnabled(locationPointSelected);
+        resetButton.setEnabled(true);
+    }
+
+    private void showProfileLoadFailure(String message) {
+        saveButton.setEnabled(false);
+        resetButton.setEnabled(false);
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private void syncSavedCloneLocation() {
+        hookRepository.syncCloneLocationHook(cloneEntry.packageName, cloneEntry.userId, (hookResult, error) -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (error != null || hookResult == null) {
+                saveButton.setEnabled(locationPointSelected);
+                resetButton.setEnabled(true);
+                Toast.makeText(this, (fa ? "ذخیره انجام شد اما اجرای همگام‌سازی ناموفق بود: " :
+                        "Profile saved, but hook synchronization could not run: ")
+                        + (error == null ? "No hook result" : error), Toast.LENGTH_LONG).show();
+                return;
+            }
+            showHookResult(hookResult);
+        });
+    }
+
+    private void showHookResult(VirtualHookManager.LocationApplyResult result) {
+        if (result.status == VirtualHookManager.LocationStatus.APPLIED
+                || result.status == VirtualHookManager.LocationStatus.DISABLED) {
+            Toast.makeText(this, fa
+                    ? "نتیجه موتور تأیید شد: " + result.status + " (" + result.detail + ")"
+                    : "Engine result verified: " + result.status + " (" + result.detail + ")",
+                    Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        saveButton.setEnabled(locationPointSelected);
+        resetButton.setEnabled(true);
+        Toast.makeText(this, (fa ? "تنظیم ذخیره شد اما اعمال موقعیت تأیید نشد: " :
+                "Profile saved, but engine application was not verified: ")
+                + result.status + " (" + result.detail + ")", Toast.LENGTH_LONG).show();
     }
 
     private void updateSelectedPoint(double lat, double lng) {
         selectedLat = lat;
         selectedLng = lng;
+        locationPointSelected = true;
+        if (saveButton != null && cloneProfileLoaded && globalProfileLoaded) saveButton.setEnabled(true);
         GeoPoint gp = new GeoPoint(lat, lng);
         pinMarker.setPosition(gp);
         mapView.getController().animateTo(gp);

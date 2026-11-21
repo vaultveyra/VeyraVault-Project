@@ -6,7 +6,7 @@ URL_REGEX = re.compile(r'https?://[^\s"\'<>]+')
 
 def scan(root):
     print("=== VEYRAVAULT STAGE-1 SOURCE AUDIT ===")
-    urls, sdks, blobs = [], [], []
+    urls, sdks, blobs, forbidden = [], [], [], []
     for dp, _, files in os.walk(root):
         if '.git' in dp: continue
         for f in files:
@@ -19,6 +19,9 @@ def scan(root):
                     for m in URL_REGEX.findall(txt):
                         if not any(w in m for w in ('schemas.android.com', 'apache.org', 'google.com', 'github.com', 'maven', 'gradle', 'openstreetmap')):
                             urls.append((p, m))
+                    for endpoint in FORBIDDEN_ENDPOINTS:
+                        if endpoint in txt:
+                            forbidden.append((p, endpoint))
                     for m in SUSPICIOUS_SDK.findall(txt):
                         sdks.append((p, m))
                 except Exception:
@@ -29,6 +32,10 @@ def scan(root):
     for p, u in urls[:30]: print("  [URL] {} -> {}".format(p, u))
     print("Suspicious SDK hits: {}".format(len(sdks)))
     for p, s in sdks: print("  [SDK-WARN] {} -> {}".format(p, s))
+    print("Forbidden remote log endpoints: {}".format(len(forbidden)))
+    for p, endpoint in forbidden: print("  [FORBIDDEN] {} -> {}".format(p, endpoint))
+    if forbidden:
+        raise SystemExit("Source audit failed: forbidden remote log-upload endpoint remains")
 
 if __name__ == '__main__':
     scan(sys.argv[1] if len(sys.argv) > 1 else '.')

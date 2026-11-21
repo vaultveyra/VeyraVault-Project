@@ -77,6 +77,46 @@ def pin_ndk_version(gradle_file, label):
     print(f"[+] {label}: ndkVersion {NDK_VERSION} -> {status}")
 
 
+
+def disable_remote_log_upload(workspace):
+    """Disable upstream BlackBox log transmission before compiling the engine."""
+    config_path = os.path.join(workspace, "Bcore", "src", "main", "java", "top", "niunaijun", "blackbox", "app", "configuration", "ClientConfiguration.java")
+    sender_path = os.path.join(workspace, "Bcore", "src", "main", "java", "top", "niunaijun", "blackbox", "utils", "LogSender.java")
+    if not os.path.isfile(config_path) or not os.path.isfile(sender_path):
+        raise RuntimeError("Pinned engine layout changed; refusing an unverified build")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = f.read()
+    if "VEYRAVAULT_REMOTE_LOG_UPLOAD_DISABLED" not in config:
+        pattern = r'public\s+String\s+getLogSenderChatId\s*\(\s*\)\s*\{[^}]*\}'
+        replacement = "/* VEYRAVAULT_REMOTE_LOG_UPLOAD_DISABLED */\n    public String getLogSenderChatId() {\n        return null;\n    }"
+        config, count = re.subn(pattern, replacement, config, count=1, flags=re.S)
+        if count != 1:
+            raise RuntimeError("Could not safely disable upstream log-upload destination")
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(config)
+
+    with open(sender_path, "r", encoding="utf-8") as f:
+        sender = f.read()
+    if "VEYRAVAULT_REMOTE_LOG_UPLOAD_DISABLED" not in sender:
+        if "logs-sender-api.vercel.app" not in sender:
+            raise RuntimeError("Unexpected LogSender source; refusing an unverified engine build")
+        stub = (
+            "package top.niunaijun.blackbox.utils;\n\n"
+            "import java.io.File;\n\n"
+            "/** VEYRAVAULT_REMOTE_LOG_UPLOAD_DISABLED: remote log transmission is disabled. */\n"
+            "public final class LogSender {\n"
+            "    private LogSender() { }\n"
+            "    public static String send(String chatId, File logFile, String caption) {\n"
+            "        return \"Remote log upload disabled by VeyraVault security policy\";\n"
+            "    }\n"
+            "}\n"
+        )
+        with open(sender_path, "w", encoding="utf-8") as f:
+            f.write(stub)
+    print("[+] Upstream BlackBox remote crash/log upload disabled and verified.")
+
+
 def post_build():
     print("[*] Collecting APK and running Stage-2 binary audit...")
     if os.path.isdir(OUTPUT_DIR):
@@ -120,6 +160,8 @@ def main():
         run(f'git clone --no-checkout https://github.com/ALEX5402/NewBlackbox.git "{WORKSPACE}"')
         run(f'git -C "{WORKSPACE}" fetch --depth 1 origin {ENGINE_COMMIT}')
         run(f'git -C "{WORKSPACE}" checkout --detach FETCH_HEAD')
+
+    disable_remote_log_upload(WORKSPACE)
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")
     if os.path.exists(gradlew_path):
@@ -189,7 +231,13 @@ android {{
     defaultConfig {{
         applicationId "com.veyravault.space"
         minSdk {min_sdk}
+        javaCompileOptions {{
+            annotationProcessorOptions {{
+                arguments += ["room.schemaLocation": "$projectDir/schemas".toString()]
+            }}
+        }}
         targetSdk 28
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         versionCode 200
         versionName "2.0.0-Enterprise"
 
@@ -203,6 +251,18 @@ android {{
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }}
+        // Debug instrumentation exercises Room without starting the virtual engine.
+        debug {{
+            // The CI emulator is x86_64. Release keeps the production ARM ABI filters above.
+            ndk {{
+                abiFilters "x86_64"
+            }}
+            packaging {{
+                jniLibs {{
+                    excludes += ["**/*.so"]
+                }}
+            }}
         }}
     }}
 
@@ -230,12 +290,20 @@ android {{
 }}
 
 dependencies {{
-    implementation project(':Bcore')
+    // The Room-only debug harness needs Bcore types at compile time, but must not package
+    // the ARM-only virtual engine or its native libraries into the x86_64 emulator APK.
+    releaseImplementation project(':Bcore')
+    debugCompileOnly project(':Bcore')
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.1'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'org.osmdroid:osmdroid-android:6.1.14'
+    implementation 'androidx.room:room-runtime:2.6.1'
+    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
 }}
 """
     with open(os.path.join(ws_app, "build.gradle"), "w", encoding="utf-8") as f:

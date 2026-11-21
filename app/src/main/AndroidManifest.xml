@@ -34,6 +34,12 @@
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme"
         tools:replace="android:allowBackup,android:label,android:theme,android:icon,android:usesCleartextTraffic">
+        <provider
+            android:name="com.veyravault.space.core.ProfileRuntimeProvider"
+            android:authorities="${applicationId}.profile-runtime"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
 
         <activity
             android:name=".ui.MainActivity"
@@ -105,13 +111,19 @@
             </intent-filter>
         </activity-alias>
 
+        <activity android:name=".ui.AppIconNameActivity" android:exported="false" />
         <activity android:name=".ui.SecurityLockActivity" android:exported="false" />
         <activity android:name=".ui.AddAppActivity" android:exported="false" />
-        <activity android:name=".ui.SetLocationActivity" android:exported="false" />
+        <activity android:name=".ui.CloneEnvironmentProfileActivity" android:exported="false" />        <activity android:name=".ui.SetLocationActivity" android:exported="false" />
         <activity android:name=".ui.GlobalEnvironmentActivity" android:exported="false" />
         <activity android:name=".ui.SecuritySettingsActivity" android:exported="false" />
         <activity android:name=".ui.PermissionsActivity" android:exported="false" />
         <activity android:name=".ui.AboutActivity" android:exported="false" />
+        <activity android:name=".ui.CompatibilityReportActivity" android:exported="false" />
+        <activity android:name=".ui.DashboardActivity" android:exported="false" />
+        <activity android:name=".ui.VpnStatusActivity" android:exported="false" />
+        <activity android:name=".ui.SettingsHubActivity" android:exported="false" />
+        <activity android:name=".ui.PendingReservationsActivity" android:exported="false" />
 
         <receiver
             android:name=".security.VaultDeviceAdminReceiver"

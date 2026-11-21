@@ -1,194 +1,290 @@
 package com.veyravault.space.core;
 
 import android.content.Context;
-import android.location.Location;
-import android.location.LocationManager;
-import android.os.Build;
-import android.os.SystemClock;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationHandler;
+
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.TimeZone;
 
-public class VirtualHookManager {
+/**
+ * Applies location profiles through the exact package/user-scoped API exposed by the
+ * pinned NewBlackbox engine. Host LocationManager statics are never modified.
+ */
+public final class VirtualHookManager {
 
-    private static volatile boolean activeMockGps = false;
-    private static volatile double activeLat = 0.0;
-    private static volatile double activeLng = 0.0;
+    public enum LocationStatus { APPLIED, DISABLED, UNSUPPORTED, FAILED }
 
-    public static void installProcessHooks(final Context ctx) {
+    public static final class LocationApplyResult {
+        public final LocationStatus status;
+        public final String detail;
+        public final ProfileResolver.Source enabledSource;
+        public final ProfileResolver.Source latitudeSource;
+        public final ProfileResolver.Source longitudeSource;
+
+        private LocationApplyResult(LocationStatus status, String detail,
+                                    ProfileResolver.Source enabledSource,
+                                    ProfileResolver.Source latitudeSource,
+                                    ProfileResolver.Source longitudeSource) {
+            this.status = status;
+            this.detail = detail;
+            this.enabledSource = enabledSource;
+            this.latitudeSource = latitudeSource;
+            this.longitudeSource = longitudeSource;
+        }
+
+        public boolean isApplied() { return status == LocationStatus.APPLIED; }
+        public boolean isDisabled() { return status == LocationStatus.DISABLED; }
+    }
+
+    public static final class SyncSummary {
+        public final boolean registryReadable;
+        public final int applied;
+        public final int disabled;
+        public final int unsupported;
+        public final int failed;
+        public final String detail;
+
+        private SyncSummary(boolean registryReadable, int applied, int disabled,
+                            int unsupported, int failed, String detail) {
+            this.registryReadable = registryReadable;
+            this.applied = applied;
+            this.disabled = disabled;
+            this.unsupported = unsupported;
+            this.failed = failed;
+            this.detail = detail;
+        }
+    }
+
+    private static volatile LocationApplyResult lastResult =
+            new LocationApplyResult(LocationStatus.UNSUPPORTED, "NOT_ATTEMPTED",
+                    ProfileResolver.Source.UNSET, ProfileResolver.Source.UNSET,
+                    ProfileResolver.Source.UNSET);
+
+    private VirtualHookManager() { }
+
+    public static LocationApplyResult getLastLocationResult() { return lastResult; }
+
+    /** Strictly reads the clone registry and returns every per-clone hook outcome. */
+    public static SyncSummary syncAllClones(Context context) {
+        if (context == null) return new SyncSummary(false, 0, 0, 0, 0, "INVALID_CONTEXT");
+        final java.util.List<CloneStore.CloneEntry> clones;
         try {
-            CloneStore.CloneEntry last = CloneStore.getLastActiveLaunch(ctx);
-            if (last != null) {
-                syncCloneHooks(ctx, last);
-            } else {
-                CloneStore.GlobalEnvConfig g = CloneStore.getGlobalEnv(ctx);
-                if (g.enabled) {
-                    applyDeviceProperties(0, g.brand, g.manufacturer, g.model, g.device,
-                            g.countryIso, g.simOperator, g.simOperatorName);
-                }
+            clones = CloneStore.readAllStrict(context);
+        } catch (Exception error) {
+            return new SyncSummary(false, 0, 0, 0, 0,
+                    "CLONE_REGISTRY_UNREADABLE:" + error.getClass().getSimpleName());
+        }
+        int applied = 0;
+        int disabled = 0;
+        int unsupported = 0;
+        int failed = 0;
+        for (CloneStore.CloneEntry clone : clones) {
+            LocationApplyResult outcome = syncCloneHooks(context, clone);
+            switch (outcome.status) {
+                case APPLIED: applied++; break;
+                case DISABLED: disabled++; break;
+                case UNSUPPORTED: unsupported++; break;
+                case FAILED: failed++; break;
             }
-            hookSystemLocationManager(ctx);
-        } catch (Throwable ignored) {}
-    }
-
-    public static void syncCloneHooks(Context ctx, CloneStore.CloneEntry entry) {
-        if (entry == null) return;
-        boolean masterGps = CloneStore.isMasterMockGpsEnabled(ctx);
-        boolean gpsOn = masterGps && entry.mockGpsEnabled;
-        activeMockGps = gpsOn;
-        activeLat = entry.latitude;
-        activeLng = entry.longitude;
-
-        applyEngineLocationHook(entry.packageName, entry.userId, gpsOn, entry.latitude, entry.longitude);
-
-        CloneStore.GlobalEnvConfig g = CloneStore.getGlobalEnv(ctx);
-        if (entry.customDeviceEnabled && !entry.deviceModel.isEmpty()) {
-            String b = entry.deviceBrand.isEmpty() ? "Samsung" : entry.deviceBrand;
-            applyDeviceProperties(entry.userId, b, b, entry.deviceModel, entry.deviceModel,
-                    g.countryIso, g.simOperator, g.simOperatorName);
-        } else if (g.enabled) {
-            applyDeviceProperties(entry.userId, g.brand, g.manufacturer, g.model, g.device,
-                    g.countryIso, g.simOperator, g.simOperatorName);
         }
+        return new SyncSummary(true, applied, disabled, unsupported, failed, "COMPLETE");
     }
 
-    public static void applyEngineLocationHook(String pkg, int userId, boolean enable, double lat, double lng) {
-        String[] mgrClasses = {
-            "top.niunaijun.blackbox.fake.frameworks.BLocationManager",
-            "com.vcore.fake.frameworks.BLocationManager"
-        };
-        String[] locClasses = {
-            "top.niunaijun.blackbox.entity.location.BLocation",
-            "com.vcore.entity.location.BLocation"
-        };
-        for (int i = 0; i < mgrClasses.length; i++) {
-            try {
-                Class<?> mgrCls = Class.forName(mgrClasses[i]);
-                Object mgr = mgrCls.getMethod("get").invoke(null);
-                for (Method m : mgrCls.getMethods()) {
-                    if (m.getName().equals("setPattern") && m.getParameterTypes().length == 3) {
-                        m.invoke(mgr, userId, pkg, enable ? 2 : 0);
-                    }
-                }
-                if (enable) {
-                    Class<?> bLocCls = Class.forName(locClasses[i]);
-                    Object bLoc = bLocCls.getConstructor(double.class, double.class).newInstance(lat, lng);
-                    for (Method m : mgrCls.getMethods()) {
-                        if (m.getName().equals("setLocation") && m.getParameterTypes().length == 3) {
-                            m.invoke(mgr, userId, pkg, bLoc);
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+    public static void installProcessHooks(Context context) {
+        if (context == null) return;
+        CloneStore.CloneEntry last = CloneStore.getLastActiveLaunch(context);
+        if (last != null) syncCloneHooks(context, last);
+    }
+
+    /**
+     * Resolves each location field independently (clone -> global -> safe system fallback),
+     * then applies only when the Master Mock GPS gate and the resolved profile both allow it.
+     */
+    public static LocationApplyResult syncCloneHooks(Context context, CloneStore.CloneEntry entry) {
+        if (context == null || entry == null || entry.packageName == null
+                || entry.packageName.trim().isEmpty() || entry.userId < 0) {
+            return remember(result(LocationStatus.FAILED, "INVALID_CLONE_IDENTITY", null));
         }
-    }
 
-    public static void applyDeviceProperties(int userId, String brand, String manufacturer, String model,
-                                             String device, String countryIso, String simOp, String simOpName) {
-        // 1. Direct In-Process android.os.Build reflection override (read by Telegram, Instagram, WhatsApp, etc.)
-        setStaticField(Build.class, "BRAND", brand);
-        setStaticField(Build.class, "MANUFACTURER", manufacturer);
-        setStaticField(Build.class, "MODEL", model);
-        setStaticField(Build.class, "PRODUCT", device);
-        setStaticField(Build.class, "DEVICE", device);
-        setStaticField(Build.class, "HARDWARE", device);
-        String fp = brand + "/" + device + "/" + device + ":13/TP1A.220624.014/Veyra200:user/release-keys";
-        setStaticField(Build.class, "FINGERPRINT", fp);
-
-        // 2. Push into BlackBox BDeviceManager for the virtual userId
-        String[] devMgrs = {
-            "top.niunaijun.blackbox.fake.frameworks.BDeviceManager",
-            "com.vcore.fake.frameworks.BDeviceManager"
-        };
-        String[] devCfgs = {
-            "top.niunaijun.blackbox.entity.device.BDeviceConfig",
-            "com.vcore.entity.device.BDeviceConfig"
-        };
-        for (int i = 0; i < devMgrs.length; i++) {
-            try {
-                Class<?> devMgrCls = Class.forName(devMgrs[i]);
-                Object devMgr = devMgrCls.getMethod("get").invoke(null);
-                Class<?> cfgCls = Class.forName(devCfgs[i]);
-                Object cfg = cfgCls.newInstance();
-                setObjectField(cfg, "BRAND", brand);
-                setObjectField(cfg, "MANUFACTURER", manufacturer);
-                setObjectField(cfg, "MODEL", model);
-                setObjectField(cfg, "PRODUCT", device);
-                setObjectField(cfg, "DEVICE", device);
-                setObjectField(cfg, "FINGERPRINT", fp);
-                setObjectField(cfg, "locale", countryIso);
-                setObjectField(cfg, "simOperator", simOp);
-                setObjectField(cfg, "simOperatorName", simOpName);
-                setObjectField(cfg, "simCountryIso", countryIso);
-                setObjectField(cfg, "networkCountryIso", countryIso);
-                for (Method m : devMgrCls.getMethods()) {
-                    if (m.getName().equals("setDeviceConfig") && m.getParameterTypes().length == 2) {
-                        m.invoke(devMgr, userId, cfg);
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-    }
-
-    private static void hookSystemLocationManager(Context ctx) {
+        final boolean masterEnabled;
+        final ProfileResolver.ResolvedProfile resolved;
         try {
-            LocationManager lm = (LocationManager) ctx.getSystemService(Context.LOCATION_SERVICE);
-            if (lm == null) return;
-            Field serviceField = LocationManager.class.getDeclaredField("mService");
-            serviceField.setAccessible(true);
-            final Object originalService = serviceField.get(lm);
-            if (originalService == null) return;
-
-            Class<?> iLocMgrCls = Class.forName("android.location.ILocationManager");
-            Object proxy = Proxy.newProxyInstance(
-                    iLocMgrCls.getClassLoader(),
-                    new Class<?>[]{iLocMgrCls},
-                    new InvocationHandler() {
-                        @Override
-                        public Object invoke(Object p, Method method, Object[] args) throws Throwable {
-                            if (activeMockGps && (method.getName().equals("getLastLocation")
-                                    || method.getName().equals("getLastKnownLocation"))) {
-                                return buildSyntheticLocation("gps", activeLat, activeLng);
-                            }
-                            return method.invoke(originalService, args);
-                        }
-                    });
-            serviceField.set(lm, proxy);
-        } catch (Throwable ignored) {}
-    }
-
-    public static Location buildSyntheticLocation(String provider, double lat, double lng) {
-        Location loc = new Location(provider != null ? provider : LocationManager.GPS_PROVIDER);
-        loc.setLatitude(lat);
-        loc.setLongitude(lng);
-        loc.setAltitude(42.0);
-        loc.setAccuracy(3.2f);
-        loc.setTime(System.currentTimeMillis());
-        if (Build.VERSION.SDK_INT >= 17) {
-            loc.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+            masterEnabled = CloneStore.readMasterMockGpsEnabledStrict(context);
+            resolved = ProfileStore.resolveStrict(context, entry.packageName, entry.userId,
+                    ProfileRuntimeApplier.systemFallback());
+        } catch (Exception error) {
+            LocationApplyResult disabled = disableEngineLocationHook(entry.packageName, entry.userId,
+                    null, null, null);
+            String detail = "PROFILE_RESOLUTION_FAILED:" + error.getClass().getSimpleName()
+                    + "; fail-closed disable=" + disabled.status;
+            return remember(result(LocationStatus.FAILED, detail, null));
         }
-        return loc;
-    }
 
-    private static void setStaticField(Class<?> cls, String fieldName, Object value) {
-        try {
-            Field f = cls.getDeclaredField(fieldName);
-            f.setAccessible(true);
-            f.set(null, value);
-        } catch (Throwable ignored) {}
-    }
-
-    private static void setObjectField(Object obj, String name, Object val) {
-        try {
-            for (Field f : obj.getClass().getDeclaredFields()) {
-                if (f.getName().equalsIgnoreCase(name)) {
-                    f.setAccessible(true);
-                    f.set(obj, val);
-                    return;
-                }
+        if (!masterEnabled) {
+            LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
+                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
+            return remember(withReason(closed, "MASTER_MOCK_GPS_KILL_SWITCH_DISABLED"));
+        }
+        if (!Boolean.TRUE.equals(resolved.locationEnabled)) {
+            LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
+                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
+            return remember(withReason(closed, "RESOLVED_LOCATION_PROFILE_DISABLED"));
+        }
+        if (resolved.latitude == null || resolved.longitude == null) {
+            LocationApplyResult disabled = disableEngineLocationHook(entry.packageName, entry.userId,
+                    resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
+            if (disabled.status == LocationStatus.DISABLED) {
+                return remember(result(LocationStatus.FAILED,
+                        "LOCATION_ENABLED_BUT_COORDINATES_MISSING; hook disabled", resolved));
             }
-        } catch (Throwable ignored) {}
+            return remember(disabled);
+        }
+
+        return remember(applyEngineLocationHook(entry.packageName, entry.userId,
+                resolved.latitude, resolved.longitude, resolved));
+    }
+
+    private static LocationApplyResult withReason(LocationApplyResult result, String reason) {
+        return new LocationApplyResult(result.status, reason + "; " + result.detail,
+                result.enabledSource, result.latitudeSource, result.longitudeSource);
+    }
+
+    private static LocationApplyResult disableEngineLocationHook(
+            String packageName, int userId, ProfileResolver.Source enabledSource,
+            ProfileResolver.Source latitudeSource, ProfileResolver.Source longitudeSource) {
+        try {
+            Object service = resolveLocationService();
+            if (service == null) return result(LocationStatus.FAILED, "LOCATION_SERVICE_UNAVAILABLE",
+                    enabledSource, latitudeSource, longitudeSource);
+            invoke(service, "setPattern", new Class<?>[]{int.class, String.class, int.class},
+                    userId, packageName, 0);
+            Object pattern = invoke(service, "getPattern",
+                    new Class<?>[]{int.class, String.class}, userId, packageName);
+            if (!(pattern instanceof Integer) || ((Integer) pattern) != 0) {
+                return result(LocationStatus.FAILED, "DISABLE_READBACK_MISMATCH",
+                        enabledSource, latitudeSource, longitudeSource);
+            }
+            return result(LocationStatus.DISABLED, "PATTERN_CLOSED_AND_READ_BACK",
+                    enabledSource, latitudeSource, longitudeSource);
+        } catch (ClassNotFoundException | NoSuchMethodException unsupported) {
+            return result(LocationStatus.UNSUPPORTED,
+                    "PINNED_ENGINE_LOCATION_API_UNAVAILABLE:" + unsupported.getClass().getSimpleName(),
+                    enabledSource, latitudeSource, longitudeSource);
+        } catch (Exception failure) {
+            return result(LocationStatus.FAILED,
+                    "LOCATION_DISABLE_FAILED:" + rootCauseName(failure),
+                    enabledSource, latitudeSource, longitudeSource);
+        }
+    }
+
+    private static LocationApplyResult applyEngineLocationHook(
+            String packageName, int userId, double latitude, double longitude,
+            ProfileResolver.ResolvedProfile resolved) {
+        try {
+            Object service = resolveLocationService();
+            if (service == null) return result(LocationStatus.FAILED, "LOCATION_SERVICE_UNAVAILABLE", resolved);
+            Class<?> locationClass = Class.forName(
+                    "top.niunaijun.blackbox.entity.location.BLocation");
+            Object location = locationClass.getConstructor(double.class, double.class)
+                    .newInstance(latitude, longitude);
+
+            // Store the coordinates first; enable OWN_MODE only after setLocation returns.
+            invoke(service, "setLocation",
+                    new Class<?>[]{int.class, String.class, locationClass},
+                    userId, packageName, location);
+            invoke(service, "setPattern",
+                    new Class<?>[]{int.class, String.class, int.class},
+                    userId, packageName, 2);
+
+            Object pattern = invoke(service, "getPattern",
+                    new Class<?>[]{int.class, String.class}, userId, packageName);
+            Object stored = invoke(service, "getLocation",
+                    new Class<?>[]{int.class, String.class}, userId, packageName);
+            if (!(pattern instanceof Integer) || ((Integer) pattern) != 2 || stored == null) {
+                return failClosedAfterEnableFailure(packageName, userId,
+                        "LOCATION_ENABLE_READBACK_MISMATCH", resolved);
+            }
+            double actualLat = ((Number) invoke(stored, "getLatitude", new Class<?>[0])).doubleValue();
+            double actualLng = ((Number) invoke(stored, "getLongitude", new Class<?>[0])).doubleValue();
+            if (Math.abs(actualLat - latitude) > 0.000001d
+                    || Math.abs(actualLng - longitude) > 0.000001d) {
+                return failClosedAfterEnableFailure(packageName, userId,
+                        "LOCATION_COORDINATE_READBACK_MISMATCH", resolved);
+            }
+            return result(LocationStatus.APPLIED, "OWN_MODE_AND_COORDINATES_READ_BACK", resolved);
+        } catch (ClassNotFoundException | NoSuchMethodException unsupported) {
+            LocationApplyResult disabled = disableEngineLocationHook(
+                    packageName, userId, resolved.locationEnabledSource,
+                    resolved.latitudeSource, resolved.longitudeSource);
+            return result(LocationStatus.UNSUPPORTED,
+                    "PINNED_ENGINE_LOCATION_API_UNAVAILABLE:" + unsupported.getClass().getSimpleName()
+                            + "; fail-closed disable=" + disabled.status, resolved);
+        } catch (Exception failure) {
+            // A partially configured hook is closed before returning a failure.
+            LocationApplyResult disabled = disableEngineLocationHook(
+                    packageName, userId, resolved.locationEnabledSource,
+                    resolved.latitudeSource, resolved.longitudeSource);
+            return result(LocationStatus.FAILED,
+                    "LOCATION_ENABLE_FAILED:" + rootCauseName(failure)
+                            + "; fail-closed disable=" + disabled.status, resolved);
+        }
+    }
+
+    private static LocationApplyResult failClosedAfterEnableFailure(
+            String packageName, int userId, String reason,
+            ProfileResolver.ResolvedProfile resolved) {
+        LocationApplyResult disabled = disableEngineLocationHook(
+                packageName, userId, resolved.locationEnabledSource,
+                resolved.latitudeSource, resolved.longitudeSource);
+        return result(LocationStatus.FAILED,
+                reason + "; fail-closed disable=" + disabled.status, resolved);
+    }
+
+    private static Object resolveLocationService() throws Exception {
+        Class<?> managerClass = Class.forName(
+                "top.niunaijun.blackbox.fake.frameworks.BLocationManager");
+        Object manager = managerClass.getMethod("get").invoke(null);
+        if (manager == null) return null;
+        // getService() is public in the pinned engine's BlackManager base class.
+        return managerClass.getMethod("getService").invoke(manager);
+    }
+
+    private static Object invoke(Object target, String name, Class<?>[] parameterTypes,
+                                 Object... arguments) throws Exception {
+        Method method = target.getClass().getMethod(name, parameterTypes);
+        try {
+            return method.invoke(target, arguments);
+        } catch (InvocationTargetException wrapped) {
+            Throwable cause = wrapped.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            throw wrapped;
+        }
+    }
+
+    private static String rootCauseName(Throwable error) {
+        Throwable cause = error;
+        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+        return cause.getClass().getSimpleName();
+    }
+
+    private static LocationApplyResult result(LocationStatus status, String detail,
+                                               ProfileResolver.ResolvedProfile resolved) {
+        if (resolved == null) return result(status, detail, null, null, null);
+        return result(status, detail, resolved.locationEnabledSource,
+                resolved.latitudeSource, resolved.longitudeSource);
+    }
+
+    private static LocationApplyResult result(LocationStatus status, String detail,
+                                               ProfileResolver.Source enabled,
+                                               ProfileResolver.Source latitude,
+                                               ProfileResolver.Source longitude) {
+        return new LocationApplyResult(status, detail,
+                enabled == null ? ProfileResolver.Source.UNSET : enabled,
+                latitude == null ? ProfileResolver.Source.UNSET : latitude,
+                longitude == null ? ProfileResolver.Source.UNSET : longitude);
+    }
+
+    private static LocationApplyResult remember(LocationApplyResult result) {
+        lastResult = result;
+        return result;
     }
 }

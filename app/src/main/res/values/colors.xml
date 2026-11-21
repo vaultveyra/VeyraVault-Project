@@ -2,6 +2,7 @@
 <resources>
     <color name="bg_page">#F3F5F9</color>
     <color name="bg_card">#FFFFFF</color>
+    <color name="bg_surface_secondary">#F3F4F6</color>
     <color name="primary_blue">#2563EB</color>
     <color name="primary_blue_light">#DBEAFE</color>
     <color name="text_primary">#111827</color>

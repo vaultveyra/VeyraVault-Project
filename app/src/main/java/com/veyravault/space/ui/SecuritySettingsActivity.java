@@ -10,18 +10,29 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
 import com.veyravault.space.core.LocaleHelper;
-import com.veyravault.space.security.AppDisguiseManager;
+import com.veyravault.space.security.AppLockPolicy;
 import com.veyravault.space.security.SecurityManager;
 import com.veyravault.space.security.VaultDeviceAdminReceiver;
 
 public class SecuritySettingsActivity extends BaseActivity {
 
     private CheckBox antiUninstallSwitch;
+    private RadioGroup backgroundTimeoutChoices;
+    private final int[] backgroundTimeoutValues = {
+            AppLockPolicy.TIMEOUT_IMMEDIATELY,
+            AppLockPolicy.TIMEOUT_30_SECONDS,
+            AppLockPolicy.TIMEOUT_1_MINUTE,
+            AppLockPolicy.TIMEOUT_5_MINUTES
+    };
+    private final int[] backgroundTimeoutIds = new int[4];
+    private boolean updatingBackgroundTimeoutChoices;
     private boolean fa;
 
     @Override
@@ -39,7 +50,7 @@ public class SecuritySettingsActivity extends BaseActivity {
         title.setText(fa ? "مرکز امنیت، تغییر آیکون و محافظت از حذف" : "Security, App Disguise & Anti-Uninstall");
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         root.addView(title);
 
         LinearLayout cardAnti = makeCard();
@@ -52,12 +63,12 @@ public class SecuritySettingsActivity extends BaseActivity {
         TextView antiDesc = new TextView(this);
         antiDesc.setText(getString(R.string.anti_uninstall_desc));
         antiDesc.setTextSize(13f);
-        antiDesc.setTextColor(Color.parseColor("#4B5563"));
+        antiDesc.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         antiDesc.setPadding(0, 10, 0, 16);
         cardAnti.addView(antiDesc);
 
         antiUninstallSwitch = new CheckBox(this);
-        antiUninstallSwitch.setText(fa ? "قفل کردن حذف برنامه (غیرقابل حذف شدن)" : "Prevent App Uninstall (Active Protection)");
+        antiUninstallSwitch.setText(fa ? "فعال‌سازی دسترسی مدیر دستگاه اندروید" : "Enable Android Device Admin");
         antiUninstallSwitch.setChecked(VaultDeviceAdminReceiver.isAntiUninstallActive(this));
         antiUninstallSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -112,44 +123,92 @@ public class SecuritySettingsActivity extends BaseActivity {
         btnDisableLock.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                SecurityManager.setLockCredential(SecuritySettingsActivity.this, SecurityManager.MODE_NONE, "");
-                Toast.makeText(SecuritySettingsActivity.this, fa ? "قفل برنامه غیرفعال شد" : "App lock disabled", Toast.LENGTH_SHORT).show();
+                if (SecurityManager.setLockCredential(SecuritySettingsActivity.this, SecurityManager.MODE_NONE, "")) {
+                    Toast.makeText(SecuritySettingsActivity.this, fa ? "قفل برنامه غیرفعال شد" : "App lock disabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(SecuritySettingsActivity.this, fa ? "ذخیره تغییرات ناموفق بود." : "Could not save the change.", Toast.LENGTH_LONG).show();
+                }
             }
         });
         cardLock.addView(btnDisableLock);
+
+        TextView timeoutTitle = new TextView(this);
+        timeoutTitle.setText(fa ? "قفل خودکار هنگام خروج از برنامه" : "Automatic lock when leaving the app");
+        timeoutTitle.setTextSize(15f);
+        timeoutTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        timeoutTitle.setTextColor(UiPalette.textPrimary(this));
+        timeoutTitle.setPadding(0, dp(18), 0, dp(4));
+        cardLock.addView(timeoutTitle);
+
+        TextView timeoutDescription = new TextView(this);
+        timeoutDescription.setText(fa
+                ? "زمان از وقتی شروع می‌شود که آخرین صفحهٔ VeyraVault از پیش‌زمینه خارج شود. با بازگشت پیش از پایان زمان، شمارش متوقف می‌شود. این گزینه فقط با PIN یا Pattern فعال اثر قفل دارد."
+                : "The timer starts when the last VeyraVault screen leaves the foreground. Returning before it expires cancels the timer. Locking takes effect only when a PIN or Pattern is configured.");
+        timeoutDescription.setTextSize(12f);
+        timeoutDescription.setTextColor(UiPalette.textSecondary(this));
+        timeoutDescription.setPadding(0, 0, 0, dp(8));
+        cardLock.addView(timeoutDescription);
+
+        backgroundTimeoutChoices = new RadioGroup(this);
+        backgroundTimeoutChoices.setOrientation(RadioGroup.VERTICAL);
+        String[] timeoutLabels = fa
+                ? new String[] {"بلافاصله", "پس از ۳۰ ثانیه", "پس از ۱ دقیقه", "پس از ۵ دقیقه"}
+                : new String[] {"Immediately", "After 30 seconds", "After 1 minute", "After 5 minutes"};
+        for (int i = 0; i < backgroundTimeoutValues.length; i++) {
+            RadioButton option = new RadioButton(this);
+            backgroundTimeoutIds[i] = View.generateViewId();
+            option.setId(backgroundTimeoutIds[i]);
+            option.setText(timeoutLabels[i]);
+            option.setTextSize(13f);
+            option.setTextColor(UiPalette.textPrimary(this));
+            backgroundTimeoutChoices.addView(option);
+        }
+        backgroundTimeoutChoices.setOnCheckedChangeListener((group, checkedId) -> {
+            if (updatingBackgroundTimeoutChoices) return;
+            int selectedIndex = -1;
+            for (int i = 0; i < backgroundTimeoutIds.length; i++) {
+                if (backgroundTimeoutIds[i] == checkedId) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            if (selectedIndex < 0) return;
+            if (!AppLockPolicy.setBackgroundTimeoutSeconds(
+                    SecuritySettingsActivity.this, backgroundTimeoutValues[selectedIndex])) {
+                Toast.makeText(SecuritySettingsActivity.this,
+                        fa ? "ذخیره زمان قفل خودکار ناموفق بود."
+                           : "Could not save the automatic lock timeout.",
+                        Toast.LENGTH_LONG).show();
+                refreshBackgroundTimeoutChoices();
+            }
+        });
+        refreshBackgroundTimeoutChoices();
+        cardLock.addView(backgroundTimeoutChoices);
         root.addView(cardLock);
 
         LinearLayout cardDisguise = makeCard();
         TextView disTitle = new TextView(this);
-        disTitle.setText(fa ? "🎭 تغییر آیکون و نام برنامه در صفحه گوشی" : "🎭 Change App Icon & Name (Disguise)");
+        disTitle.setText(fa ? "آیکون و نام لانچر" : "Launcher Icon & Label");
         disTitle.setTypeface(Typeface.DEFAULT_BOLD);
         disTitle.setTextSize(16f);
+        disTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         cardDisguise.addView(disTitle);
 
-        String[] disguiseLabels = {
-            fa ? "۱. پیش‌فرض (VeyraVault)" : "1. Default (VeyraVault)",
-            fa ? "۲. ماشین‌حساب (Calculator)" : "2. Calculator",
-            fa ? "۳. تقویم (Calendar)" : "3. Calendar",
-            fa ? "۴. یادداشت‌ها (Notes)" : "4. Notes",
-            fa ? "۵. آب‌وهوا (Weather)" : "5. Weather"
-        };
+        TextView disDescription = new TextView(this);
+        disDescription.setText(fa
+                ? "مدیریت گزینه‌های آیکون و نام موجود در صفحه مستقل تنظیمات."
+                : "Manage the available launcher icon and label options in the dedicated settings screen.");
+        disDescription.setTextSize(12f);
+        disDescription.setTextColor(UiPalette.textSecondary(getApplicationContext()));
+        disDescription.setPadding(0, dp(6), 0, dp(10));
+        cardDisguise.addView(disDescription);
 
-        for (int i = 0; i < disguiseLabels.length; i++) {
-            final int idx = i;
-            Button b = new Button(this);
-            b.setAllCaps(false);
-            b.setText(disguiseLabels[i]);
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    AppDisguiseManager.applyDisguise(SecuritySettingsActivity.this, idx);
-                    Toast.makeText(SecuritySettingsActivity.this,
-                            fa ? "آیکون و نام برنامه تغییر کرد!" : "App icon and name updated!",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-            cardDisguise.addView(b);
-        }
+        Button openLauncherOptions = new Button(this);
+        openLauncherOptions.setAllCaps(false);
+        openLauncherOptions.setText(fa ? "انتخاب آیکون و نام" : "Choose Icon & Label");
+        openLauncherOptions.setOnClickListener(v ->
+                startActivity(new Intent(SecuritySettingsActivity.this, AppIconNameActivity.class)));
+        cardDisguise.addView(openLauncherOptions);
         root.addView(cardDisguise);
 
         setContentView(sv);
@@ -161,6 +220,22 @@ public class SecuritySettingsActivity extends BaseActivity {
         if (antiUninstallSwitch != null) {
             antiUninstallSwitch.setChecked(VaultDeviceAdminReceiver.isAntiUninstallActive(this));
         }
+        refreshBackgroundTimeoutChoices();
+    }
+
+    private void refreshBackgroundTimeoutChoices() {
+        if (backgroundTimeoutChoices == null) return;
+        int saved = AppLockPolicy.getBackgroundTimeoutSeconds(this);
+        int selectedId = backgroundTimeoutIds[0];
+        for (int i = 0; i < backgroundTimeoutValues.length; i++) {
+            if (backgroundTimeoutValues[i] == saved) {
+                selectedId = backgroundTimeoutIds[i];
+                break;
+            }
+        }
+        updatingBackgroundTimeoutChoices = true;
+        backgroundTimeoutChoices.check(selectedId);
+        updatingBackgroundTimeoutChoices = false;
     }
 
     private LinearLayout makeCard() {
@@ -174,4 +249,9 @@ public class SecuritySettingsActivity extends BaseActivity {
         card.setLayoutParams(lp);
         return card;
     }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
 }

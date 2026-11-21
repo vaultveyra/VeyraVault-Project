@@ -22,23 +22,36 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.veyravault.space.R;
+import com.veyravault.space.core.AsyncCloneRepository;
+import com.veyravault.space.core.AsyncCloneLaunchRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ShortcutHelper;
 import com.veyravault.space.core.VirtualHookManager;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends BaseActivity {
 
     private LinearLayout spacesContainer;
     private boolean fa;
+    private AsyncCloneRepository repository;
+    private AsyncCloneLaunchRepository launchRepository;
+    private long refreshGeneration;
+    private View toggleAllButton;
+    private TextView globalProfileSummary;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
+        repository = AsyncCloneRepository.getInstance(getApplicationContext());
+        launchRepository = AsyncCloneLaunchRepository.getInstance(getApplicationContext());
         buildDashboardUi();
         handleShortcutLaunch(getIntent());
     }
@@ -53,21 +66,71 @@ public class MainActivity extends BaseActivity {
         if (intent != null && intent.hasExtra("shortcut_pkg")) {
             String pkg = intent.getStringExtra("shortcut_pkg");
             int uid = intent.getIntExtra("shortcut_uid", 0);
-            CloneStore.CloneEntry e = CloneStore.getClone(this, pkg, uid);
-            if (e != null) Engine.launchClone(this, e);
+            if (pkg == null || pkg.trim().isEmpty() || uid < 0) {
+                Toast.makeText(this, fa ? "اطلاعات میانبر معتبر نیست." : "Shortcut identity is invalid.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            launchRepository.launchClone(pkg, uid, outcome -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (outcome == null || !outcome.isLaunched()) {
+                    String detail = outcome == null ? "UNKNOWN_LAUNCH_FAILURE"
+                            : (outcome.error != null ? outcome.error
+                            : outcome.launchResult == null ? "UNKNOWN_LAUNCH_FAILURE"
+                            : outcome.launchResult.failure);
+                    Toast.makeText(this, (fa ? "اجرای میانبر ناموفق بود: " : "Shortcut launch failed: ")
+                            + detail, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                showCloneLaunchFeedback(outcome, outcome.clone.displayName);
+            });
         }
+    }
+
+    private void showCloneLaunchFeedback(AsyncCloneLaunchRepository.Outcome outcome, String displayName) {
+        VirtualHookManager.LocationApplyResult hook = outcome.launchResult.locationResult;
+        if (hook != null && (hook.status == VirtualHookManager.LocationStatus.FAILED
+                || hook.status == VirtualHookManager.LocationStatus.UNSUPPORTED)) {
+            Toast.makeText(this,
+                    (fa ? "کلون اجرا شد؛ اما اعمال موقعیت تأیید نشد: " : "Clone launched; location hook was not verified: ")
+                            + hook.status + " (" + hook.detail + ")",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, (fa ? "در حال اجرای " : "Launching ") + displayName + "...",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void releaseReservationAfterConfirmedEngineAbsence(
+            CloneStore.CloneReservation reservation) {
+        repository.releaseReservationAfterEngineAbsence(reservation, true,
+                new AsyncCloneRepository.Callback<Boolean>() {
+                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
+                        // Explicit Engine absence was already verified by the caller.
+                    }
+                });
+    }
+
+    private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
+        boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
+                reservation.getPackageName(), reservation.getUserId());
+        repository.releaseReservationAfterEngineAbsence(reservation, confirmedAbsent,
+                result -> {
+                    // A failed or unknown Engine query leaves the durable reservation in place.
+                });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        loadGlobalProfileSummary();
         refreshSpaces();
     }
 
     private void buildDashboardUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F3F5F9"));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -78,18 +141,11 @@ public class MainActivity extends BaseActivity {
         brandTitle.setText("VeyraVault");
         brandTitle.setTextSize(22f);
         brandTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        brandTitle.setTextColor(Color.parseColor("#111827"));
+        brandTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         topBar.addView(brandTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView btnLang = makePillChip(getString(R.string.lang_switch), "#DBEAFE", "#2563EB");
-        btnLang.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                LocaleHelper.toggleLanguage(MainActivity.this);
-                recreate();
-            }
-        });
-        topBar.addView(btnLang);
+        topBar.addView(createLanguageAction(fa));
+        topBar.addView(createImmediateLockSwitch(fa));
         root.addView(topBar);
 
         LinearLayout banner = new LinearLayout(this);
@@ -104,16 +160,14 @@ public class MainActivity extends BaseActivity {
         bTitle.setTextColor(Color.WHITE);
         bTitle.setTextSize(16f);
         bTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        CloneStore.GlobalEnvConfig gCfg = CloneStore.getGlobalEnv(this);
         bTitle.setText(fa ? "فضاهای چندگانه و موقعیت مکانی هوشمند" : "Multi-Space & Global Virtual Locations");
         banner.addView(bTitle);
 
         TextView bSub = new TextView(this);
-        bSub.setTextColor(Color.parseColor("#DBEAFE"));
+        bSub.setTextColor(UiPalette.accentSurface(getApplicationContext()));
         bSub.setTextSize(12f);
-        bSub.setText(fa
-                ? ("مدل سراسری فعال: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | منطقه: " + gCfg.countryIso.toUpperCase())
-                : ("Global Device: " + gCfg.brand.toUpperCase() + " " + gCfg.model + " | Region: " + gCfg.countryIso.toUpperCase()));
+        bSub.setText(fa ? "در حال خواندن پروفایل ذخیره‌شده..." : "Loading saved profile...");
+        globalProfileSummary = bSub;
         banner.addView(bSub);
         banner.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -132,22 +186,12 @@ public class MainActivity extends BaseActivity {
         myClonesTv.setText(getString(R.string.my_clones));
         myClonesTv.setTextSize(18f);
         myClonesTv.setTypeface(Typeface.DEFAULT_BOLD);
-        myClonesTv.setTextColor(Color.parseColor("#111827"));
+        myClonesTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         secRow.addView(myClonesTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView btnToggleAll = makePillChip(fa ? "جمع/باز کردن همه ⊞" : "Collapse/Expand All ⊞", "#FFFFFF", "#374151");
-        btnToggleAll.setOnClickListener(new View.OnClickListener() {
-            boolean allCollapsed = false;
-            @Override
-            public void onClick(View v) {
-                allCollapsed = !allCollapsed;
-                Map<Integer, List<CloneStore.CloneEntry>> map = CloneStore.getGroupedBySpace(MainActivity.this);
-                for (Integer s : map.keySet()) {
-                    CloneStore.setSpaceCollapsed(MainActivity.this, s, allCollapsed);
-                }
-                refreshSpaces();
-            }
-        });
+        toggleAllButton = btnToggleAll;
+        btnToggleAll.setOnClickListener(v -> toggleAllSpaces());
         secRow.addView(btnToggleAll);
         root.addView(secRow);
 
@@ -162,29 +206,29 @@ public class MainActivity extends BaseActivity {
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setGravity(Gravity.CENTER);
         bottomBar.setBackgroundResource(R.drawable.bg_card_rounded);
-        bottomBar.setPadding(20, 18, 20, 18);
+        bottomBar.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams bottomLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bottomLp.setMargins(28, 8, 28, 24);
+        bottomLp.setMargins(dp(16), dp(6), dp(16), dp(14));
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_clones), true, new View.OnClickListener() {
-            @Override public void onClick(View v) { refreshSpaces(); }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        bottomBar.addView(makeNavButton(getString(R.string.nav_global_env), false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "خانه" : "Home", android.R.drawable.ic_menu_view, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, GlobalEnvironmentActivity.class));
+                startActivity(new Intent(MainActivity.this, DashboardActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
-        TextView fabPlus = new TextView(this);
-        fabPlus.setText("+");
-        fabPlus.setTextColor(Color.WHITE);
-        fabPlus.setTextSize(28f);
-        fabPlus.setGravity(Gravity.CENTER);
+        bottomBar.addView(makeNavButton(fa ? "فضاها" : "Spaces", android.R.drawable.ic_menu_agenda, true, new View.OnClickListener() {
+            @Override public void onClick(View v) { refreshSpaces(); }
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
+
+        ImageView fabPlus = new ImageView(this);
+        fabPlus.setImageResource(android.R.drawable.ic_input_add);
+        fabPlus.setColorFilter(Color.WHITE);
+        fabPlus.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        fabPlus.setContentDescription(fa ? "افزودن برنامه" : "Add app");
         fabPlus.setBackgroundResource(R.drawable.bg_pill_blue);
-        LinearLayout.LayoutParams fabLp = new LinearLayout.LayoutParams(132, 132);
-        fabLp.setMargins(16, 0, 16, 0);
+        LinearLayout.LayoutParams fabLp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        fabLp.setMargins(dp(8), 0, dp(8), 0);
         fabPlus.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -193,40 +237,150 @@ public class MainActivity extends BaseActivity {
         });
         bottomBar.addView(fabPlus, fabLp);
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_security), false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton("VPN", android.R.drawable.ic_menu_compass, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, SecuritySettingsActivity.class));
+                startActivity(new Intent(MainActivity.this, VpnStatusActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
-        bottomBar.addView(makeNavButton(getString(R.string.nav_about), false, new View.OnClickListener() {
+        bottomBar.addView(makeNavButton(fa ? "تنظیمات" : "Settings", android.R.drawable.ic_menu_preferences, false, new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, AboutActivity.class));
+                startActivity(new Intent(MainActivity.this, SettingsHubActivity.class));
             }
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }), new LinearLayout.LayoutParams(0, dp(54), 1f));
 
         root.addView(bottomBar, bottomLp);
         setContentView(root);
     }
 
-    private void refreshSpaces() {
-        if (spacesContainer == null) return;
-        spacesContainer.removeAllViews();
-        Map<Integer, List<CloneStore.CloneEntry>> grouped = CloneStore.getGroupedBySpace(this);
-        for (Map.Entry<Integer, List<CloneStore.CloneEntry>> entry : grouped.entrySet()) {
-            spacesContainer.addView(buildSpaceCard(entry.getKey(), entry.getValue()));
-        }
+    private void loadGlobalProfileSummary() {
+        repository.loadGlobalEnvironment(result -> {
+            if (isFinishing() || isDestroyed() || globalProfileSummary == null) return;
+            if (!result.isSuccess() || result.getValue() == null) {
+                globalProfileSummary.setText(fa ? "پروفایل ذخیره‌شده در دسترس نیست" : "Saved profile is unavailable");
+                return;
+            }
+            CloneStore.GlobalEnvConfig profile = result.getValue();
+            globalProfileSummary.setText(fa
+                    ? ("پروفایل ذخیره‌شده: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
+                            + " " + profile.model + " | منطقه: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT))
+                    : ("Saved Profile: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
+                            + " " + profile.model + " | Region: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT)));
+        });
     }
 
-    private View buildSpaceCard(final int spaceNum, final List<CloneStore.CloneEntry> clones) {
-        final boolean collapsed = CloneStore.isSpaceCollapsed(this, spaceNum);
+    private void refreshSpaces() {
+        if (spacesContainer == null) return;
+        final long request = ++refreshGeneration;
+        repository.loadClones(cloneResult -> {
+            if (!isCurrentRefresh(request)) return;
+            if (!cloneResult.isSuccess()) {
+                showSpaceLoadFailure(cloneResult.getMessage());
+                return; // Preserve the last known UI; never render corrupt data as an empty registry.
+            }
+            repository.loadCollapsedSpaces(collapsedResult -> {
+                if (!isCurrentRefresh(request)) return;
+                if (!collapsedResult.isSuccess() || collapsedResult.getValue() == null) {
+                    showSpaceLoadFailure(collapsedResult.getMessage());
+                    return; // Do not silently expand every Space when collapsed-state data is unreadable.
+                }
+                Map<Integer, List<CloneStore.CloneEntry>> grouped = groupClonesBySpace(cloneResult.getValue());
+                Set<Integer> collapsedSpaces = collapsedResult.getValue();
+                spacesContainer.removeAllViews();
+                for (Map.Entry<Integer, List<CloneStore.CloneEntry>> entry : grouped.entrySet()) {
+                    spacesContainer.addView(buildSpaceCard(entry.getKey(), entry.getValue(),
+                            collapsedSpaces.contains(entry.getKey())));
+                }
+            });
+        });
+    }
+
+    private boolean isCurrentRefresh(long request) {
+        return request == refreshGeneration && !isFinishing() && !isDestroyed();
+    }
+
+    private void showSpaceLoadFailure(String detail) {
+        if (isFinishing() || isDestroyed()) return;
+        String message = fa ? "خواندن فهرست فضاها ناموفق بود؛ اطلاعات قبلی نمایش‌داده‌شده حفظ شد."
+                : "Could not read Spaces; the previously displayed data was preserved.";
+        if (detail != null && !detail.trim().isEmpty()) message += " " + detail;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private Map<Integer, List<CloneStore.CloneEntry>> groupClonesBySpace(List<CloneStore.CloneEntry> clones) {
+        Map<Integer, List<CloneStore.CloneEntry>> grouped = new LinkedHashMap<Integer, List<CloneStore.CloneEntry>>();
+        for (CloneStore.CloneEntry clone : clones) {
+            int spaceNumber = clone.getSpaceNumber();
+            if (!grouped.containsKey(spaceNumber)) grouped.put(spaceNumber, new ArrayList<CloneStore.CloneEntry>());
+            grouped.get(spaceNumber).add(clone);
+        }
+        if (grouped.isEmpty()) grouped.put(1, new ArrayList<CloneStore.CloneEntry>());
+        return grouped;
+    }
+
+    private void toggleAllSpaces() {
+        if (toggleAllButton != null) toggleAllButton.setEnabled(false);
+        repository.loadClones(cloneResult -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!cloneResult.isSuccess()) {
+                finishToggleAllWithFailure(cloneResult.getMessage());
+                return;
+            }
+            repository.loadCollapsedSpaces(collapsedResult -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!collapsedResult.isSuccess() || collapsedResult.getValue() == null) {
+                    finishToggleAllWithFailure(collapsedResult.getMessage());
+                    return;
+                }
+                Map<Integer, List<CloneStore.CloneEntry>> grouped = groupClonesBySpace(cloneResult.getValue());
+                Set<Integer> collapsed = new HashSet<Integer>(collapsedResult.getValue());
+                boolean allCollapsed = true;
+                List<Integer> spaceNumbers = new ArrayList<Integer>(grouped.keySet());
+                for (Integer number : spaceNumbers) {
+                    if (!collapsed.contains(number)) { allCollapsed = false; break; }
+                }
+                setAllSpacesCollapsed(spaceNumbers, !allCollapsed, 0);
+            });
+        });
+    }
+
+    private void setAllSpacesCollapsed(final List<Integer> spaceNumbers, final boolean collapsed, final int index) {
+        if (isFinishing() || isDestroyed()) return;
+        if (index >= spaceNumbers.size()) {
+            if (toggleAllButton != null) toggleAllButton.setEnabled(true);
+            refreshSpaces();
+            return;
+        }
+        repository.setSpaceCollapsed(spaceNumbers.get(index), collapsed, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess()) {
+                finishToggleAllWithFailure(result.getMessage());
+                return; // Earlier commits may have succeeded; reload and report the partial outcome.
+            }
+            setAllSpacesCollapsed(spaceNumbers, collapsed, index + 1);
+        });
+    }
+
+    private void finishToggleAllWithFailure(String detail) {
+        if (toggleAllButton != null) toggleAllButton.setEnabled(true);
+        if (isFinishing() || isDestroyed()) return;
+        String message = fa ? "تغییر همه فضاها کامل نشد؛ ممکن است بخشی از تغییرات ذخیره شده باشد."
+                : "Could not update every Space; some earlier changes may already be saved.";
+        if (detail != null && !detail.trim().isEmpty()) message += " " + detail;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        refreshSpaces();
+    }
+
+    private View buildSpaceCard(final int spaceNum, final List<CloneStore.CloneEntry> clones,
+                                final boolean collapsed) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundResource(R.drawable.bg_card_rounded);
-        card.setPadding(32, 28, 32, 28);
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        card.setElevation(dp(2));
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardLp.bottomMargin = 28;
+        cardLp.bottomMargin = dp(14);
         card.setLayoutParams(cardLp);
 
         LinearLayout header = new LinearLayout(this);
@@ -235,9 +389,9 @@ public class MainActivity extends BaseActivity {
 
         TextView chevron = new TextView(this);
         chevron.setText(collapsed ? "⌄" : "⌃");
-        chevron.setTextSize(22f);
-        chevron.setTextColor(Color.parseColor("#6B7280"));
-        chevron.setPadding(12, 0, 20, 0);
+        chevron.setTextSize(20f);
+        chevron.setTextColor(UiPalette.muted(getApplicationContext()));
+        chevron.setPadding(dp(8), 0, dp(12), 0);
         header.addView(chevron);
 
         LinearLayout previewBox = new LinearLayout(this);
@@ -248,14 +402,14 @@ public class MainActivity extends BaseActivity {
             for (int i = 0; i < maxIcons; i++) {
                 ImageView mini = new ImageView(this);
                 mini.setImageDrawable(loadAppIcon(clones.get(i).packageName));
-                LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(68, 68);
+                LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(28), dp(28));
                 if (i > 0) mlp.setMargins(-18, 0, 0, 0);
                 previewBox.addView(mini, mlp);
             }
             TextView countPill = makePillChip(clones.size() + "+", "#E5E7EB", "#4B5563");
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            clp.setMargins(12, 0, 12, 0);
+            clp.setMargins(dp(8), 0, dp(8), 0);
             previewBox.addView(countPill, clp);
         }
         header.addView(previewBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -276,7 +430,7 @@ public class MainActivity extends BaseActivity {
             }
         });
         LinearLayout.LayoutParams gmlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gmlp.setMargins(12, 0, 12, 0);
+        gmlp.setMargins(dp(8), 0, dp(8), 0);
         header.addView(gmsChip, gmlp);
 
         TextView badge = makePillChip(String.valueOf(spaceNum), "#2563EB", "#FFFFFF");
@@ -286,15 +440,23 @@ public class MainActivity extends BaseActivity {
         spaceTitle.setText("  " + getString(R.string.space_label));
         spaceTitle.setTextSize(17f);
         spaceTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        spaceTitle.setTextColor(Color.parseColor("#111827"));
+        spaceTitle.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         header.addView(spaceTitle);
 
-        header.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                CloneStore.setSpaceCollapsed(MainActivity.this, spaceNum, !collapsed);
-                refreshSpaces();
-            }
+        header.setOnClickListener(v -> {
+            header.setEnabled(false);
+            repository.setSpaceCollapsed(spaceNum, !collapsed, result -> {
+                if (isFinishing() || isDestroyed()) return;
+                header.setEnabled(true);
+                if (result.isSuccess()) {
+                    refreshSpaces();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            (fa ? "وضعیت باز/بسته ذخیره نشد: " : "Space collapse state was not saved: ")
+                                    + result.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
         });
         card.addView(header);
 
@@ -302,14 +464,14 @@ public class MainActivity extends BaseActivity {
             if (clones.isEmpty()) {
                 TextView emptyTv = new TextView(this);
                 emptyTv.setText(fa ? "هنوز برنامه‌ای در این فضا نیست. دکمه + پایین را بزنید." : "No apps in this space yet. Tap + below to add.");
-                emptyTv.setTextColor(Color.parseColor("#9CA3AF"));
+                emptyTv.setTextColor(UiPalette.muted(getApplicationContext()));
                 emptyTv.setPadding(16, 32, 16, 16);
                 card.addView(emptyTv);
             } else {
                 GridLayout grid = new GridLayout(this);
-                grid.setColumnCount(4);
-                grid.setPadding(0, 24, 0, 8);
-                int cellWidth = (getResources().getDisplayMetrics().widthPixels - 160) / 4;
+                grid.setColumnCount(3);
+                grid.setPadding(0, dp(16), 0, dp(6));
+                int cellWidth = (getResources().getDisplayMetrics().widthPixels - dp(64)) / 3;
                 for (final CloneStore.CloneEntry item : clones) {
                     grid.addView(buildCloneCell(item, cellWidth));
                 }
@@ -323,13 +485,13 @@ public class MainActivity extends BaseActivity {
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER_HORIZONTAL);
-        cell.setPadding(8, 16, 8, 16);
+        cell.setPadding(dp(6), dp(10), dp(6), dp(10));
         cell.setLayoutParams(new ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout iconFrame = new FrameLayout(this);
         ImageView iconIv = new ImageView(this);
         iconIv.setImageDrawable(loadAppIcon(item.packageName));
-        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(126, 126, Gravity.CENTER);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER);
         iconFrame.addView(iconIv, iconLp);
 
         TextView spaceBadge = new TextView(this);
@@ -338,7 +500,7 @@ public class MainActivity extends BaseActivity {
         spaceBadge.setTextSize(10f);
         spaceBadge.setTypeface(Typeface.DEFAULT_BOLD);
         spaceBadge.setBackgroundResource(R.drawable.bg_pill_blue);
-        spaceBadge.setPadding(14, 2, 14, 2);
+        spaceBadge.setPadding(dp(8), dp(2), dp(8), dp(2));
         FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
         iconFrame.addView(spaceBadge, badgeLp);
@@ -346,10 +508,22 @@ public class MainActivity extends BaseActivity {
         iconFrame.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(MainActivity.this,
-                        (fa ? "در حال اجرای " : "Launching ") + item.displayName + "...",
-                        Toast.LENGTH_SHORT).show();
-                Engine.launchClone(MainActivity.this, item);
+                iconFrame.setEnabled(false);
+                launchRepository.launchClone(item.packageName, item.userId, outcome -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    iconFrame.setEnabled(true);
+                    if (outcome == null || !outcome.isLaunched()) {
+                        String detail = outcome == null ? "UNKNOWN_LAUNCH_FAILURE"
+                                : (outcome.error != null ? outcome.error
+                                : outcome.launchResult == null ? "UNKNOWN_LAUNCH_FAILURE"
+                                : outcome.launchResult.failure);
+                        Toast.makeText(MainActivity.this,
+                                (fa ? "اجرای کلون ناموفق بود: " : "Clone launch failed: ") + detail,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    showCloneLaunchFeedback(outcome, item.displayName);
+                });
             }
         });
         cell.addView(iconFrame);
@@ -357,14 +531,14 @@ public class MainActivity extends BaseActivity {
         LinearLayout labelRow = new LinearLayout(this);
         labelRow.setOrientation(LinearLayout.HORIZONTAL);
         labelRow.setGravity(Gravity.CENTER);
-        labelRow.setPadding(0, 10, 0, 0);
+        labelRow.setPadding(0, dp(7), 0, 0);
 
         TextView dots = new TextView(this);
         dots.setText("⋮");
         dots.setTextSize(17f);
         dots.setTypeface(Typeface.DEFAULT_BOLD);
-        dots.setTextColor(Color.parseColor("#6B7280"));
-        dots.setPadding(10, 0, 10, 0);
+        dots.setTextColor(UiPalette.muted(getApplicationContext()));
+        dots.setPadding(dp(8), 0, dp(8), 0);
         dots.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -376,7 +550,7 @@ public class MainActivity extends BaseActivity {
         TextView nameTv = new TextView(this);
         nameTv.setText(item.displayName);
         nameTv.setTextSize(12f);
-        nameTv.setTextColor(Color.parseColor("#374151"));
+        nameTv.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         nameTv.setSingleLine(true);
         nameTv.setEllipsize(TextUtils.TruncateAt.END);
         labelRow.addView(nameTv);
@@ -430,12 +604,12 @@ public class MainActivity extends BaseActivity {
         titleTv.setText(item.displayName);
         titleTv.setTextSize(17f);
         titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         infoCol.addView(titleTv);
 
         TextView locSub = new TextView(this);
         locSub.setTextSize(12f);
-        locSub.setTextColor(item.mockGpsEnabled ? Color.parseColor("#2563EB") : Color.parseColor("#9CA3AF"));
+        locSub.setTextColor(item.mockGpsEnabled ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext()));
         locSub.setText(item.mockGpsEnabled
                 ? String.format("📍 %.4f, %.4f", item.latitude, item.longitude)
                 : (getString(R.string.no_location_set) + " 📍"));
@@ -444,8 +618,8 @@ public class MainActivity extends BaseActivity {
         if (item.customDeviceEnabled && !item.deviceModel.isEmpty()) {
             TextView devSub = new TextView(this);
             devSub.setTextSize(11f);
-            devSub.setTextColor(Color.parseColor("#10B981"));
-            devSub.setText("📱 " + item.deviceBrand + " " + item.deviceModel);
+            devSub.setTextColor(UiPalette.success(getApplicationContext()));
+            devSub.setText((fa ? "📱 پروفایل ذخیره‌شده: " : "📱 Saved profile: ") + item.deviceBrand + " " + item.deviceModel);
             infoCol.addView(devSub);
         }
 
@@ -460,7 +634,7 @@ public class MainActivity extends BaseActivity {
         cfgHeader.setText(getString(R.string.configuration));
         cfgHeader.setTextSize(16f);
         cfgHeader.setTypeface(Typeface.DEFAULT_BOLD);
-        cfgHeader.setTextColor(Color.parseColor("#111827"));
+        cfgHeader.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         cfgHeader.setPadding(0, 36, 0, 24);
         root.addView(cfgHeader);
 
@@ -485,14 +659,64 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("⊞+", getString(R.string.duplicate), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                int nextUid = CloneStore.nextFreeUserIdForPackage(MainActivity.this, item.packageName);
-                CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
-                copy.packageName = item.packageName;
-                copy.userId = nextUid;
-                copy.displayName = item.displayName;
-                Engine.installPackageAsUser(copy.packageName, copy.userId);
-                CloneStore.upsertClone(MainActivity.this, copy);
-                refreshSpaces();
+                repository.reserveNextUserId(item.packageName, allocation -> {
+                    if (!allocation.isSuccess() || allocation.getValue() == null) {
+                        if (!isFinishing() && !isDestroyed()) {
+                            Toast.makeText(MainActivity.this,
+                                    (fa ? "رزرو شناسهٔ کلون ناموفق بود: " : "Could not reserve a clone ID: ")
+                                            + allocation.getMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                        return;
+                    }
+                    final CloneStore.CloneReservation reservation = allocation.getValue();
+                    if (isFinishing() || isDestroyed()) {
+                        releaseReservationIfEngineAbsent(reservation);
+                        return;
+                    }
+
+                    final CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
+                    copy.packageName = item.packageName;
+                    copy.userId = reservation.getUserId();
+                    copy.displayName = item.displayName;
+                    if (!Engine.installPackageAsUser(copy.packageName, copy.userId)) {
+                        boolean absent = Engine.isCloneConfirmedAbsent(copy.packageName, copy.userId);
+                        if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
+                        if (!isFinishing() && !isDestroyed()) {
+                            Toast.makeText(MainActivity.this,
+                                    fa
+                                            ? (absent
+                                                ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
+                                                : "وضعیت نصب نامشخص است؛ شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
+                                            : (absent
+                                                ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
+                                                : "Engine absence is unconfirmed; the ID remains reserved to prevent collision."),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                        return;
+                    }
+
+                    repository.commitReservedClone(copy, reservation, save -> {
+                        if (!save.isSuccess()) {
+                            boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
+                            if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation);
+                            if (!isFinishing() && !isDestroyed()) {
+                                Toast.makeText(MainActivity.this,
+                                        fa
+                                                ? (cleanupConfirmed
+                                                    ? "ثبت کلون ناموفق بود؛ حذف نصب تأیید شد و رزرو آزاد می‌شود."
+                                                    : "ثبت کلون ناموفق بود؛ حذف نصب تأیید نشد و شناسه رزرو می‌ماند.")
+                                                : (cleanupConfirmed
+                                                    ? "Clone registry commit failed; uninstall was confirmed and the reservation is being released."
+                                                    : "Clone registry commit failed and uninstall was not confirmed; the reservation remains blocked."),
+                                        Toast.LENGTH_LONG).show();
+                            }
+                            return;
+                        }
+                        if (isFinishing() || isDestroyed()) return;
+                        refreshSpaces();
+                    });
+                });
             }
         }));
 
@@ -500,6 +724,16 @@ public class MainActivity extends BaseActivity {
             @Override public void onClick(View v) {
                 sheet.dismiss();
                 showPerCloneDeviceIdentityDialog(item);
+            }
+        }));
+
+        actionGrid.addView(makeSheetActionBtn("🌐", fa ? "محیط کلون" : "Clone Environment", btnW, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                sheet.dismiss();
+                Intent intent = new Intent(MainActivity.this, CloneEnvironmentProfileActivity.class);
+                intent.putExtra("pkg", item.packageName);
+                intent.putExtra("uid", item.userId);
+                startActivity(intent);
             }
         }));
 
@@ -532,9 +766,23 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("🗑️", getString(R.string.uninstall), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                Engine.uninstallClone(item.packageName, item.userId);
-                CloneStore.removeClone(MainActivity.this, item.packageName, item.userId);
-                refreshSpaces();
+                if (!Engine.uninstallClone(item.packageName, item.userId)) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
+                               : "The engine did not confirm uninstall; the Space record was preserved.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                repository.removeClone(item.packageName, item.userId, result -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!result.isSuccess()) {
+                        Toast.makeText(MainActivity.this,
+                                fa ? "برنامه حذف شد، اما ثبت حذف در فهرست ناموفق بود."
+                                   : "The app was uninstalled, but removing its registry entry failed.",
+                                Toast.LENGTH_LONG).show();
+                    }
+                    refreshSpaces();
+                });
             }
         }));
 
@@ -567,7 +815,7 @@ public class MainActivity extends BaseActivity {
         TextView tv = new TextView(this);
         tv.setText(label);
         tv.setTextSize(12f);
-        tv.setTextColor(Color.parseColor("#374151"));
+        tv.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, 10, 0, 0);
         wrap.addView(tv);
@@ -586,11 +834,20 @@ public class MainActivity extends BaseActivity {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         String n = et.getText().toString().trim();
-                        if (!n.isEmpty()) {
-                            item.displayName = n;
-                            CloneStore.upsertClone(MainActivity.this, item);
+                        if (n.isEmpty()) return;
+                        final String previousName = item.displayName;
+                        item.displayName = n;
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.displayName = previousName;
+                                Toast.makeText(MainActivity.this,
+                                        (fa ? "ذخیره ناموفق بود: " : "Name was not saved: ") + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
                             refreshSpaces();
-                        }
+                        });
                     }
                 })
                 .setNegativeButton(fa ? "انصراف" : "Cancel", null)
@@ -640,27 +897,55 @@ public class MainActivity extends BaseActivity {
         }
 
         new AlertDialog.Builder(this)
-                .setTitle(fa ? ("هویت دستگاه برای " + item.displayName + " (فضای " + item.getSpaceNumber() + ")")
-                             : ("Device Identity for " + item.displayName))
+                .setTitle(fa ? ("اطلاعات پروفایل دستگاه برای " + item.displayName + " (فضای " + item.getSpaceNumber() + ")")
+                             : ("Saved Device Profile for " + item.displayName))
                 .setView(box)
-                .setPositiveButton(fa ? "فعال‌سازی و ذخیره" : "Enable & Save", new DialogInterface.OnClickListener() {
+                .setPositiveButton(fa ? "ذخیره اطلاعات پروفایل" : "Save Profile Metadata", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        final boolean previousEnabled = item.customDeviceEnabled;
+                        final String previousBrand = item.deviceBrand;
+                        final String previousModel = item.deviceModel;
                         item.customDeviceEnabled = true;
                         item.deviceBrand = brandEt.getText().toString().trim();
                         item.deviceModel = modelEt.getText().toString().trim();
-                        CloneStore.upsertClone(MainActivity.this, item);
-                        VirtualHookManager.syncCloneHooks(MainActivity.this, item);
-                        Toast.makeText(MainActivity.this,
-                                fa ? "مشخصات دستگاه برای این کلون ثبت شد" : "Custom device identity saved for this clone",
-                                Toast.LENGTH_SHORT).show();
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.customDeviceEnabled = previousEnabled;
+                                item.deviceBrand = previousBrand;
+                                item.deviceModel = previousModel;
+                                Toast.makeText(MainActivity.this,
+                                        (fa ? "ذخیره پروفایل ناموفق بود: " : "Profile metadata was not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            refreshSpaces();
+                            Toast.makeText(MainActivity.this,
+                                    fa ? "اطلاعات پروفایل ذخیره شد؛ موتور فعلی آن را روی کلون اعمال نمی‌کند."
+                                       : "Profile metadata saved; the current engine does not apply it to this clone.",
+                                    Toast.LENGTH_SHORT).show();
+                        });
                     }
                 })
-                .setNeutralButton(fa ? "استفاده از مدل سراسری" : "Use Global Default", new DialogInterface.OnClickListener() {
+                .setNeutralButton(fa ? "استفاده از پروفایل سراسری ذخیره‌شده" : "Use Saved Global Profile", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        final boolean previousEnabled = item.customDeviceEnabled;
                         item.customDeviceEnabled = false;
-                        CloneStore.upsertClone(MainActivity.this, item);
+                        repository.upsertClone(item, result -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (!result.isSuccess()) {
+                                item.customDeviceEnabled = previousEnabled;
+                                Toast.makeText(MainActivity.this,
+                                        (fa ? "ذخیره تنظیمات ناموفق بود: " : "Settings were not saved: ")
+                                                + result.getMessage(),
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                refreshSpaces();
+                            }
+                        });
                     }
                 })
                 .setNegativeButton(fa ? "بستن" : "Close", null)
@@ -668,37 +953,69 @@ public class MainActivity extends BaseActivity {
     }
 
     private void showBatchUninstallDialog() {
-        final List<CloneStore.CloneEntry> all = CloneStore.getAll(this);
-        if (all.isEmpty()) return;
-        String[] labels = new String[all.size()];
-        final boolean[] checked = new boolean[all.size()];
-        for (int i = 0; i < all.size(); i++) {
-            CloneStore.CloneEntry e = all.get(i);
-            labels[i] = e.displayName + " (" + getString(R.string.space_label) + " " + e.getSpaceNumber() + ")";
+        repository.loadClones(result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (!result.isSuccess() || result.getValue() == null) {
+                Toast.makeText(this, fa ? "فهرست کلون‌ها قابل خواندن نیست؛ حذف گروهی متوقف شد."
+                        : "Clone registry could not be read; batch uninstall was stopped.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            final List<CloneStore.CloneEntry> all = result.getValue();
+            if (all.isEmpty()) return;
+            String[] labels = new String[all.size()];
+            final boolean[] checked = new boolean[all.size()];
+            for (int i = 0; i < all.size(); i++) {
+                CloneStore.CloneEntry e = all.get(i);
+                labels[i] = e.displayName + " (" + getString(R.string.space_label) + " " + e.getSpaceNumber() + ")";
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.batch_uninstall))
+                    .setMultiChoiceItems(labels, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                    .setPositiveButton(getString(R.string.uninstall), (d, w) -> {
+                        int selected = 0;
+                        for (boolean value : checked) if (value) selected++;
+                        if (selected == 0) return;
+                        Toast.makeText(this, fa ? "حذف گروهی آغاز شد..." : "Batch uninstall started...", Toast.LENGTH_SHORT).show();
+                        runBatchUninstall(all, checked, 0, new int[]{0, 0, 0});
+                    })
+                    .setNegativeButton(fa ? "انصراف" : "Cancel", null)
+                    .show();
+        });
+    }
+
+    // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
+    private void runBatchUninstall(List<CloneStore.CloneEntry> all, boolean[] checked,
+                                   int index, int[] counts) {
+        if (isFinishing() || isDestroyed()) return;
+        int next = index;
+        while (next < all.size()) {
+            if (!checked[next]) {
+                next++;
+                continue;
+            }
+            CloneStore.CloneEntry entry = all.get(next);
+            final int nextIndex = next + 1;
+            if (!Engine.uninstallClone(entry.packageName, entry.userId)) {
+                counts[1]++;
+                next++;
+                continue;
+            }
+            repository.removeClone(entry.packageName, entry.userId, result -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result.isSuccess()) counts[0]++;
+                else counts[2]++;
+                runBatchUninstall(all, checked, nextIndex, counts);
+            });
+            return; // Wait for the registry commit before uninstalling the next selected clone.
         }
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.batch_uninstall))
-                .setMultiChoiceItems(labels, checked, new DialogInterface.OnMultiChoiceClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which, boolean isChecked) {
-                        checked[which] = isChecked;
-                    }
-                })
-                .setPositiveButton(getString(R.string.uninstall), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int w) {
-                        for (int i = 0; i < all.size(); i++) {
-                            if (checked[i]) {
-                                CloneStore.CloneEntry e = all.get(i);
-                                Engine.uninstallClone(e.packageName, e.userId);
-                                CloneStore.removeClone(MainActivity.this, e.packageName, e.userId);
-                            }
-                        }
-                        refreshSpaces();
-                    }
-                })
-                .setNegativeButton(fa ? "انصراف" : "Cancel", null)
-                .show();
+
+        String summary = fa
+                ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
+                        + "، خطای ثبت فهرست: " + counts[2])
+                : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
+                        + ", registry failures: " + counts[2]);
+        Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+        refreshSpaces();
     }
 
     private Drawable loadAppIcon(String pkg) {
@@ -714,22 +1031,39 @@ public class MainActivity extends BaseActivity {
         tv.setText(text);
         tv.setTextSize(12f);
         tv.setTypeface(Typeface.DEFAULT_BOLD);
-        tv.setTextColor(Color.parseColor(fgHex));
+        tv.setTextColor(UiPalette.fromLegacyHex(getApplicationContext(), fgHex));
         tv.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        tv.getBackground().setTint(Color.parseColor(bgHex));
+        tv.getBackground().setTint(UiPalette.fromLegacyHex(getApplicationContext(), bgHex));
         tv.setPadding(28, 12, 28, 12);
         return tv;
     }
 
-    private View makeNavButton(String title, boolean active, View.OnClickListener l) {
-        TextView tv = new TextView(this);
-        tv.setText(title);
-        tv.setGravity(Gravity.CENTER);
-        tv.setTextSize(12f);
-        tv.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-        tv.setTextColor(Color.parseColor(active ? "#2563EB" : "#6B7280"));
-        tv.setPadding(8, 16, 8, 16);
-        tv.setOnClickListener(l);
-        return tv;
+    private View makeNavButton(String title, int iconRes, boolean active, View.OnClickListener listener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(title);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter((active ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext())));
+        item.addView(icon, new LinearLayout.LayoutParams(dp(21), dp(21)));
+
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setGravity(Gravity.CENTER);
+        label.setTextSize(10f);
+        label.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        label.setTextColor((active ? UiPalette.accent(getApplicationContext()) : UiPalette.muted(getApplicationContext())));
+        label.setPadding(0, dp(3), 0, 0);
+        item.addView(label);
+        item.setOnClickListener(listener);
+        return item;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }
