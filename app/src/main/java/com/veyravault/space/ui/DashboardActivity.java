@@ -333,12 +333,12 @@ public class DashboardActivity extends BaseActivity {
             }
 
             final String summary = (fa ? "قفل برنامه: " : "App lock: ") + appLockState
-                    + (fa ? "\\nمدیر دستگاه Android: " : "\\nAndroid Device Admin: ") + deviceAdminState
-                    + (fa ? "\\nوضعیت Core موتور: " : "\\nEngine Core: ") + engineCoreState
-                    + (fa ? "\\nچرخه عمر پروفایل Clone: " : "\\nClone profile lifecycle: ")
+                    + (fa ? "\nمدیر دستگاه Android: " : "\nAndroid Device Admin: ") + deviceAdminState
+                    + (fa ? "\nوضعیت Core موتور: " : "\nEngine Core: ") + engineCoreState
+                    + (fa ? "\nچرخه عمر پروفایل Clone: " : "\nClone profile lifecycle: ")
                     + profileLifecycleState
-                    + (fa ? "\\nاین بخش فقط وضعیت را می‌خواند و هیچ تنظیم امنیتی را تغییر نمی‌دهد."
-                          : "\\nThis panel is read-only and does not change security settings.");
+                    + (fa ? "\nاین بخش فقط وضعیت را می‌خواند و هیچ تنظیم امنیتی را تغییر نمی‌دهد."
+                          : "\nThis panel is read-only and does not change security settings.");
 
             dateRefreshHandler.post(() -> {
                 if (isFinishing() || isDestroyed()
