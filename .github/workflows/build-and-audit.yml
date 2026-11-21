@@ -98,6 +98,8 @@ jobs:
         run: python3 scripts/test_app_lock_lifecycle_contract.py
       - name: Test actual Device Admin state contract
         run: python3 scripts/test_device_admin_state_contract.py
+      - name: Test Dashboard read-only security and Engine summary
+        run: python3 scripts/test_dashboard_read_only_security_engine_contract.py
       - name: Test launcher icon and truthful About contract
         run: python3 scripts/test_launcher_icon_and_about_contract.py
       - name: Test Add App picker UI contract
