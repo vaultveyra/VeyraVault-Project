@@ -26,17 +26,36 @@ import com.veyravault.space.core.ProfileSettings;
 import com.veyravault.space.core.ProfileResolver;
 import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.DashboardDateFormatter;
+import com.veyravault.space.core.Engine;
+import com.veyravault.space.security.VaultDeviceAdminReceiver;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class DashboardActivity extends BaseActivity {
     private final Handler dateRefreshHandler = new Handler(Looper.getMainLooper());
     private final List<Runnable> dateRefreshTasks = new ArrayList<>();
+    private final ExecutorService dashboardStatusExecutor = Executors.newSingleThreadExecutor();
+    private int dashboardStatusGeneration;
+    private TextView platformSecuritySummary;
+
+    @Override protected void onResume() {
+        super.onResume();
+        refreshReadOnlyPlatformStatus();
+    }
+
+    @Override protected void onPause() {
+        dashboardStatusGeneration++;
+        super.onPause();
+    }
 
     @Override protected void onDestroy() {
+        dashboardStatusGeneration++;
+        dashboardStatusExecutor.shutdownNow();
         for (Runnable task : dateRefreshTasks) dateRefreshHandler.removeCallbacks(task);
         dateRefreshTasks.clear();
         super.onDestroy();
@@ -113,6 +132,9 @@ public class DashboardActivity extends BaseActivity {
         final TextView globalMetadataSummary = addSummaryCard(root,
                 fa ? "مشخصات سراسری ذخیره‌شده (فقط Metadata)" : "Saved Global Device Metadata",
                 fa ? "در حال خواندن اطلاعات…" : "Reading saved metadata…");
+        platformSecuritySummary = addSummaryCard(root,
+                fa ? "وضعیت امنیت و موتور (فقط خواندنی)" : "Security & Engine Status (Read-only)",
+                fa ? "در حال بررسی وضعیت‌ها…" : "Checking read-only status…");
         addSummaryCard(root,
                 fa ? "IP عمومی" : "Public IP",
                 fa ? "بررسی نشده است؛ داشبورد هیچ درخواست جست‌وجوی IP به سرویس خارجی ارسال نکرده است."
@@ -258,6 +280,87 @@ public class DashboardActivity extends BaseActivity {
 
         root.addView(card, params);
         return value;
+    }
+
+    private void refreshReadOnlyPlatformStatus() {
+        if (platformSecuritySummary == null || dashboardStatusExecutor.isShutdown()) return;
+        final int generation = ++dashboardStatusGeneration;
+        final Context appContext = getApplicationContext();
+        final boolean fa = LocaleHelper.isPersian(this);
+
+        // Engine reflection and Android system-service reads stay off the UI thread.
+        dashboardStatusExecutor.execute(() -> {
+            String appLockState;
+            try {
+                boolean lockEnabled = com.veyravault.space.security.SecurityManager
+                        .isLockEnabled(appContext);
+                appLockState = !lockEnabled
+                        ? (fa ? "تنظیم نشده" : "Not configured")
+                        : (com.veyravault.space.security.SecurityManager.isSessionUnlocked(appContext)
+                            ? (fa ? "فعال؛ نشست باز است" : "Configured; session unlocked")
+                            : (fa ? "فعال؛ نشست قفل است" : "Configured; session locked"));
+            } catch (RuntimeException failure) {
+                appLockState = fa ? "وضعیت در دسترس نیست" : "Status unavailable";
+            }
+
+            String deviceAdminState;
+            try {
+                deviceAdminState = VaultDeviceAdminReceiver.isAntiUninstallActive(appContext)
+                        ? (fa ? "فعال" : "Active")
+                        : (fa ? "غیرفعال" : "Inactive");
+            } catch (RuntimeException failure) {
+                deviceAdminState = fa ? "وضعیت در دسترس نیست" : "Status unavailable";
+            }
+
+            String engineCoreState;
+            try {
+                engineCoreState = Engine.getCore() != null
+                        ? (fa ? "Core شناسایی شد؛ آماده‌بودن کامل تأیید نشده"
+                              : "Core detected; full readiness is not verified")
+                        : (fa ? "Core شناسایی نشد" : "Core not detected");
+            } catch (RuntimeException failure) {
+                engineCoreState = fa ? "وضعیت Core در دسترس نیست"
+                        : "Core status unavailable";
+            }
+
+            String profileLifecycleState;
+            try {
+                profileLifecycleState = describeProfileLifecycle(
+                        Engine.getProfileLifecycleDiagnostic(), fa);
+            } catch (RuntimeException failure) {
+                profileLifecycleState = fa ? "وضعیت Callback در دسترس نیست"
+                        : "Callback status unavailable";
+            }
+
+            final String summary = (fa ? "قفل برنامه: " : "App lock: ") + appLockState
+                    + (fa ? "\\nمدیر دستگاه Android: " : "\\nAndroid Device Admin: ") + deviceAdminState
+                    + (fa ? "\\nوضعیت Core موتور: " : "\\nEngine Core: ") + engineCoreState
+                    + (fa ? "\\nچرخه عمر پروفایل Clone: " : "\\nClone profile lifecycle: ")
+                    + profileLifecycleState
+                    + (fa ? "\\nاین بخش فقط وضعیت را می‌خواند و هیچ تنظیم امنیتی را تغییر نمی‌دهد."
+                          : "\\nThis panel is read-only and does not change security settings.");
+
+            dateRefreshHandler.post(() -> {
+                if (isFinishing() || isDestroyed()
+                        || generation != dashboardStatusGeneration
+                        || platformSecuritySummary == null) return;
+                platformSecuritySummary.setText(summary);
+            });
+        });
+    }
+
+    private String describeProfileLifecycle(String diagnostic, boolean fa) {
+        if ("REGISTERED".equals(diagnostic))
+            return fa ? "ثبت شده" : "Registered";
+        if ("NOT_REGISTERED".equals(diagnostic))
+            return fa ? "هنوز ثبت نشده" : "Not registered";
+        if ("ENGINE_UNAVAILABLE".equals(diagnostic))
+            return fa ? "موتور در دسترس نیست" : "Engine unavailable";
+        if ("INVALID_CONTEXT".equals(diagnostic))
+            return fa ? "Context معتبر نیست" : "Invalid context";
+        if (diagnostic != null && diagnostic.startsWith("REGISTRATION_FAILED:"))
+            return fa ? "ثبت Callback ناموفق بود" : "Callback registration failed";
+        return fa ? "وضعیت نامشخص" : "Unknown status";
     }
 
     private String describeHostNetwork(boolean fa) {
