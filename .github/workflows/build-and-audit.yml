@@ -169,6 +169,9 @@ jobs:
             echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
+      - name: Test source audit contract
+        run: python3 scripts/test_source_audit_contract.py
+
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
 
