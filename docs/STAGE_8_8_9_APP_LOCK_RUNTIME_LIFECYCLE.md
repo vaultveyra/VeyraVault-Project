@@ -9,11 +9,12 @@ Exercise the production `AppLockLifecycleController` through actual Android Acti
 - Add `AppLockLifecycleProbeActivity` under `app/src/debug` and declare it only in the Debug manifest. It is not part of the Release manifest.
 - Add `AppLockLifecycleRuntimeInstrumentationTest` under `app/src/androidTest`.
 - The test runs in the target app's main process, checks `ProcessUtils.isMainProcess`, and invokes the same production `AppLockLifecycleController.initialize(Application)` entry point called by `VaultApp.onCreate()`.
-- Launch two real probe Activities through `Context.startActivity`, then observe their actual `onActivityStarted` and `onActivityStopped` deliveries using an additional `Application.ActivityLifecycleCallbacks` observer.
+- Launch the initial probe Activity through `ActivityScenario`; launch the second probe Activity by calling `startActivity` from the first Activity itself. The test asserts both Activities have the same task ID, so the transition models normal in-app navigation rather than two independently launched test tasks.
+- Observe actual `onActivityResumed`, `onActivityPaused`, and `onActivityStopped` deliveries using an additional `Application.ActivityLifecycleCallbacks` observer. The observer tracks which probe Activity is currently resumed and waits for the first Activity to resume again before checking that the session is still unlocked.
 - Avoid `Instrumentation.startActivitySync` and `waitForIdleSync` because both introduce a global main-loop-idle dependency that proved unreliable in the hosted emulator.
-- Verify that transitioning between Activities does not lock while one remains started, then finish the final Activity and verify that the production main-thread Handler locks the session using the configured immediate timeout.
+- Verify that navigating from the first Activity to the second and back does not lock the session, then finish the final Activity and verify that the production main-thread Handler locks the session using the configured immediate timeout.
 - Snapshot and restore the original credential keys, timeout preference, and in-process `sessionUnlocked` flag. Verify the preference values are exactly restored. No app data clearing or Clone/session/account mutation is performed.
-- Add a source contract for the production startup call, main-process guard, Debug-only probe Activity, callback-driven test, cleanup, and CI wiring.
+- Add a source contract for the production startup call, main-process guard, Debug-only probe Activity, same-task navigation, callback-driven assertions, cleanup, and CI wiring.
 
 ## Validation boundary
 

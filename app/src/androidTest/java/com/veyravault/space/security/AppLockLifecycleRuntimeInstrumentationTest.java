@@ -3,6 +3,7 @@ package com.veyravault.space.security;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 
@@ -55,7 +56,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         boolean originalUnlockedState = unlockedField.getBoolean(null);
 
         ProbeActivityHandle firstActivity = null;
-        ProbeActivityHandle secondActivity = null;
+        Activity secondActivity = null;
         boolean controllerInitialized = false;
         ProbeLifecycleObserver lifecycleObserver = new ProbeLifecycleObserver();
 
@@ -82,14 +83,17 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             assertTrue("First Activity should leave the test session unlocked",
                     SecurityManager.isSessionUnlocked(context));
 
-            // The second Activity starts before the first finishes. The app must remain
-            // foregrounded while at least one Activity is started.
-            secondActivity = launchProbeActivity(lifecycleObserver);
+            // Launch the second Activity from the first Activity itself. This guarantees a real
+            // same-task navigation transition instead of two independently launched test tasks.
+            secondActivity = launchProbeActivityFrom(firstActivity, lifecycleObserver);
             assertTrue("Opening a second Activity must not lock the session",
                     SecurityManager.isSessionUnlocked(context));
 
             finishProbeActivity(secondActivity, lifecycleObserver);
             secondActivity = null;
+            assertTrue("The first Activity must be resumed again before checking the session",
+                    lifecycleObserver.awaitActiveResumed(
+                            firstActivity.activity, ACTIVITY_EVENT_TIMEOUT_MILLIS));
             assertTrue("Returning to the first Activity must cancel the pending background lock",
                     SecurityManager.isSessionUnlocked(context));
 
@@ -127,8 +131,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
     private static ProbeActivityHandle launchProbeActivity(
             ProbeLifecycleObserver observer) throws InterruptedException {
-        // ActivityScenario owns launch and teardown, avoiding timing-sensitive manual launch
-        // monitoring while still exercising Android's real Application lifecycle callbacks.
+        // ActivityScenario owns the initial launch and final teardown while the observer verifies
+        // the real Application callbacks.
         ActivityScenario<AppLockLifecycleProbeActivity> scenario =
                 ActivityScenario.launch(AppLockLifecycleProbeActivity.class);
         Activity[] activityHolder = new Activity[1];
@@ -140,16 +144,55 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         return new ProbeActivityHandle(scenario, activity);
     }
 
+    private static Activity launchProbeActivityFrom(
+            ProbeActivityHandle parent,
+            ProbeLifecycleObserver observer) throws InterruptedException {
+        parent.activity.runOnUiThread(() -> parent.activity.startActivity(
+                new Intent(parent.activity, AppLockLifecycleProbeActivity.class)));
+        Activity activity = observer.awaitAnotherResumedProbe(
+                parent.activity, ACTIVITY_EVENT_TIMEOUT_MILLIS);
+        assertNotNull("Second probe Activity did not reach onActivityResumed", activity);
+        assertEquals("Navigation Activity must remain in the first Activity task",
+                parent.activity.getTaskId(), activity.getTaskId());
+        return activity;
+    }
+
+    private static void finishProbeActivity(
+            Activity activity,
+            ProbeLifecycleObserver observer) throws InterruptedException {
+        CountDownLatch stopped = observer.expectStopped(activity);
+        activity.runOnUiThread(activity::finish);
+        assertTrue("Debug lifecycle probe Activity did not reach onActivityStopped",
+                stopped.await(ACTIVITY_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+        observer.clearStopWaiter(activity);
+    }
+
     private static void finishProbeActivity(
             ProbeActivityHandle handle,
             ProbeLifecycleObserver observer) throws InterruptedException {
         CountDownLatch stopped = observer.expectStopped(handle.activity);
-        // ActivityScenario.close() drives the Activity to DESTROYED on the main thread and
-        // waits for the lifecycle transition; the observer verifies the actual STOPPED event.
+        // ActivityScenario.close() destroys the initial Activity; the observer independently
+        // confirms the actual onActivityStopped callback reached the production controller.
         handle.scenario.close();
-        assertTrue("Debug lifecycle probe Activity did not reach onActivityStopped",
+        assertTrue("Final debug lifecycle probe Activity did not reach onActivityStopped",
                 stopped.await(ACTIVITY_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
         observer.clearStopWaiter(handle.activity);
+    }
+
+    private static void closeProbeActivityQuietly(
+            Activity activity,
+            ProbeLifecycleObserver observer) {
+        if (activity == null) return;
+        try {
+            CountDownLatch stopped = observer.expectStopped(activity);
+            activity.runOnUiThread(activity::finish);
+            stopped.await(5L, TimeUnit.SECONDS);
+            observer.clearStopWaiter(activity);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException ignored) {
+            // Preserve the original assertion while still restoring the saved security state.
+        }
     }
 
     private static void closeProbeActivityQuietly(
@@ -225,6 +268,30 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             return resumed;
         }
 
+        Activity awaitAnotherResumedProbe(Activity excluded, long timeoutMillis)
+                throws InterruptedException {
+            long deadline = SystemClock.elapsedRealtime() + timeoutMillis;
+            while (SystemClock.elapsedRealtime() < deadline) {
+                for (Activity activity : resumedActivities) {
+                    if (activity != excluded && activity instanceof AppLockLifecycleProbeActivity) {
+                        return activity;
+                    }
+                }
+                Thread.sleep(10L);
+            }
+            return null;
+        }
+
+        boolean awaitActiveResumed(Activity activity, long timeoutMillis)
+                throws InterruptedException {
+            long deadline = SystemClock.elapsedRealtime() + timeoutMillis;
+            while (SystemClock.elapsedRealtime() < deadline) {
+                if (resumedActivities.contains(activity)) return true;
+                Thread.sleep(10L);
+            }
+            return resumedActivities.contains(activity);
+        }
+
         CountDownLatch expectStopped(Activity activity) {
             CountDownLatch latch = new CountDownLatch(1);
             if (stoppedActivities.contains(activity)) {
@@ -267,6 +334,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         }
 
         @Override public void onActivityCreated(Activity activity, android.os.Bundle state) { }
+
         @Override public void onActivityResumed(Activity activity) {
             if (activity instanceof AppLockLifecycleProbeActivity) {
                 resumedActivities.add(activity);
@@ -274,8 +342,16 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
                 if (latch != null) latch.countDown();
             }
         }
-        @Override public void onActivityPaused(Activity activity) { }
-        @Override public void onActivitySaveInstanceState(Activity activity, android.os.Bundle state) { }
+
+        @Override public void onActivityPaused(Activity activity) {
+            if (activity instanceof AppLockLifecycleProbeActivity) {
+                resumedActivities.remove(activity);
+            }
+        }
+
+        @Override public void onActivitySaveInstanceState(
+                Activity activity, android.os.Bundle state) { }
+
         @Override public void onActivityDestroyed(Activity activity) { }
     }
 }

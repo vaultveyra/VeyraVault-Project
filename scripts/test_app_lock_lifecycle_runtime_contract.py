@@ -23,9 +23,15 @@ for marker in (
     "AppLockLifecycleController.initialize(application)",
     "application.registerActivityLifecycleCallbacks(lifecycleObserver)",
     "ActivityScenario.launch(AppLockLifecycleProbeActivity.class)",
+    "parent.activity.startActivity(",
+    "new Intent(parent.activity, AppLockLifecycleProbeActivity.class)",
+    "observer.awaitAnotherResumedProbe(",
+    "observer.awaitActiveResumed(",
+    "parent.activity.getTaskId(), activity.getTaskId()",
+    "activity.runOnUiThread(activity::finish)",
     "handle.scenario.close()",
     "observer.expectStopped(handle.activity)",
-    "CountDownLatch existing = resumeWaiters.putIfAbsent(activity, latch)",
+    "resumedActivities.remove(activity)",
     "stoppedActivities.add(activity)",
     "resumedActivities.add(activity)",
     "observer.awaitResumed(activity, ACTIVITY_EVENT_TIMEOUT_MILLIS)",
@@ -41,17 +47,24 @@ for marker in (
 ):
     assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
-assert "ActivityMonitor" not in test, "Use ActivityScenario to avoid timing-sensitive manual launch monitoring."
-assert "ActivityScenario<AppLockLifecycleProbeActivity>" in test, "Use ActivityScenario to own Activity launch and teardown."
-assert "launchProbeActivity(context, instrumentation, lifecycleObserver)" not in test, "Every probe launch must use the ActivityScenario helper signature."
-assert test.count("launchProbeActivity(lifecycleObserver)") == 2, "Both foreground Activities must use the ActivityScenario helper."
-assert "void markRegistered()" in test, "Lifecycle observer registration state must be explicitly recorded after registration."
-assert "void markUnregistered()" in test, "Lifecycle observer unregistration state must be explicitly recorded after unregistration."
-assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
-assert "waitForIdleSync(" not in test, "Lifecycle instrumentation must use callback signals rather than global idle waits."
+assert test.count("ActivityScenario.launch(AppLockLifecycleProbeActivity.class)") == 1, (
+    "ActivityScenario must launch only the first Activity; the second must be started from its parent task."
+)
+assert test.count("launchProbeActivity(lifecycleObserver)") == 1, (
+    "The test must create one ActivityScenario and one same-task navigation Activity."
+)
+assert "ActivityMonitor" not in test
+assert "launchProbeActivity(context, instrumentation, lifecycleObserver)" not in test
+assert "FLAG_ACTIVITY_NEW_TASK" not in test
+assert "void markRegistered()" in test
+assert "void markUnregistered()" in test
+assert "startActivitySync(" not in test
+assert "waitForIdleSync(" not in test
 assert "test_app_lock_lifecycle_runtime_contract.py" in workflow
+
 print("PASS: VaultApp registers the production lifecycle controller only in the package main process.")
-print("PASS: Debug-only Activity is launched and closed through ActivityScenario, with real Application callbacks observed.")
-print("PASS: The test verifies no premature lock during Activity transition and lock after the final Activity stops.")
-print("PASS: No startActivitySync/waitForIdleSync global idle barrier is used.")
+print("PASS: The initial Debug Activity is launched by ActivityScenario; the next Activity is opened from its parent in the same task.")
+print("PASS: The test verifies the second Activity shares the task, then waits for the first Activity to resume before checking the unlocked session.")
+print("PASS: Finishing the final Activity still verifies the configured background lock through real Application callbacks.")
+print("PASS: No startActivitySync/waitForIdleSync global idle barrier or independent ActivityScenario task is used.")
 print("PASS: Credential preferences, policy preferences, and the original in-memory session flag are restored.")
