@@ -144,6 +144,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             context.startActivity(intent);
             Activity activity = monitor.waitForActivityWithTimeout(ACTIVITY_EVENT_TIMEOUT_MILLIS);
             assertNotNull("Debug lifecycle probe Activity was not launched by ActivityManager", activity);
+            assertTrue("Debug lifecycle probe Activity did not reach onActivityResumed",
+                    observer.awaitResumed(activity, ACTIVITY_EVENT_TIMEOUT_MILLIS));
             return activity;
         } finally {
             instrumentation.removeMonitor(monitor);
@@ -210,17 +212,40 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
     private static final class ProbeLifecycleObserver
             implements Application.ActivityLifecycleCallbacks {
+        private final Map<Activity, CountDownLatch> resumeWaiters = new ConcurrentHashMap<>();
         private final Map<Activity, CountDownLatch> stopWaiters = new ConcurrentHashMap<>();
+        private final java.util.Set<Activity> resumedActivities = ConcurrentHashMap.newKeySet();
+        private final java.util.Set<Activity> stoppedActivities = ConcurrentHashMap.newKeySet();
         private volatile boolean registered = false;
+
+        boolean awaitResumed(Activity activity, long timeoutMillis) throws InterruptedException {
+            if (resumedActivities.contains(activity)) return true;
+            CountDownLatch latch = new CountDownLatch(1);
+            CountDownLatch existing = resumeWaiters.putIfAbsent(activity, latch);
+            if (existing != null) latch = existing;
+            if (resumedActivities.contains(activity)) latch.countDown();
+            boolean resumed = latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
+            resumeWaiters.remove(activity, latch);
+            return resumed;
+        }
 
         CountDownLatch expectStopped(Activity activity) {
             CountDownLatch latch = new CountDownLatch(1);
-            stopWaiters.put(activity, latch);
+            if (stoppedActivities.contains(activity)) {
+                latch.countDown();
+                return latch;
+            }
+            CountDownLatch existing = stopWaiters.putIfAbsent(activity, latch);
+            if (existing != null) latch = existing;
+            if (stoppedActivities.contains(activity)) latch.countDown();
             return latch;
         }
 
         void clearStopWaiter(Activity activity) {
             stopWaiters.remove(activity);
+            resumeWaiters.remove(activity);
+            resumedActivities.remove(activity);
+            stoppedActivities.remove(activity);
         }
 
         boolean isRegistered() {
@@ -239,13 +264,20 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
         @Override public void onActivityStopped(Activity activity) {
             if (activity instanceof AppLockLifecycleProbeActivity) {
+                stoppedActivities.add(activity);
                 CountDownLatch latch = stopWaiters.get(activity);
                 if (latch != null) latch.countDown();
             }
         }
 
         @Override public void onActivityCreated(Activity activity, android.os.Bundle state) { }
-        @Override public void onActivityResumed(Activity activity) { }
+        @Override public void onActivityResumed(Activity activity) {
+            if (activity instanceof AppLockLifecycleProbeActivity) {
+                resumedActivities.add(activity);
+                CountDownLatch latch = resumeWaiters.get(activity);
+                if (latch != null) latch.countDown();
+            }
+        }
         @Override public void onActivityPaused(Activity activity) { }
         @Override public void onActivitySaveInstanceState(Activity activity, android.os.Bundle state) { }
         @Override public void onActivityDestroyed(Activity activity) { }
