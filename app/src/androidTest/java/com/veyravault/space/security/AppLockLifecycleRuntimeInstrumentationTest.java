@@ -19,9 +19,7 @@ import org.junit.runner.RunWith;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -84,13 +82,13 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             application.registerActivityLifecycleCallbacks(lifecycleObserver);
             lifecycleObserver.markRegistered();
 
-            firstActivity = launchProbeActivity(context, lifecycleObserver);
+            firstActivity = launchProbeActivity(context, instrumentation, lifecycleObserver);
             assertTrue("First Activity should leave the test session unlocked",
                     SecurityManager.isSessionUnlocked(context));
 
             // The second Activity starts before the first finishes. The app must remain
             // foregrounded while at least one Activity is started.
-            secondActivity = launchProbeActivity(context, lifecycleObserver);
+            secondActivity = launchProbeActivity(context, instrumentation, lifecycleObserver);
             assertTrue("Opening a second Activity must not lock the session",
                     SecurityManager.isSessionUnlocked(context));
 
@@ -132,17 +130,24 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
     }
 
     private static Activity launchProbeActivity(
-            Context context, ProbeLifecycleObserver observer) throws InterruptedException {
+            Context context,
+            Instrumentation instrumentation,
+            ProbeLifecycleObserver observer) throws InterruptedException {
         Intent intent = new Intent(context, AppLockLifecycleProbeActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-        // Context.startActivity avoids Instrumentation.startActivitySync's global
-        // wait-for-main-loop-idle barrier. The Application callback below confirms
-        // that Android actually delivered Activity.onStart in the target process.
-        context.startActivity(intent);
-        Activity activity = observer.awaitStartedActivity(ACTIVITY_EVENT_TIMEOUT_MILLIS);
-        assertNotNull("Debug lifecycle probe Activity did not reach onActivityStarted", activity);
-        return activity;
+        // ActivityMonitor independently confirms that Android launched the component.
+        // The lifecycle observer remains responsible for observing the actual stop event.
+        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
+                AppLockLifecycleProbeActivity.class.getName(), null, false);
+        try {
+            context.startActivity(intent);
+            Activity activity = monitor.waitForActivityWithTimeout(ACTIVITY_EVENT_TIMEOUT_MILLIS);
+            assertNotNull("Debug lifecycle probe Activity was not launched by ActivityManager", activity);
+            return activity;
+        } finally {
+            instrumentation.removeMonitor(monitor);
+        }
     }
 
     private static void finishProbeActivity(
@@ -205,13 +210,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
     private static final class ProbeLifecycleObserver
             implements Application.ActivityLifecycleCallbacks {
-        private final BlockingQueue<Activity> startedActivities = new LinkedBlockingQueue<>();
         private final Map<Activity, CountDownLatch> stopWaiters = new ConcurrentHashMap<>();
         private volatile boolean registered = false;
-
-        Activity awaitStartedActivity(long timeoutMillis) throws InterruptedException {
-            return startedActivities.poll(timeoutMillis, TimeUnit.MILLISECONDS);
-        }
 
         CountDownLatch expectStopped(Activity activity) {
             CountDownLatch latch = new CountDownLatch(1);
@@ -233,12 +233,6 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
         void markUnregistered() {
             registered = false;
-        }
-
-        @Override public void onActivityStarted(Activity activity) {
-            if (activity instanceof AppLockLifecycleProbeActivity) {
-                startedActivities.offer(activity);
-            }
         }
 
         @Override public void onActivityStopped(Activity activity) {

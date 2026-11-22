@@ -24,7 +24,9 @@ for marker in (
     "InstrumentationRegistry.getInstrumentation()",
     "application.registerActivityLifecycleCallbacks(lifecycleObserver)",
     "context.startActivity(intent)",
-    "observer.awaitStartedActivity(ACTIVITY_EVENT_TIMEOUT_MILLIS)",
+    "instrumentation.addMonitor(",
+    "monitor.waitForActivityWithTimeout(ACTIVITY_EVENT_TIMEOUT_MILLIS)",
+    "instrumentation.removeMonitor(monitor)",
     "observer.expectStopped(activity)",
     "instrumentation.runOnMainSync",
     "finishProbeActivity(secondActivity, instrumentation, lifecycleObserver)",
@@ -41,6 +43,7 @@ for marker in (
 ):
     assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
+assert "awaitStartedActivity(" not in test, "Activity launch detection must not depend on the observer callback queue."
 assert "void markRegistered()" in test, "Lifecycle observer registration state must be explicitly recorded after registration."
 assert "void markUnregistered()" in test, "Lifecycle observer unregistration state must be explicitly recorded after unregistration."
 assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
