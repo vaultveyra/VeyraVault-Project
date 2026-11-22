@@ -18,7 +18,7 @@ The audit inspected the recursive source tree and relevant implementation at thi
 
 The Stage 6 statement that this revision does not contain BDeviceManager or BDeviceConfig is still accurate. It must not be interpreted as saying the Engine contains no device-related hooks at all.
 
-The pinned Engine does register several service hooks for telephony, serial identifiers, Android ID, Wi-Fi and settings. The key distinction is that the presence of a service hook does not establish a configurable, durable, package/user-scoped device profile. Most of the hooks below return a host-derived value, a fixed constant, or an unstable fallback rather than reading a VeyraVault per-Clone setting.
+The pinned Engine does register several service hooks for telephony, serial identifiers, Android ID, Wi-Fi and settings. The location service stores its per-user package settings in `SparseArray<HashMap<String, BLocationConfig>>`: the outer map is keyed by virtual user ID and the inner map is keyed by package name. The key distinction is that the presence of a service hook does not establish a configurable, durable, package/user-scoped device profile. Most of the hooks below return a host-derived value, a fixed constant, or an unstable fallback rather than reading a VeyraVault per-Clone setting.
 
 ## Virtual process isolation evidence
 
