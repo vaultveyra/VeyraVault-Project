@@ -250,11 +250,12 @@ public class Engine {
         if (installState == CloneInstallState.ABSENT) {
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_REQUIRED,
                     entry.packageName, null, entry.userId, "confirmed_absent");
-            if (!installPackageAsUser(entry.packageName, entry.userId)) {
-                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
-                        entry.packageName, null, entry.userId, "install_returned_false");
-                return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
-            }
+        }
+        if (installState == CloneInstallState.ABSENT
+                && !installPackageAsUser(entry.packageName, entry.userId)) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                    entry.packageName, null, entry.userId, "install_returned_false");
+            return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
         }
 
         // Preserve hook-before-launch ordering and make hook preparation failures observable.
