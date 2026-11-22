@@ -235,6 +235,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             registered = false;
         }
 
+        @Override public void onActivityStarted(Activity activity) { }
+
         @Override public void onActivityStopped(Activity activity) {
             if (activity instanceof AppLockLifecycleProbeActivity) {
                 CountDownLatch latch = stopWaiters.get(activity);
