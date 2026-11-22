@@ -26,7 +26,7 @@ for marker in (
     "parent.activity.startActivity(",
     "new Intent(parent.activity, AppLockLifecycleProbeActivity.class)",
     "observer.awaitAnotherResumedProbe(",
-    "observer.awaitActiveResumed(",
+    "lifecycleObserver.awaitActiveResumed(",
     "parent.activity.getTaskId(), activity.getTaskId()",
     "activity.runOnUiThread(activity::finish)",
     "handle.scenario.close()",
