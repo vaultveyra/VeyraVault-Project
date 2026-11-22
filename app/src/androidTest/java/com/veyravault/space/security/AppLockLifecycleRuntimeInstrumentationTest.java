@@ -82,6 +82,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
             // Register after the production controller so its callback observes each event first.
             application.registerActivityLifecycleCallbacks(lifecycleObserver);
+            lifecycleObserver.markRegistered();
 
             firstActivity = launchProbeActivity(context, lifecycleObserver);
             assertTrue("First Activity should leave the test session unlocked",
@@ -206,7 +207,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             implements Application.ActivityLifecycleCallbacks {
         private final BlockingQueue<Activity> startedActivities = new LinkedBlockingQueue<>();
         private final Map<Activity, CountDownLatch> stopWaiters = new ConcurrentHashMap<>();
-        private volatile boolean registered = true;
+        private volatile boolean registered = false;
 
         Activity awaitStartedActivity(long timeoutMillis) throws InterruptedException {
             return startedActivities.poll(timeoutMillis, TimeUnit.MILLISECONDS);
