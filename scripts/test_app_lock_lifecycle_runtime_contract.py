@@ -21,20 +21,14 @@ assert "extends Activity" in probe_activity
 
 for marker in (
     "AppLockLifecycleController.initialize(application)",
-    "InstrumentationRegistry.getInstrumentation()",
     "application.registerActivityLifecycleCallbacks(lifecycleObserver)",
-    "context.startActivity(intent)",
-    "instrumentation.addMonitor(",
-    "monitor.waitForActivityWithTimeout(ACTIVITY_EVENT_TIMEOUT_MILLIS)",
-    "instrumentation.removeMonitor(monitor)",
-    "observer.expectStopped(activity)",
+    "ActivityScenario.launch(AppLockLifecycleProbeActivity.class)",
+    "handle.scenario.close()",
+    "observer.expectStopped(handle.activity)",
     "CountDownLatch existing = resumeWaiters.putIfAbsent(activity, latch)",
     "stoppedActivities.add(activity)",
     "resumedActivities.add(activity)",
     "observer.awaitResumed(activity, ACTIVITY_EVENT_TIMEOUT_MILLIS)",
-    "instrumentation.runOnMainSync",
-    "finishProbeActivity(secondActivity, instrumentation, lifecycleObserver)",
-    "finishProbeActivity(firstActivity, instrumentation, lifecycleObserver)",
     "awaitSessionLock(context, LOCK_WAIT_TIMEOUT_MILLIS)",
     "SecurityManager.setLockCredential(",
     "AppLockPolicy.setBackgroundTimeoutSeconds(",
@@ -47,14 +41,15 @@ for marker in (
 ):
     assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
-assert "awaitStartedActivity(" not in test, "Activity launch detection must not depend on the observer callback queue."
+assert "ActivityMonitor" not in test, "Use ActivityScenario to avoid timing-sensitive manual launch monitoring."
+assert "ActivityScenario<AppLockLifecycleProbeActivity>" in test, "Use ActivityScenario to own Activity launch and teardown."
 assert "void markRegistered()" in test, "Lifecycle observer registration state must be explicitly recorded after registration."
 assert "void markUnregistered()" in test, "Lifecycle observer unregistration state must be explicitly recorded after unregistration."
 assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
 assert "waitForIdleSync(" not in test, "Lifecycle instrumentation must use callback signals rather than global idle waits."
 assert "test_app_lock_lifecycle_runtime_contract.py" in workflow
 print("PASS: VaultApp registers the production lifecycle controller only in the package main process.")
-print("PASS: Debug-only Activity is launched by Context.startActivity and observed through real Application callbacks.")
+print("PASS: Debug-only Activity is launched and closed through ActivityScenario, with real Application callbacks observed.")
 print("PASS: The test verifies no premature lock during Activity transition and lock after the final Activity stops.")
 print("PASS: No startActivitySync/waitForIdleSync global idle barrier is used.")
 print("PASS: Credential preferences, policy preferences, and the original in-memory session flag are restored.")

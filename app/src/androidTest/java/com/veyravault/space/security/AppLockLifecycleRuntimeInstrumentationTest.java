@@ -3,15 +3,12 @@ package com.veyravault.space.security;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
-
-import android.app.Instrumentation;
+import androidx.test.core.app.ActivityScenario;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,7 +39,6 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             throws Exception {
         Context context = ApplicationProvider.getApplicationContext();
         Application application = (Application) context.getApplicationContext();
-        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
 
         assertTrue("Instrumentation must be running in the host app main process",
                 com.veyravault.space.core.ProcessUtils.isMainProcess(application));
@@ -58,8 +54,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         unlockedField.setAccessible(true);
         boolean originalUnlockedState = unlockedField.getBoolean(null);
 
-        Activity firstActivity = null;
-        Activity secondActivity = null;
+        ProbeActivityHandle firstActivity = null;
+        ProbeActivityHandle secondActivity = null;
         boolean controllerInitialized = false;
         ProbeLifecycleObserver lifecycleObserver = new ProbeLifecycleObserver();
 
@@ -82,7 +78,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             application.registerActivityLifecycleCallbacks(lifecycleObserver);
             lifecycleObserver.markRegistered();
 
-            firstActivity = launchProbeActivity(context, instrumentation, lifecycleObserver);
+            firstActivity = launchProbeActivity(lifecycleObserver);
             assertTrue("First Activity should leave the test session unlocked",
                     SecurityManager.isSessionUnlocked(context));
 
@@ -92,12 +88,12 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             assertTrue("Opening a second Activity must not lock the session",
                     SecurityManager.isSessionUnlocked(context));
 
-            finishProbeActivity(secondActivity, instrumentation, lifecycleObserver);
+            finishProbeActivity(secondActivity, lifecycleObserver);
             secondActivity = null;
             assertTrue("Returning to the first Activity must cancel the pending background lock",
                     SecurityManager.isSessionUnlocked(context));
 
-            finishProbeActivity(firstActivity, instrumentation, lifecycleObserver);
+            finishProbeActivity(firstActivity, lifecycleObserver);
             firstActivity = null;
 
             assertTrue("The final Activity stop must trigger the configured background lock",
@@ -105,8 +101,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         } finally {
             // Finish any Activity left alive after an assertion failure. Avoid waitForIdleSync:
             // the lifecycle observer provides a direct signal for the actual stop callback.
-            closeProbeActivityQuietly(secondActivity, instrumentation, lifecycleObserver);
-            closeProbeActivityQuietly(firstActivity, instrumentation, lifecycleObserver);
+            closeProbeActivityQuietly(secondActivity, lifecycleObserver);
+            closeProbeActivityQuietly(firstActivity, lifecycleObserver);
 
             if (controllerInitialized) {
                 awaitSessionLock(context, LOCK_WAIT_TIMEOUT_MILLIS);
@@ -129,58 +125,58 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         }
     }
 
-    private static Activity launchProbeActivity(
-            Context context,
-            Instrumentation instrumentation,
+    private static ProbeActivityHandle launchProbeActivity(
             ProbeLifecycleObserver observer) throws InterruptedException {
-        Intent intent = new Intent(context, AppLockLifecycleProbeActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        // ActivityMonitor independently confirms that Android launched the component.
-        // The lifecycle observer remains responsible for observing the actual stop event.
-        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
-                AppLockLifecycleProbeActivity.class.getName(), null, false);
-        try {
-            context.startActivity(intent);
-            Activity activity = monitor.waitForActivityWithTimeout(ACTIVITY_EVENT_TIMEOUT_MILLIS);
-            assertNotNull("Debug lifecycle probe Activity was not launched by ActivityManager", activity);
-            assertTrue("Debug lifecycle probe Activity did not reach onActivityResumed",
-                    observer.awaitResumed(activity, ACTIVITY_EVENT_TIMEOUT_MILLIS));
-            return activity;
-        } finally {
-            instrumentation.removeMonitor(monitor);
-        }
+        // ActivityScenario owns launch and teardown, avoiding timing-sensitive manual launch
+        // monitoring while still exercising Android's real Application lifecycle callbacks.
+        ActivityScenario<AppLockLifecycleProbeActivity> scenario =
+                ActivityScenario.launch(AppLockLifecycleProbeActivity.class);
+        Activity[] activityHolder = new Activity[1];
+        scenario.onActivity(activity -> activityHolder[0] = activity);
+        Activity activity = activityHolder[0];
+        assertNotNull("ActivityScenario did not provide the launched debug Activity", activity);
+        assertTrue("Debug lifecycle probe Activity did not reach onActivityResumed",
+                observer.awaitResumed(activity, ACTIVITY_EVENT_TIMEOUT_MILLIS));
+        return new ProbeActivityHandle(scenario, activity);
     }
 
     private static void finishProbeActivity(
-            Activity activity,
-            Instrumentation instrumentation,
+            ProbeActivityHandle handle,
             ProbeLifecycleObserver observer) throws InterruptedException {
-        CountDownLatch stopped = observer.expectStopped(activity);
-        instrumentation.runOnMainSync(() -> {
-            if (!activity.isFinishing()) activity.finish();
-        });
+        CountDownLatch stopped = observer.expectStopped(handle.activity);
+        // ActivityScenario.close() drives the Activity to DESTROYED on the main thread and
+        // waits for the lifecycle transition; the observer verifies the actual STOPPED event.
+        handle.scenario.close();
         assertTrue("Debug lifecycle probe Activity did not reach onActivityStopped",
                 stopped.await(ACTIVITY_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
-        observer.clearStopWaiter(activity);
+        observer.clearStopWaiter(handle.activity);
     }
 
     private static void closeProbeActivityQuietly(
-            Activity activity,
-            Instrumentation instrumentation,
+            ProbeActivityHandle handle,
             ProbeLifecycleObserver observer) {
-        if (activity == null) return;
+        if (handle == null) return;
         try {
-            CountDownLatch stopped = observer.expectStopped(activity);
-            instrumentation.runOnMainSync(() -> {
-                if (!activity.isFinishing()) activity.finish();
-            });
+            CountDownLatch stopped = observer.expectStopped(handle.activity);
+            handle.scenario.close();
             stopped.await(5L, TimeUnit.SECONDS);
-            observer.clearStopWaiter(activity);
+            observer.clearStopWaiter(handle.activity);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         } catch (RuntimeException ignored) {
             // Preserve the original assertion while still restoring the saved security state.
+        }
+    }
+
+    private static final class ProbeActivityHandle {
+        final ActivityScenario<AppLockLifecycleProbeActivity> scenario;
+        final Activity activity;
+
+        ProbeActivityHandle(
+                ActivityScenario<AppLockLifecycleProbeActivity> scenario,
+                Activity activity) {
+            this.scenario = scenario;
+            this.activity = activity;
         }
     }
 
