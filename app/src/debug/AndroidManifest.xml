@@ -10,5 +10,8 @@
             android:name="com.veyravault.space.security.AppLockSessionProbeService"
             android:process=":app_lock_session_probe"
             android:exported="false" />
+        <activity
+            android:name="com.veyravault.space.security.AppLockLifecycleProbeActivity"
+            android:exported="false" />
     </application>
 </manifest>

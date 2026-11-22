@@ -102,6 +102,8 @@ jobs:
         run: python3 scripts/test_app_lock_lifecycle_state_contract.py
       - name: Test app-lock isolated-process instrumentation wiring
         run: python3 scripts/test_app_lock_process_isolation_contract.py
+      - name: Test app-lock runtime Activity lifecycle contract
+        run: python3 scripts/test_app_lock_lifecycle_runtime_contract.py
       - name: Test actual Device Admin state contract
         run: python3 scripts/test_device_admin_state_contract.py
       - name: Test Dashboard read-only security and Engine summary
