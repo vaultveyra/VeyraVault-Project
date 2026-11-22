@@ -84,7 +84,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
             // The second Activity starts before the first finishes. The app must remain
             // foregrounded while at least one Activity is started.
-            secondActivity = launchProbeActivity(context, instrumentation, lifecycleObserver);
+            secondActivity = launchProbeActivity(lifecycleObserver);
             assertTrue("Opening a second Activity must not lock the session",
                     SecurityManager.isSessionUnlocked(context));
 

@@ -43,6 +43,8 @@ for marker in (
 
 assert "ActivityMonitor" not in test, "Use ActivityScenario to avoid timing-sensitive manual launch monitoring."
 assert "ActivityScenario<AppLockLifecycleProbeActivity>" in test, "Use ActivityScenario to own Activity launch and teardown."
+assert "launchProbeActivity(context, instrumentation, lifecycleObserver)" not in test, "Every probe launch must use the ActivityScenario helper signature."
+assert test.count("launchProbeActivity(lifecycleObserver)") == 2, "Both foreground Activities must use the ActivityScenario helper."
 assert "void markRegistered()" in test, "Lifecycle observer registration state must be explicitly recorded after registration."
 assert "void markUnregistered()" in test, "Lifecycle observer unregistration state must be explicitly recorded after unregistration."
 assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
