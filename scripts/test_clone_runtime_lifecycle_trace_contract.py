@@ -36,6 +36,8 @@ for event in (
     "ENGINE_LAUNCH_ACCEPTED",
     "ENGINE_LAUNCH_REJECTED",
     "ENGINE_LAUNCH_EXCEPTION",
+    "ENGINE_LIFECYCLE_CALLBACK_REGISTERED",
+    "ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED",
     "VIRTUAL_PROCESS_BEFORE_APP_CREATE",
     "TARGET_APPLICATION_ONCREATE_BEGIN",
     "TARGET_APPLICATION_ONCREATE_COMPLETE",
@@ -68,6 +70,17 @@ positions = [launch.index(item) for item in ordered]
 assert positions == sorted(positions)
 assert "failure.getMessage()" not in launch
 assert "CloneRuntimeTrace.Event.ENGINE_LAUNCH_EXCEPTION" in launch
+
+registration = method_body(
+    engine, "public static boolean registerCloneProfileLifecycleCallback("
+)
+assert "ENGINE_LIFECYCLE_CALLBACK_REGISTERED" in registration
+assert "ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED" in registration
+assert "recordLifecycleCallbackRegistration" in registration
+assert "already_registered" in registration
+assert "engine_unavailable" in registration
+assert "registered" in registration
+assert "ProcessUtils.currentProcessName(context)" in engine
 
 before_create = method_body(
     callback, "public void beforeCreateApplication(String packageName, String processName,"

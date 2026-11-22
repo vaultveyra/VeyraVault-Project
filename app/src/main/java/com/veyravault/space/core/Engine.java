@@ -94,17 +94,48 @@ public class Engine {
      * beforeCreateApplication inside the package/user-scoped virtual process, before
      * the target Application is instantiated.
      */
+    private static void recordLifecycleCallbackRegistration(
+            Context context, CloneRuntimeTrace.Event event, String outcome) {
+        String hostPackage = null;
+        String processName = null;
+        if (context != null) {
+            hostPackage = context.getPackageName();
+            try {
+                processName = ProcessUtils.currentProcessName(context);
+            } catch (Throwable ignored) {
+                // Process identity is diagnostic-only; registration must not depend on it.
+            }
+        }
+        CloneRuntimeTrace.record(event, hostPackage, processName, -1, outcome);
+    }
+
     public static boolean registerCloneProfileLifecycleCallback(Context context) {
         if (context == null) {
             profileLifecycleDiagnostic = "INVALID_CONTEXT";
+            recordLifecycleCallbackRegistration(null,
+                    CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                    "invalid_context");
             return false;
         }
-        if (profileLifecycleCallbackRegistered) return true;
+        if (profileLifecycleCallbackRegistered) {
+            recordLifecycleCallbackRegistration(context,
+                    CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                    "already_registered");
+            return true;
+        }
         synchronized (Engine.class) {
-            if (profileLifecycleCallbackRegistered) return true;
+            if (profileLifecycleCallbackRegistered) {
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                        "already_registered");
+                return true;
+            }
             Object core = getCore();
             if (core == null) {
                 profileLifecycleDiagnostic = "ENGINE_UNAVAILABLE";
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                        "engine_unavailable");
                 return false;
             }
             try {
@@ -118,10 +149,16 @@ public class Engine {
                 add.invoke(core, callback);
                 profileLifecycleCallbackRegistered = true;
                 profileLifecycleDiagnostic = "REGISTERED";
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                        "registered");
                 return true;
             } catch (Throwable error) {
                 profileLifecycleDiagnostic = "REGISTRATION_FAILED: "
                         + error.getClass().getSimpleName();
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                        error.getClass().getSimpleName());
                 return false;
             }
         }

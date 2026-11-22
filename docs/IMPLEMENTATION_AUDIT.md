@@ -246,3 +246,12 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Trace fields are allowlisted, sanitized and truncated. No trace file, SharedPreferences/CloneStore write, network upload, credentials, messages, media, location, or session data is read or emitted.
 - Added CI contract coverage for event ordering and the no-persistence/no-upload boundary.
 - Physical-device traces for Chrome, Instagram and Soroush remain required; no app-specific root cause is asserted.
+
+
+### Stage 8.10 — Per-process lifecycle callback registration observability (2026-11-22)
+
+- Closed a trace-visibility gap: lifecycle-callback registration success and failure are now logged to the bounded local `VeyraCloneRuntime` stream.
+- Each marker includes the sanitized VeyraVault host package/process name when Android can resolve it, allowing the main UI process to be distinguished from separate virtual host processes.
+- Failure outcomes are limited to fixed categories or exception class names; exception messages, stack traces, persistent storage, network transmission, Clone data and session data are not included.
+- Extended the Stage 8.10 source contract to require both registration outcomes and the process-name source.
+- This remains diagnostic instrumentation only. It does not retry registration, change callback order, or prove third-party app startup; physical-device traces are still required.
