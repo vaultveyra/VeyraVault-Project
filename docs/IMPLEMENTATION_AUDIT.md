@@ -219,3 +219,12 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Added docs/STAGE_8_9_ENGINE_DEVICE_CAPABILITY_AUDIT.md, a source-contract test, and CI wiring. No production hook or Engine source was changed.
 - No CloneStore records, virtual package data, account/session data or Room migration state was modified. SharedPreferences remains the active profile source; Room remains inactive.
 - Physical-device and target-app readback validation remain outstanding for OEM-specific behavior.
+
+
+## Stage 8.10 — Per-app compatibility diagnostics (partial source audit)
+
+- Inspected the existing compatibility report and confirmed it reports host-only facts; it does not certify Chrome, Instagram or Soroush inside a virtual Clone.
+- Audited the pinned Engine install path and found it passes only the base `sourceDir` APK to the installer rather than `splitSourceDirs`. This is a conditional risk for split-installed apps, not a confirmed cause on the user's device.
+- Found the launch flow previously treated an indeterminate Engine install query as package absence and could attempt installation. Corrected it to fail closed with `ENGINE_INSTALL_STATE_UNKNOWN`; only an explicit Engine `ABSENT` result can trigger installation.
+- Added a static contract test and CI wiring. No split installer changes, CloneStore edits, app-data clearing or account/session changes were made.
+- Stage 8.10 remains incomplete until per-app redacted device traces and physical-device smoke tests identify actual startup outcomes.

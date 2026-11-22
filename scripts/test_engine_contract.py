@@ -23,17 +23,18 @@ assert "if (res == null) {" in install
 assert "success.getBoolean(res)" in install
 assert "catch (Throwable error)" in install and "return false;" in install
 
-installed = method_body("private static boolean isInstalledAsUser(")
-assert "Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId))" in installed
-assert "return false;" not in installed
 query_installed = method_body("private static Boolean queryInstalledAsUser(")
 assert 'getMethod("isInstalled", String.class, int.class)' in query_installed
 assert "result instanceof Boolean ? (Boolean) result : null" in query_installed
 assert "return null;" in query_installed
 
 launch = method_body("public static CloneLaunchResult launchCloneDetailed(")
-assert "if (!isInstalledAsUser(entry.packageName, entry.userId)" in launch
+assert "CloneInstallState installState = getCloneInstallState(entry.packageName, entry.userId);" in launch
+assert "installState == null || installState == CloneInstallState.UNKNOWN" in launch
+assert 'new CloneLaunchResult(false, "ENGINE_INSTALL_STATE_UNKNOWN", null)' in launch
+assert "installState == CloneInstallState.ABSENT" in launch
 assert "&& !installPackageAsUser(entry.packageName, entry.userId))" in launch
+assert "isInstalledAsUser(" not in launch
 assert "ENGINE_INSTALL_FAILED" in launch
 assert "if (!Boolean.TRUE.equals(value))" in launch
 assert launch.index("installPackageAsUser(entry.packageName, entry.userId)") < launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")

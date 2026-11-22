@@ -201,10 +201,6 @@ public class Engine {
         }
     }
 
-    private static boolean isInstalledAsUser(String pkg, int userId) {
-        return Boolean.TRUE.equals(queryInstalledAsUser(pkg, userId));
-    }
-
     /** Returns a tri-state Engine result; reflection/query failures remain UNKNOWN. */
     public static CloneInstallState getCloneInstallState(String pkg, int userId) {
         if (pkg == null || pkg.trim().isEmpty() || userId < 0)
@@ -240,7 +236,13 @@ public class Engine {
                 || entry.packageName.trim().isEmpty() || entry.userId < 0) {
             return new CloneLaunchResult(false, "INVALID_CLONE_IDENTITY", null);
         }
-        if (!isInstalledAsUser(entry.packageName, entry.userId)
+        // A failed/indeterminate Engine query is not proof that the package is absent.
+        // Never start a second installation attempt unless absence is explicitly confirmed.
+        CloneInstallState installState = getCloneInstallState(entry.packageName, entry.userId);
+        if (installState == null || installState == CloneInstallState.UNKNOWN) {
+            return new CloneLaunchResult(false, "ENGINE_INSTALL_STATE_UNKNOWN", null);
+        }
+        if (installState == CloneInstallState.ABSENT
                 && !installPackageAsUser(entry.packageName, entry.userId)) {
             return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
         }

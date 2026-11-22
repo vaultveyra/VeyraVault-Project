@@ -55,6 +55,9 @@ jobs:
       - name: Test engine install/launch failure contract
         run: python3 scripts/test_engine_contract.py
 
+      - name: Test Stage 8.10 Clone install-state diagnostics contract
+        run: python3 scripts/test_stage_8_10_compatibility_diagnostics.py
+
       - name: Test fail-closed CloneStore mutations
         run: python3 scripts/test_clone_store_safe_mutations.py
 
