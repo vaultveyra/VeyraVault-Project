@@ -238,6 +238,8 @@ public final class CompatibilityManager {
 
         items.add(new CheckItem("launch_observation", Status.INFO,
                 "This report did not launch the target app. It does not establish whether the Clone process starts, completes Application.onCreate, or remains alive."));
+        items.add(new CheckItem("runtime_trace", Status.INFO,
+                "When a Clone is launched, bounded lifecycle markers are written only to local Android Logcat under VeyraCloneRuntime. Filter with: adb logcat -v threadtime -s VeyraCloneRuntime:I. This snapshot does not read or share Logcat."));
         return Collections.unmodifiableList(items);
     }
 

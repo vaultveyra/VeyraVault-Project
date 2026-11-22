@@ -237,3 +237,12 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Reports can be shared through Android's standard share chooser. They omit account/session contents, credentials, messages, photos, precise coordinates, Clone user IDs, denied-permission sets and private app files.
 - GMS availability is now tri-state for diagnostics; Engine query errors are no longer conflated with confirmed absence.
 - This remains a read-only diagnostic snapshot, not an automatic repair or a physical-device compatibility certification. Chrome, Instagram and Soroush still require separate device-side launch traces.
+
+
+### Stage 8.10 — Bounded Clone runtime lifecycle trace (2026-11-22)
+
+- Added local Logcat milestones at Engine launch request/accept/reject, hook preparation, virtual-process callback entry, and target Application.onCreate begin/complete.
+- The callback milestones are wired to the pinned Engine's verified invocation order. Engine acceptance and Application.onCreate completion are explicitly not treated as proof that the app Activity rendered or remained alive.
+- Trace fields are allowlisted, sanitized and truncated. No trace file, SharedPreferences/CloneStore write, network upload, credentials, messages, media, location, or session data is read or emitted.
+- Added CI contract coverage for event ordering and the no-persistence/no-upload boundary.
+- Physical-device traces for Chrome, Instagram and Soroush remain required; no app-specific root cause is asserted.

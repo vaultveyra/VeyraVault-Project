@@ -6,8 +6,9 @@ import android.util.Log;
 import top.niunaijun.blackbox.app.configuration.AppLifecycleCallback;
 
 /**
- * Runs inside each BlackBox virtual package/user process before the target Application
- * is created. Profile data is read-only here; all writes remain in the host repository.
+ * Runs inside each BlackBox virtual package/user process at the Engine's verified
+ * Application lifecycle boundaries. Profile data is read-only here; writes stay in
+ * the host repository. Trace records contain only bounded technical metadata.
  */
 public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
     private static final String TAG = "VeyraCloneProfile";
@@ -18,29 +19,53 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
         this.appContext = application == null ? context : application;
     }
 
+    private boolean isTargetProcess(String packageName, int userId) {
+        return appContext != null && packageName != null && !packageName.trim().isEmpty()
+                && !packageName.equals(appContext.getPackageName()) && userId >= 0;
+    }
+
     @Override
     public void beforeCreateApplication(String packageName, String processName,
                                         Context packageContext, int userId) {
-        if (appContext == null || packageContext == null
-                || packageName == null || packageName.trim().isEmpty()
-                || packageName.equals(appContext.getPackageName()) || userId < 0) {
-            return;
-        }
+        if (!isTargetProcess(packageName, userId) || packageContext == null) return;
+
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.VIRTUAL_PROCESS_BEFORE_APP_CREATE,
+                packageName, processName, userId, "callback_entered");
         try {
             // Reset process-wide defaults first so a prior clone cannot leak locale/time-zone.
             ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(appContext, packageName, userId);
             ProfileRuntimeApplier.apply(packageContext, resolved);
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_APPLIED,
+                    packageName, processName, userId, "locale_timezone_applied");
             Log.i(TAG, "Applied clone locale/time-zone profile before Application creation: "
                     + packageName + "#" + userId
                     + " localeSource=" + resolved.localeSource
                     + " timeZoneSource=" + resolved.timeZoneSource);
         } catch (Exception error) {
             // A malformed profile must not crash the target app or be silently rewritten.
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_FALLBACK,
+                    packageName, processName, userId, error.getClass().getSimpleName());
             ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
             Log.w(TAG, "Clone profile could not be resolved; system process defaults retained for "
-                    + packageName + "#" + userId, error);
+                    + packageName + "#" + userId + " (" + error.getClass().getSimpleName() + ")");
         }
+    }
+
+    @Override
+    public void beforeApplicationOnCreate(String packageName, String processName,
+                                          android.app.Application application, int userId) {
+        if (!isTargetProcess(packageName, userId)) return;
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.TARGET_APPLICATION_ONCREATE_BEGIN,
+                packageName, processName, userId, "entered");
+    }
+
+    @Override
+    public void afterApplicationOnCreate(String packageName, String processName,
+                                         android.app.Application application, int userId) {
+        if (!isTargetProcess(packageName, userId)) return;
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.TARGET_APPLICATION_ONCREATE_COMPLETE,
+                packageName, processName, userId, "returned");
     }
 }

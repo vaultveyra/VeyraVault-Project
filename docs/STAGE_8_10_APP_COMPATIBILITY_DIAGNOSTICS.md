@@ -1,6 +1,6 @@
 # Stage 8.10 — Per-app compatibility diagnostics (initial source audit)
 
-**Status: partial — static source audit, fail-closed launch correction and a read-only per-Clone report are implemented. Physical app reproduction is still outstanding.**
+**Status: partial — static source audit, fail-closed launch correction, a read-only per-Clone report and bounded local lifecycle tracing are implemented. Physical app reproduction is still outstanding.**
 
 ## Scope
 
@@ -25,6 +25,10 @@ The pinned engine revision inspected here is `ALEX5402/NewBlackbox@89b59836c66f1
 - Added `AppCompatibilityDiagnosticsActivity`: it reads the existing Clone registry through `AsyncCloneRepository.loadClones`, allows selecting a Clone, builds the report on a worker thread, and shares only the bounded text report with Android's share sheet.
 - The report deliberately omits Clone user IDs, coordinates, denied-permission sets, credentials, messages, photos, app-private files and session data. It does not launch, install, uninstall, clear or change settings for a target app.
 - Added a test contract for read-only report scope, tri-state GMS, manifest registration and sharing; CI executes it.
+- Added `CloneRuntimeTrace`, a bounded Logcat-only trace for Engine launch request/result, hook preparation, virtual-process entry, and target `Application.onCreate` begin/complete. Package/process/outcome fields are sanitized and truncated; no file, preference, network, account, or session data is accessed.
+- The pinned Engine calls `beforeCreateApplication` before `makeApplication`, then calls `beforeApplicationOnCreate`, the target `Application.onCreate`, and `afterApplicationOnCreate` in that order. The local tag `VeyraCloneRuntime` can be filtered with `adb logcat -v threadtime -s VeyraCloneRuntime:I`; the diagnostic screen does not collect or share Logcat.
+- An Engine launch-accepted marker means only that `launchApk` returned true. An `onCreate` complete marker means only that target `Application.onCreate` returned; it does not prove the first Activity was rendered or that the app remained alive.
+- Added a static trace contract and CI wiring to protect the allowlisted events and read-only boundary.
 - `scripts/test_engine_contract.py` continues to assert fail-closed launch behavior and the hook/launch/active-marker ordering.
 - `scripts/test_stage_8_10_compatibility_diagnostics.py` continues to preserve the source-audit findings and host-only scope boundary.
 
@@ -32,7 +36,15 @@ The pinned engine revision inspected here is `ALEX5402/NewBlackbox@89b59836c66f1
 
 This is a source-level correction and read-only per-Clone report, not a physical-device reproduction. The report can be exported through Android's share sheet, but it does not capture the target process's actual startup or crash outcome. It does not establish the actual failure mode of Chrome, Instagram or Soroush.
 
-A complete per-app diagnosis still needs a device-side run for each affected Clone, recording only redacted technical fields: package identifier, host package version, base/split APK counts and native ABI directories, Engine install-state result, install result category, launch-request result, clone-process/Application lifecycle outcome, WebView/GMS availability state where relevant, and a bounded exception class/code. Do not capture account credentials, messages, media, authentication tokens, precise location, raw unrestricted logcat, or third-party private data. Keep the capture read-only and do not clear/reinstall/reset existing Clone data as a diagnostic shortcut.
+A complete per-app diagnosis still needs a device-side run for each affected Clone. Use the filtered `VeyraCloneRuntime` tag, plus the selected Clone's read-only snapshot, to compare Engine launch acceptance with virtual-process entry and target Application lifecycle markers. Record only the minimum redacted technical fields required. Do not capture account credentials, messages, media, authentication tokens, precise location, raw unrestricted logcat, or third-party private data. Do not clear logs, reinstall, reset, or modify existing Clone data as a diagnostic shortcut.
+
+Interpret the milestones conservatively:
+- `ENGINE_LAUNCH_ACCEPTED`: Engine's `launchApk` call returned true; target startup is not yet confirmed.
+- `VIRTUAL_PROCESS_BEFORE_APP_CREATE`: the pinned Engine invoked the callback before constructing the target Application.
+- `TARGET_APPLICATION_ONCREATE_BEGIN`: the Engine reached the callback immediately before target `Application.onCreate`.
+- `TARGET_APPLICATION_ONCREATE_COMPLETE`: target `Application.onCreate` returned to the Engine. This does not prove an Activity rendered or that the process remained alive.
+
+The trace is emitted only to local Android Logcat and is not stored in CloneStore/SharedPreferences, exported by the diagnostics screen, or uploaded. A missing later marker narrows the stage to investigate but is not, by itself, a definitive crash diagnosis; process death, callback-registration problems, and log-buffer rotation must also be considered.
 
 No split-APK installer patch is attempted here: the pinned Engine currently accepts a single APK path, and a correct split-aware implementation would need an end-to-end review of package parsing, package settings, ABI selection, native-library copying and rollback semantics before it could be safely introduced.
 

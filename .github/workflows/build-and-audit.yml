@@ -61,6 +61,9 @@ jobs:
       - name: Test read-only per-Clone diagnostic report contract
         run: python3 scripts/test_stage_8_10_clone_diagnostic_screen.py
 
+      - name: Test Clone runtime lifecycle trace contract
+        run: python3 scripts/test_clone_runtime_lifecycle_trace_contract.py
+
       - name: Test fail-closed CloneStore mutations
         run: python3 scripts/test_clone_store_safe_mutations.py
 

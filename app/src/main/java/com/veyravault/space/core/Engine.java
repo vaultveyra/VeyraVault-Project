@@ -236,37 +236,71 @@ public class Engine {
                 || entry.packageName.trim().isEmpty() || entry.userId < 0) {
             return new CloneLaunchResult(false, "INVALID_CLONE_IDENTITY", null);
         }
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REQUEST,
+                entry.packageName, null, entry.userId, "requested");
+
         // A failed/indeterminate Engine query is not proof that the package is absent.
         // Never start a second installation attempt unless absence is explicitly confirmed.
         CloneInstallState installState = getCloneInstallState(entry.packageName, entry.userId);
         if (installState == null || installState == CloneInstallState.UNKNOWN) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_STATE_UNKNOWN,
+                    entry.packageName, null, entry.userId, "query_unknown");
             return new CloneLaunchResult(false, "ENGINE_INSTALL_STATE_UNKNOWN", null);
         }
-        if (installState == CloneInstallState.ABSENT
-                && !installPackageAsUser(entry.packageName, entry.userId)) {
-            return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
+        if (installState == CloneInstallState.ABSENT) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_REQUIRED,
+                    entry.packageName, null, entry.userId, "confirmed_absent");
+            if (!installPackageAsUser(entry.packageName, entry.userId)) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                        entry.packageName, null, entry.userId, "install_returned_false");
+                return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
+            }
         }
 
-        // Preserve the required hook-before-launch ordering. Let unexpected hook exceptions
-        // fail the preparation step rather than reporting a stale global last-result value.
-        VirtualHookManager.LocationApplyResult hookResult =
-                VirtualHookManager.syncCloneHooks(ctx, entry);
+        // Preserve hook-before-launch ordering and make hook preparation failures observable.
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_BEGIN,
+                entry.packageName, null, entry.userId, "begin");
+        final VirtualHookManager.LocationApplyResult hookResult;
+        try {
+            hookResult = VirtualHookManager.syncCloneHooks(ctx, entry);
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_COMPLETE,
+                    entry.packageName, null, entry.userId, "returned");
+        } catch (Throwable failure) {
+            String type = failure.getClass().getSimpleName();
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_FAILED,
+                    entry.packageName, null, entry.userId, type);
+            return new CloneLaunchResult(false, "ENGINE_HOOK_SYNC_EXCEPTION:" + type, null);
+        }
 
         try {
             Object core = getCore();
-            if (core == null) return new CloneLaunchResult(false, "ENGINE_UNAVAILABLE", hookResult);
+            if (core == null) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REJECTED,
+                        entry.packageName, null, entry.userId, "engine_unavailable");
+                return new CloneLaunchResult(false, "ENGINE_UNAVAILABLE", hookResult);
+            }
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_CALL,
+                    entry.packageName, null, entry.userId, "calling_engine");
             Method m = core.getClass().getMethod("launchApk", String.class, int.class);
             Object value = m.invoke(core, entry.packageName, entry.userId);
             if (!Boolean.TRUE.equals(value)) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REJECTED,
+                        entry.packageName, null, entry.userId, "engine_returned_false");
                 return new CloneLaunchResult(false, "ENGINE_REJECTED_LAUNCH", hookResult);
             }
 
+            // Engine acceptance confirms only the launch request, not Application startup.
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_ACCEPTED,
+                    entry.packageName, null, entry.userId, "engine_returned_true");
             // Persist only a confirmed successful launch; failed attempts must not replace
             // the last-known successful clone in the host-side active-launch marker.
             CloneStore.recordActiveLaunch(ctx, entry);
             return new CloneLaunchResult(true, null, hookResult);
         } catch (Throwable failure) {
-            String detail = failure.getClass().getSimpleName();
+            String type = failure.getClass().getSimpleName();
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_EXCEPTION,
+                    entry.packageName, null, entry.userId, type);
+            String detail = type;
             if (failure.getCause() != null) detail += ":" + failure.getCause().getClass().getSimpleName();
             return new CloneLaunchResult(false, "ENGINE_LAUNCH_EXCEPTION:" + detail, hookResult);
         }
