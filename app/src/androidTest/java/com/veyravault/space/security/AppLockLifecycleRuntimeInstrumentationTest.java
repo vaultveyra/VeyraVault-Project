@@ -19,6 +19,11 @@ import org.junit.runner.RunWith;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -31,6 +36,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
     private static final String KEY_HASH = "lock_hash";
     private static final String POLICY_PREFS = "veyra_security_policy_prefs";
     private static final String KEY_TIMEOUT = "background_lock_timeout_seconds";
+    private static final long ACTIVITY_EVENT_TIMEOUT_MILLIS = 15_000L;
     private static final long LOCK_WAIT_TIMEOUT_MILLIS = 4_000L;
 
     @Test
@@ -57,6 +63,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         Activity firstActivity = null;
         Activity secondActivity = null;
         boolean controllerInitialized = false;
+        ProbeLifecycleObserver lifecycleObserver = new ProbeLifecycleObserver();
 
         try {
             assertTrue("Temporary test credential must be durably stored",
@@ -73,33 +80,42 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             assertTrue("Test credential should establish an unlocked session",
                     SecurityManager.isSessionUnlocked(context));
 
-            firstActivity = launchProbeActivity(context, instrumentation);
+            // Register after the production controller so its callback observes each event first.
+            application.registerActivityLifecycleCallbacks(lifecycleObserver);
+
+            firstActivity = launchProbeActivity(context, lifecycleObserver);
             assertTrue("First Activity should leave the test session unlocked",
                     SecurityManager.isSessionUnlocked(context));
 
             // The second Activity starts before the first finishes. The app must remain
             // foregrounded while at least one Activity is started.
-            secondActivity = launchProbeActivity(context, instrumentation);
+            secondActivity = launchProbeActivity(context, lifecycleObserver);
             assertTrue("Opening a second Activity must not lock the session",
                     SecurityManager.isSessionUnlocked(context));
 
-            finishProbeActivity(secondActivity, instrumentation);
+            finishProbeActivity(secondActivity, instrumentation, lifecycleObserver);
             secondActivity = null;
             assertTrue("Returning to the first Activity must cancel the pending background lock",
                     SecurityManager.isSessionUnlocked(context));
 
-            finishProbeActivity(firstActivity, instrumentation);
+            finishProbeActivity(firstActivity, instrumentation, lifecycleObserver);
             firstActivity = null;
 
             assertTrue("The final Activity stop must trigger the configured background lock",
                     awaitSessionLock(context, LOCK_WAIT_TIMEOUT_MILLIS));
         } finally {
-            // Close any Activity left alive by an assertion failure, then let a possible
-            // immediate-lock callback drain before restoring the caller's original state.
-            finishProbeActivity(secondActivity, instrumentation);
-            finishProbeActivity(firstActivity, instrumentation);
+            // Finish any Activity left alive after an assertion failure. Avoid waitForIdleSync:
+            // the lifecycle observer provides a direct signal for the actual stop callback.
+            closeProbeActivityQuietly(secondActivity, instrumentation, lifecycleObserver);
+            closeProbeActivityQuietly(firstActivity, instrumentation, lifecycleObserver);
+
             if (controllerInitialized) {
                 awaitSessionLock(context, LOCK_WAIT_TIMEOUT_MILLIS);
+            }
+
+            if (lifecycleObserver.isRegistered()) {
+                application.unregisterActivityLifecycleCallbacks(lifecycleObserver);
+                lifecycleObserver.markUnregistered();
             }
 
             restorePreferenceKey(credentialPreferences, originalCredentials, KEY_MODE);
@@ -115,22 +131,49 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
     }
 
     private static Activity launchProbeActivity(
-            Context context, Instrumentation instrumentation) {
+            Context context, ProbeLifecycleObserver observer) throws InterruptedException {
         Intent intent = new Intent(context, AppLockLifecycleProbeActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Activity activity = instrumentation.startActivitySync(intent);
-        assertNotNull("Debug lifecycle probe Activity failed to launch", activity);
-        instrumentation.waitForIdleSync();
+
+        // Context.startActivity avoids Instrumentation.startActivitySync's global
+        // wait-for-main-loop-idle barrier. The Application callback below confirms
+        // that Android actually delivered Activity.onStart in the target process.
+        context.startActivity(intent);
+        Activity activity = observer.awaitStartedActivity(ACTIVITY_EVENT_TIMEOUT_MILLIS);
+        assertNotNull("Debug lifecycle probe Activity did not reach onActivityStarted", activity);
         return activity;
     }
 
     private static void finishProbeActivity(
-            Activity activity, Instrumentation instrumentation) {
-        if (activity == null) return;
+            Activity activity,
+            Instrumentation instrumentation,
+            ProbeLifecycleObserver observer) throws InterruptedException {
+        CountDownLatch stopped = observer.expectStopped(activity);
         instrumentation.runOnMainSync(() -> {
             if (!activity.isFinishing()) activity.finish();
         });
-        instrumentation.waitForIdleSync();
+        assertTrue("Debug lifecycle probe Activity did not reach onActivityStopped",
+                stopped.await(ACTIVITY_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+        observer.clearStopWaiter(activity);
+    }
+
+    private static void closeProbeActivityQuietly(
+            Activity activity,
+            Instrumentation instrumentation,
+            ProbeLifecycleObserver observer) {
+        if (activity == null) return;
+        try {
+            CountDownLatch stopped = observer.expectStopped(activity);
+            instrumentation.runOnMainSync(() -> {
+                if (!activity.isFinishing()) activity.finish();
+            });
+            stopped.await(5L, TimeUnit.SECONDS);
+            observer.clearStopWaiter(activity);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException ignored) {
+            // Preserve the original assertion while still restoring the saved security state.
+        }
     }
 
     private static boolean awaitSessionLock(Context context, long timeoutMillis)
@@ -157,5 +200,53 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         assertTrue("Could not restore preference key " + key, editor.commit());
         assertEquals("Preference key changed after restoration: " + key,
                 original.get(key), preferences.getAll().get(key));
+    }
+
+    private static final class ProbeLifecycleObserver
+            implements Application.ActivityLifecycleCallbacks {
+        private final BlockingQueue<Activity> startedActivities = new LinkedBlockingQueue<>();
+        private final Map<Activity, CountDownLatch> stopWaiters = new ConcurrentHashMap<>();
+        private volatile boolean registered = true;
+
+        Activity awaitStartedActivity(long timeoutMillis) throws InterruptedException {
+            return startedActivities.poll(timeoutMillis, TimeUnit.MILLISECONDS);
+        }
+
+        CountDownLatch expectStopped(Activity activity) {
+            CountDownLatch latch = new CountDownLatch(1);
+            stopWaiters.put(activity, latch);
+            return latch;
+        }
+
+        void clearStopWaiter(Activity activity) {
+            stopWaiters.remove(activity);
+        }
+
+        boolean isRegistered() {
+            return registered;
+        }
+
+        void markUnregistered() {
+            registered = false;
+        }
+
+        @Override public void onActivityStarted(Activity activity) {
+            if (activity instanceof AppLockLifecycleProbeActivity) {
+                startedActivities.offer(activity);
+            }
+        }
+
+        @Override public void onActivityStopped(Activity activity) {
+            if (activity instanceof AppLockLifecycleProbeActivity) {
+                CountDownLatch latch = stopWaiters.get(activity);
+                if (latch != null) latch.countDown();
+            }
+        }
+
+        @Override public void onActivityCreated(Activity activity, android.os.Bundle state) { }
+        @Override public void onActivityResumed(Activity activity) { }
+        @Override public void onActivityPaused(Activity activity) { }
+        @Override public void onActivitySaveInstanceState(Activity activity, android.os.Bundle state) { }
+        @Override public void onActivityDestroyed(Activity activity) { }
     }
 }

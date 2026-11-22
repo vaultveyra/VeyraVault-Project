@@ -18,14 +18,17 @@ assert "context.getPackageName().equals(name)" in process_utils
 assert "AppLockLifecycleProbeActivity" in manifest
 assert 'android:exported="false"' in manifest
 assert "extends Activity" in probe_activity
-assert "AppLockLifecycleProbeActivity" in probe_activity
 
 for marker in (
     "AppLockLifecycleController.initialize(application)",
     "InstrumentationRegistry.getInstrumentation()",
-    "startActivitySync(intent)",
-    "finishProbeActivity(secondActivity, instrumentation)",
-    "finishProbeActivity(firstActivity, instrumentation)",
+    "application.registerActivityLifecycleCallbacks(lifecycleObserver)",
+    "context.startActivity(intent)",
+    "observer.awaitStartedActivity(ACTIVITY_EVENT_TIMEOUT_MILLIS)",
+    "observer.expectStopped(activity)",
+    "instrumentation.runOnMainSync",
+    "finishProbeActivity(secondActivity, instrumentation, lifecycleObserver)",
+    "finishProbeActivity(firstActivity, instrumentation, lifecycleObserver)",
     "awaitSessionLock(context, LOCK_WAIT_TIMEOUT_MILLIS)",
     "SecurityManager.setLockCredential(",
     "AppLockPolicy.setBackgroundTimeoutSeconds(",
@@ -38,8 +41,11 @@ for marker in (
 ):
     assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
+assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
+assert "waitForIdleSync(" not in test, "Lifecycle instrumentation must use callback signals rather than global idle waits."
 assert "test_app_lock_lifecycle_runtime_contract.py" in workflow
 print("PASS: VaultApp registers the production lifecycle controller only in the package main process.")
-print("PASS: Debug-only Activity and Android instrumentation exercise real Activity start/stop callbacks.")
+print("PASS: Debug-only Activity is launched by Context.startActivity and observed through real Application callbacks.")
 print("PASS: The test verifies no premature lock during Activity transition and lock after the final Activity stops.")
+print("PASS: No startActivitySync/waitForIdleSync global idle barrier is used.")
 print("PASS: Credential preferences, policy preferences, and the original in-memory session flag are restored.")
