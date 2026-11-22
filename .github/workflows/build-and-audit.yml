@@ -123,6 +123,8 @@ jobs:
 
       - name: Test clone hook isolation contract
         run: python3 scripts/test_hook_isolation_contract.py
+      - name: Test Stage 8.9 Engine device capability audit
+        run: python3 scripts/test_stage_8_9_engine_device_capability_audit.py
 
       - name: Test CloneStore migration inventory contract
         run: python3 scripts/test_clone_store_migration_inventory.py

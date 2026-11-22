@@ -53,3 +53,8 @@ The global and per-clone screens previously described saved brand/model/country/
 CI must pass the profile resolver, security credential, engine launch, hook-isolation, workspace preparation, source audit, unsigned APK compilation, and compiled APK audit steps.
 
 This is source-level and CI validation. It is not a physical-device certification of clone isolation. The generated PR artifact is unsigned and is not a production-installable release.
+
+
+## Clarification from Stage 8.9 — generic device-service hooks
+
+The absence of BDeviceManager and BDeviceConfig means the pinned Engine does not provide those unified device-profile APIs. It does not mean the Engine contains no device-related service hooks. The pinned source also registers telephony, serial, Android ID and Wi-Fi proxies. Stage 8.9 distinguishes those hooks from a configurable per-Clone profile: the inspected implementations return host-package-derived values, fixed constants, or non-persisted fallback values. See docs/STAGE_8_9_ENGINE_DEVICE_CAPABILITY_AUDIT.md for exact source references and the capability matrix.

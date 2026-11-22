@@ -194,3 +194,28 @@ Confirmed gaps:
 - Chrome, Instagram and Soroush launch/runtime failures remain unclassified until redacted per-app diagnostics are available.
 
 This is a static audit and user-reported acceptance record, not a runtime fix or physical-device certification. It defines Stages 8.5–8.10 and preserves the CloneStore/session, no-Room-cutover, feature-branch-only and Draft PR constraints.
+
+
+## Stage 8.8.9 — Runtime App Lock Activity lifecycle verification (2026-11-22)
+
+- Reworked the Debug instrumentation test to launch the first probe Activity with ActivityScenario, open the second Activity from the first Activity in the same task, verify matching task IDs, and wait for the first Activity to resume before asserting the session remains unlocked.
+- Corrected the Stage 8.9 runtime test contract's observer variable marker.
+- Final validated feature-branch head for this stage: bbef9fd41f98ee52959bac7915ec0b79c292415f.
+- Push run 45063108486: 68/68 Android Emulator instrumentation tests passed, 0 skipped, 0 failed; all source/contract checks, Source Audit, unsigned Release APK build, APK audit and isolated signing job passed.
+- PR run 45063112951: 68/68 Android Emulator instrumentation tests passed, 0 skipped, 0 failed; all source/contract checks, Source Audit, unsigned Release APK build and APK audit passed. Signing is skipped for pull_request events by workflow policy.
+- Both APK audits reported 0 forbidden remote log endpoints.
+- Push unsigned artifact 14770912029, ZIP SHA-256 8c3b50fe0e78f6187320452249aa41bd0676be14639868ae624e92ce043d54dc.
+- Push signed artifact 14770594866, ZIP SHA-256 c89fec60a3c9a9d704f437fd4587770cb92f0d53fc52cbff23d6a557bcc534c1. apksigner verify --verbose: v1=true, v2=true, v3=true; v3.1/v3.2/v4=false. The log also reported META-INF metadata/dependency-entry signature-coverage warnings; these are retained as release-review notes.
+- PR unsigned artifact 14770054296, ZIP SHA-256 5b2d30d82db5a0e1db59256ea89c4862813a43b29d15bbc868dbdd9cf3673007.
+- Validation boundary: Debug Room instrumentation still uses RoomTestApplication and explicitly calls the production controller's initialize entry point. It does not execute the complete production VaultApp.onCreate() method or replace physical-device/OEM testing.
+- PR #4 remains open and Draft; no merge or main modification occurred.
+
+## Stage 8.9 — Pinned Engine device and environment capability audit (2026-11-22)
+
+- Audited the exact ALEX5402/NewBlackbox revision 89b59836c66f173756a4ae258cf379a957649820 pinned in scripts/prepare_workspace.py.
+- Confirmed the Engine has package/user process isolation and active telephony, serial, Android ID and Wi-Fi hooks, but those hooks do not expose configurable per-Clone values: some derive values from the host package, some return fixed Wi-Fi constants, and Android ID only generates a random fallback for invalid underlying results.
+- Confirmed the Engine's location service stores its configuration by virtual user ID and package name. VeyraVault uses this scoped location API with readback. Cell list storage exists, but two telephony adapter methods return null and therefore do not establish complete cell-profile support.
+- Confirmed current VeyraVault ProfileSettings transports exactly Locale, Time Zone, location-enabled, latitude and longitude. Other device/SIM data remains metadata unless a separately verified scoped implementation is added.
+- Added docs/STAGE_8_9_ENGINE_DEVICE_CAPABILITY_AUDIT.md, a source-contract test, and CI wiring. No production hook or Engine source was changed.
+- No CloneStore records, virtual package data, account/session data or Room migration state was modified. SharedPreferences remains the active profile source; Room remains inactive.
+- Physical-device and target-app readback validation remain outstanding for OEM-specific behavior.
