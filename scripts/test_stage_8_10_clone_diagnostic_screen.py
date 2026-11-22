@@ -58,7 +58,7 @@ for forbidden in ("removeClone(", "upsertClone(", "saveCloneProfile(", "clearClo
 assert "AppCompatibilityDiagnosticsActivity" in entry_activity
 assert 'android:name=".ui.AppCompatibilityDiagnosticsActivity" android:exported="false"' in manifest
 assert "app-private" in doc.lower()
-assert "not a physical-device compatibility certification" in doc.lower()
+assert "not a physical-device reproduction" in doc.lower()
 
 print("Stage 8.10: per-Clone report reads Engine and package metadata without modifying Clone state: PASS")
 print("Stage 8.10: split APK and native ABI metadata inspection is read-only: PASS")
