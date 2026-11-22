@@ -228,3 +228,12 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Found the launch flow previously treated an indeterminate Engine install query as package absence and could attempt installation. Corrected it to fail closed with `ENGINE_INSTALL_STATE_UNKNOWN`; only an explicit Engine `ABSENT` result can trigger installation.
 - Added a static contract test and CI wiring. No split installer changes, CloneStore edits, app-data clearing or account/session changes were made.
 - Stage 8.10 remains incomplete until per-app redacted device traces and physical-device smoke tests identify actual startup outcomes.
+
+
+## Stage 8.10 — Read-only per-Clone diagnostic report (2026-11-22)
+
+- Added a per-Clone diagnostics screen reachable from the existing Compatibility Report. It reads Clone entries asynchronously and generates each snapshot on a worker thread.
+- The snapshot reports only package metadata, base/split APK counts, native ABI directory names, Engine install state, tri-state GMS availability, host architecture, WebView provider and all-files-access state. It explicitly states that target startup was not tested.
+- Reports can be shared through Android's standard share chooser. They omit account/session contents, credentials, messages, photos, precise coordinates, Clone user IDs, denied-permission sets and private app files.
+- GMS availability is now tri-state for diagnostics; Engine query errors are no longer conflated with confirmed absence.
+- This remains a read-only diagnostic snapshot, not an automatic repair or a physical-device compatibility certification. Chrome, Instagram and Soroush still require separate device-side launch traces.

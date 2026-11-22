@@ -58,6 +58,9 @@ jobs:
       - name: Test Stage 8.10 Clone install-state diagnostics contract
         run: python3 scripts/test_stage_8_10_compatibility_diagnostics.py
 
+      - name: Test read-only per-Clone diagnostic report contract
+        run: python3 scripts/test_stage_8_10_clone_diagnostic_screen.py
+
       - name: Test fail-closed CloneStore mutations
         run: python3 scripts/test_clone_store_safe_mutations.py
 

@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -51,6 +52,14 @@ public class CompatibilityReportActivity extends BaseActivity {
             lp.bottomMargin = 16;
             root.addView(row, lp);
         }
+
+        Button cloneDiagnostics = new Button(this);
+        cloneDiagnostics.setAllCaps(false);
+        cloneDiagnostics.setText(fa ? "عیب‌یابی اختصاصی Cloneها" : "Per-Clone App Diagnostics");
+        cloneDiagnostics.setOnClickListener(v ->
+                startActivity(new android.content.Intent(
+                        CompatibilityReportActivity.this, AppCompatibilityDiagnosticsActivity.class)));
+        root.addView(cloneDiagnostics);
 
         TextView footer = new TextView(this);
         footer.setText(fa

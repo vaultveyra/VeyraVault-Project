@@ -119,6 +119,7 @@
         <activity android:name=".ui.SecuritySettingsActivity" android:exported="false" />
         <activity android:name=".ui.PermissionsActivity" android:exported="false" />
         <activity android:name=".ui.AboutActivity" android:exported="false" />
+        <activity android:name=".ui.AppCompatibilityDiagnosticsActivity" android:exported="false" />
         <activity android:name=".ui.CompatibilityReportActivity" android:exported="false" />
         <activity android:name=".ui.DashboardActivity" android:exported="false" />
         <activity android:name=".ui.VpnStatusActivity" android:exported="false" />

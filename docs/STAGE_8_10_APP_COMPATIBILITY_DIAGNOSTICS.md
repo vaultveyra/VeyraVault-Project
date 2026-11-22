@@ -1,6 +1,6 @@
 # Stage 8.10 — Per-app compatibility diagnostics (initial source audit)
 
-**Status: partial — static source audit and fail-closed launch correction only. This stage is not accepted as complete.**
+**Status: partial — static source audit, fail-closed launch correction and a read-only per-Clone report are implemented. Physical app reproduction is still outstanding.**
 
 ## Scope
 
@@ -19,11 +19,14 @@ The pinned engine revision inspected here is `ALEX5402/NewBlackbox@89b59836c66f1
 
 ## Changes in this increment
 
-- `Engine.launchCloneDetailed` now uses the tri-state `getCloneInstallState` result.
-- It installs only when the Engine explicitly returns `ABSENT`.
-- It fails closed with `ENGINE_INSTALL_STATE_UNKNOWN` when the query is indeterminate, without attempting installation, changing CloneStore records, deleting app data or altering session state.
-- `scripts/test_engine_contract.py` asserts the fail-closed branch and that installation still precedes hook synchronization and launch.
-- `scripts/test_stage_8_10_compatibility_diagnostics.py` and CI wiring preserve the findings and check that the existing host-only report is not overstated.
+- `Engine.launchCloneDetailed` now uses the tri-state `getCloneInstallState` result. It installs only when the Engine explicitly returns `ABSENT` and fails closed with `ENGINE_INSTALL_STATE_UNKNOWN` for an indeterminate query.
+- Added a tri-state read-only GMS query (`INSTALLED`, `ABSENT`, `UNKNOWN`) so a reflection failure is no longer displayed as proof that GMS is absent. The existing boolean helper remains as a backward-compatible convenience method.
+- Added a per-Clone snapshot to `CompatibilityManager`. It records host package version, base/split APK counts, native ABI directories read from APK ZIP metadata, Engine install state, GMS state for the selected virtual user, host ABI/bitness, WebView provider and host all-files-access state.
+- Added `AppCompatibilityDiagnosticsActivity`: it reads the existing Clone registry through `AsyncCloneRepository.loadClones`, allows selecting a Clone, builds the report on a worker thread, and shares only the bounded text report with Android's share sheet.
+- The report deliberately omits Clone user IDs, coordinates, denied-permission sets, credentials, messages, photos, app-private files and session data. It does not launch, install, uninstall, clear or change settings for a target app.
+- Added a test contract for read-only report scope, tri-state GMS, manifest registration and sharing; CI executes it.
+- `scripts/test_engine_contract.py` continues to assert fail-closed launch behavior and the hook/launch/active-marker ordering.
+- `scripts/test_stage_8_10_compatibility_diagnostics.py` continues to preserve the source-audit findings and host-only scope boundary.
 
 ## Acceptance boundary / next evidence required
 
