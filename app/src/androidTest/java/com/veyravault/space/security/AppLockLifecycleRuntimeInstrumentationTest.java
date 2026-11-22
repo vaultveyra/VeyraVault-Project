@@ -227,6 +227,10 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
             return registered;
         }
 
+        void markRegistered() {
+            registered = true;
+        }
+
         void markUnregistered() {
             registered = false;
         }

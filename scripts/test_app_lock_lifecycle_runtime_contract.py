@@ -41,6 +41,8 @@ for marker in (
 ):
     assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
+assert "void markRegistered()" in test, "Lifecycle observer registration state must be explicitly recorded after registration."
+assert "void markUnregistered()" in test, "Lifecycle observer unregistration state must be explicitly recorded after unregistration."
 assert "startActivitySync(" not in test, "Do not introduce a global main-loop idle barrier in lifecycle instrumentation."
 assert "waitForIdleSync(" not in test, "Lifecycle instrumentation must use callback signals rather than global idle waits."
 assert "test_app_lock_lifecycle_runtime_contract.py" in workflow
