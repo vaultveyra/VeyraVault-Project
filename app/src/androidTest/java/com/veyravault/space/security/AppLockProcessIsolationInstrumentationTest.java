@@ -21,6 +21,7 @@ import org.junit.runner.RunWith;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,8 +33,6 @@ import static org.junit.Assert.assertTrue;
 @RunWith(AndroidJUnit4.class)
 public final class AppLockProcessIsolationInstrumentationTest {
     private static final String CREDENTIAL_PREFS = "veyra_security_prefs";
-    private static final String KEY_MODE = "lock_mode";
-    private static final String KEY_HASH = "lock_hash";
 
     @Test
     public void freshAndroidProcessDoesNotInheritUnlockedHostSession() throws Exception {
@@ -43,8 +42,16 @@ public final class AppLockProcessIsolationInstrumentationTest {
         Map<String, ?> originalPreferences = new HashMap<>(preferences.getAll());
 
         Field unlockedField = SecurityManager.class.getDeclaredField("sessionUnlocked");
+        Field failedAttemptsField =
+                SecurityManager.class.getDeclaredField("processFailedAttempts");
+        Field lockoutUntilElapsedField =
+                SecurityManager.class.getDeclaredField("processLockoutUntilElapsed");
         unlockedField.setAccessible(true);
+        failedAttemptsField.setAccessible(true);
+        lockoutUntilElapsedField.setAccessible(true);
         boolean originalUnlockedState = unlockedField.getBoolean(null);
+        int originalFailedAttempts = failedAttemptsField.getInt(null);
+        long originalLockoutUntilElapsed = lockoutUntilElapsedField.getLong(null);
 
         final CountDownLatch resultLatch = new CountDownLatch(1);
         final AtomicReference<Boolean> remoteUnlockedState = new AtomicReference<>();
@@ -96,34 +103,40 @@ public final class AppLockProcessIsolationInstrumentationTest {
                     Boolean.FALSE, remoteUnlockedState.get());
         } finally {
             if (bound) context.unbindService(connection);
-            restoreCredentialPreferences(preferences, originalPreferences);
-            unlockedField.setBoolean(null, originalUnlockedState);
+            try {
+                restoreCredentialPreferences(preferences, originalPreferences);
+            } finally {
+                // setLockCredential() clears the process-local throttle companion as well as
+                // persisted counters. Restore both so this fixture cannot affect later tests.
+                unlockedField.setBoolean(null, originalUnlockedState);
+                failedAttemptsField.setInt(null, originalFailedAttempts);
+                lockoutUntilElapsedField.setLong(null, originalLockoutUntilElapsed);
+            }
         }
     }
 
     private static void restoreCredentialPreferences(
             SharedPreferences preferences, Map<String, ?> original) {
-        SharedPreferences.Editor editor = preferences.edit();
-        restoreValue(editor, original, KEY_MODE);
-        restoreValue(editor, original, KEY_HASH);
+        SharedPreferences.Editor editor = preferences.edit().clear();
+        for (Map.Entry<String, ?> entry : original.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof String) editor.putString(key, (String) value);
+            else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+            else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+            else if (value instanceof Long) editor.putLong(key, (Long) value);
+            else if (value instanceof Float) editor.putFloat(key, (Float) value);
+            else if (value instanceof Set) {
+                @SuppressWarnings("unchecked")
+                Set<String> strings = (Set<String>) value;
+                editor.putStringSet(key, new java.util.HashSet<>(strings));
+            } else {
+                throw new AssertionError("Unexpected credential preference type for " + key);
+            }
+        }
         assertTrue("Credential preferences could not be restored after process-isolation test",
                 editor.commit());
         assertEquals("Credential preference values changed during the test",
                 original, preferences.getAll());
-    }
-
-    private static void restoreValue(
-            SharedPreferences.Editor editor, Map<String, ?> original, String key) {
-        if (!original.containsKey(key)) {
-            editor.remove(key);
-            return;
-        }
-        Object value = original.get(key);
-        if (value instanceof Integer) editor.putInt(key, (Integer) value);
-        else if (value instanceof String) editor.putString(key, (String) value);
-        else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
-        else if (value instanceof Long) editor.putLong(key, (Long) value);
-        else if (value instanceof Float) editor.putFloat(key, (Float) value);
-        else throw new AssertionError("Unexpected credential preference type for " + key);
     }
 }
