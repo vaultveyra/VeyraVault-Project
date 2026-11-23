@@ -30,6 +30,8 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
     private static final String CREDENTIAL_PREFS = "veyra_security_prefs";
     private static final String KEY_MODE = "lock_mode";
     private static final String KEY_HASH = "lock_hash";
+    private static final String KEY_FAILED_ATTEMPTS = "lock_failed_attempts";
+    private static final String KEY_LOCKOUT_UNTIL = "lockout_until_epoch_millis";
     private static final String POLICY_PREFS = "veyra_security_policy_prefs";
     private static final String KEY_TIMEOUT = "background_lock_timeout_seconds";
     private static final long ACTIVITY_EVENT_TIMEOUT_MILLIS = 15_000L;
@@ -52,8 +54,16 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         Map<String, ?> originalPolicy = new HashMap<>(policyPreferences.getAll());
 
         Field unlockedField = SecurityManager.class.getDeclaredField("sessionUnlocked");
+        Field failedAttemptsField =
+                SecurityManager.class.getDeclaredField("processFailedAttempts");
+        Field lockoutUntilElapsedField =
+                SecurityManager.class.getDeclaredField("processLockoutUntilElapsed");
         unlockedField.setAccessible(true);
+        failedAttemptsField.setAccessible(true);
+        lockoutUntilElapsedField.setAccessible(true);
         boolean originalUnlockedState = unlockedField.getBoolean(null);
+        int originalFailedAttempts = failedAttemptsField.getInt(null);
+        long originalLockoutUntilElapsed = lockoutUntilElapsedField.getLong(null);
 
         ProbeActivityHandle firstActivity = null;
         Activity secondActivity = null;
@@ -119,8 +129,14 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
 
             restorePreferenceKey(credentialPreferences, originalCredentials, KEY_MODE);
             restorePreferenceKey(credentialPreferences, originalCredentials, KEY_HASH);
+            restorePreferenceKey(
+                    credentialPreferences, originalCredentials, KEY_FAILED_ATTEMPTS);
+            restorePreferenceKey(
+                    credentialPreferences, originalCredentials, KEY_LOCKOUT_UNTIL);
             restorePreferenceKey(policyPreferences, originalPolicy, KEY_TIMEOUT);
             unlockedField.setBoolean(null, originalUnlockedState);
+            failedAttemptsField.setInt(null, originalFailedAttempts);
+            lockoutUntilElapsedField.setLong(null, originalLockoutUntilElapsed);
 
             assertEquals("Credential preferences were not restored exactly",
                     originalCredentials, credentialPreferences.getAll());
@@ -241,6 +257,7 @@ public final class AppLockLifecycleRuntimeInstrumentationTest {
         } else {
             Object value = original.get(key);
             if (value instanceof Integer) editor.putInt(key, (Integer) value);
+            else if (value instanceof Long) editor.putLong(key, (Long) value);
             else if (value instanceof String) editor.putString(key, (String) value);
             else throw new AssertionError("Unexpected preference type for " + key);
         }

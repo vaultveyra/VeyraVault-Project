@@ -275,3 +275,13 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Added pure-Java boundary tests, extended the KDF test harness, and added CI source-contract coverage.
 - Limitations: this is application-level throttling, not Keystore/hardware-backed rate limiting. A failed preference commit receives only a process-local fallback; reboot/time-tampering behavior is not claimed as tamper-proof.
 - No CloneStore, virtual app package, account/session, profile or Engine state was modified. SharedPreferences remains active; Room remains inactive.
+
+
+### Stage 8.11 — Restore full app-lock test fixture state (2026-11-23)
+
+- Fixed the existing AppLock lifecycle instrumentation fixture to snapshot and restore the two new attempt-throttling preference keys and both associated in-memory fields.
+- Extended its preference restoration helper to retain Long values exactly.
+- Extended the source contract to require complete cleanup, preserving the original security preference map and in-memory process state.
+- CI's first Android run reached 69/69 tests with one failure in the older lifecycle test's exact preference-map cleanup assertion; ADB also emitted transient offline messages earlier in boot. The observed assertion was caused by the older fixture not knowing about the newly added zero-valued attempt metadata keys.
+- The new attempt-throttling instrumentation itself did not appear among the failed test names. Re-run is required to verify the fixture correction and the new test together.
+- No production credential, CloneStore, Engine, account/session or profile behavior was changed in this correction.

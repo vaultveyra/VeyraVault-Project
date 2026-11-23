@@ -45,3 +45,10 @@
 - This is application-level rate limiting, not Android Keystore-enforced or hardware-backed throttling.
 - It does not replace device-level authentication or prevent a privileged attacker from modifying private app data on a compromised device.
 - Physical-device usability and persistence behavior across reboot/OEM process management remain to be validated.
+
+
+## Instrumentation fixture compatibility
+
+- The pre-existing app-lock lifecycle instrumentation now snapshots and restores both new attempt-throttling preference keys and both new in-memory monotonic/counter fields.
+- This keeps the historical lifecycle test non-destructive: it restores the full security preference map exactly, including the case where the new keys did not exist before the test.
+- The test failure observed on the first full run was a fixture cleanup assertion (new zero-valued keys were not previously covered by the older test); no failed assertion came from the new attempt-throttling behavior test.
