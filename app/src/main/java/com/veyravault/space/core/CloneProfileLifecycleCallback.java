@@ -37,9 +37,9 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(appContext, packageName, userId);
             ProfileRuntimeApplier.apply(packageContext, resolved);
-            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_APPLIED,
-                    packageName, processName, userId, "locale_timezone_applied");
-            Log.i(TAG, "Applied clone locale/time-zone profile before Application creation: "
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED,
+                    packageName, processName, userId, "apply_returned");
+            Log.i(TAG, "Clone locale/time-zone profile apply operation returned before Application creation: "
                     + packageName + "#" + userId
                     + " localeSource=" + resolved.localeSource
                     + " timeZoneSource=" + resolved.timeZoneSource);

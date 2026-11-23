@@ -41,6 +41,7 @@ for event in (
     "VIRTUAL_PROCESS_BEFORE_APP_CREATE",
     "TARGET_APPLICATION_ONCREATE_BEGIN",
     "TARGET_APPLICATION_ONCREATE_COMPLETE",
+    "PROFILE_APPLY_RETURNED",
 ):
     assert event in trace, event
 
@@ -94,6 +95,10 @@ after_on_create = method_body(
 assert "VIRTUAL_PROCESS_BEFORE_APP_CREATE" in before_create
 assert "TARGET_APPLICATION_ONCREATE_BEGIN" in before_on_create
 assert "TARGET_APPLICATION_ONCREATE_COMPLETE" in after_on_create
+assert "CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED" in before_create
+assert '"apply_returned"' in before_create
+assert "PROFILE_APPLIED" not in trace
+assert "Profile apply operation returned" in callback
 assert "error.getMessage()" not in callback
 
 assert 'new CheckItem("runtime_trace"' in compatibility

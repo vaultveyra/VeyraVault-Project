@@ -46,6 +46,7 @@ Interpret the milestones conservatively:
 - `VIRTUAL_PROCESS_BEFORE_APP_CREATE`: the pinned Engine invoked the callback before constructing the target Application.
 - `TARGET_APPLICATION_ONCREATE_BEGIN`: the Engine reached the callback immediately before target `Application.onCreate`.
 - `TARGET_APPLICATION_ONCREATE_COMPLETE`: target `Application.onCreate` returned to the Engine. This does not prove an Activity rendered or that the process remained alive.
+- `PROFILE_APPLY_RETURNED`: strict profile resolution completed and `ProfileRuntimeApplier.apply()` returned without throwing. The current applier does not perform a separate platform readback, so this marker is not proof that the target app observed the selected Locale/TimeZone values.
 
 The trace is emitted only to local Android Logcat and is not stored in CloneStore/SharedPreferences, exported by the diagnostics screen, or uploaded. A missing later marker narrows the stage to investigate but is not, by itself, a definitive crash diagnosis; process death, callback-registration problems, and log-buffer rotation must also be considered.
 
@@ -57,3 +58,9 @@ No split-APK installer patch is attempted here: the pinned Engine currently acce
 - No Clone records, reservations, account/session data or virtual app-private data are modified by this diagnostic correction.
 - No host-global Build/device property changes, identifier spoofing or third-party integrity bypass is introduced.
 - PR #4 must remain open and Draft; all work stays on the feature branch.
+
+
+### Trace semantic precision
+
+- The profile milestone is named `PROFILE_APPLY_RETURNED`, not `PROFILE_APPLIED`. It confirms that profile resolution completed and the applier returned without throwing; it does not claim a runtime readback or target-app observation of Locale/TimeZone.
+- The human-readable `VeyraCloneProfile` log message uses the same conservative wording.

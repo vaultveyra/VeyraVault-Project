@@ -255,3 +255,11 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - Failure outcomes are limited to fixed categories or exception class names; exception messages, stack traces, persistent storage, network transmission, Clone data and session data are not included.
 - Extended the Stage 8.10 source contract to require both registration outcomes and the process-name source.
 - This remains diagnostic instrumentation only. It does not retry registration, change callback order, or prove third-party app startup; physical-device traces are still required.
+
+
+### Stage 8.10 — Profile trace semantic precision (2026-11-22)
+
+- Renamed the profile milestone from `PROFILE_APPLIED` to `PROFILE_APPLY_RETURNED` and changed its outcome to `apply_returned`.
+- The callback logs now state that the profile apply operation returned, rather than claiming verified device/runtime application. The applier has no readback API; the trace therefore cannot claim that the target app observed the resolved Locale/TimeZone.
+- Extended the source contract to reject the old over-strong event name and require the conservative event, outcome and documentation.
+- No profile resolution, setting application, fallback behavior, clone launch sequence or persisted data changed.
