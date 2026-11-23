@@ -19,6 +19,8 @@ assert "AppLockLifecycleProbeActivity" in manifest
 assert 'android:exported="false"' in manifest
 assert "extends Activity" in probe_activity
 
+normalized_test = " ".join(test.split())
+
 for marker in (
     "AppLockLifecycleController.initialize(application)",
     "application.registerActivityLifecycleCallbacks(lifecycleObserver)",
@@ -42,8 +44,8 @@ for marker in (
     "restorePreferenceKey(credentialPreferences, originalCredentials, KEY_HASH)",
     "KEY_FAILED_ATTEMPTS",
     "KEY_LOCKOUT_UNTIL",
-    "restorePreferenceKey(credentialPreferences, originalCredentials, KEY_FAILED_ATTEMPTS)",
-    "restorePreferenceKey(credentialPreferences, originalCredentials, KEY_LOCKOUT_UNTIL)",
+    "restorePreferenceKey( credentialPreferences, originalCredentials, KEY_FAILED_ATTEMPTS)",
+    "restorePreferenceKey( credentialPreferences, originalCredentials, KEY_LOCKOUT_UNTIL)",
     "restorePreferenceKey(policyPreferences, originalPolicy, KEY_TIMEOUT)",
     'SecurityManager.class.getDeclaredField("processFailedAttempts")',
     'SecurityManager.class.getDeclaredField("processLockoutUntilElapsed")',
@@ -54,7 +56,7 @@ for marker in (
     "Credential preferences were not restored exactly",
     "App-lock policy preferences were not restored exactly",
 ):
-    assert marker in test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
+    assert marker in normalized_test, f"Missing runtime lifecycle assertion or safe restoration: {marker}"
 
 assert test.count("ActivityScenario.launch(AppLockLifecycleProbeActivity.class)") == 1, (
     "ActivityScenario must launch only the first Activity; the second must be started from its parent task."
