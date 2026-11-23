@@ -265,23 +265,23 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - No profile resolution, setting application, fallback behavior, clone launch sequence or persisted data changed.
 
 
-## Stage 8.11 — App-lock failed-attempt throttling (2026-11-23)
+# Stage 8.11 — App-lock failed-attempt throttling (2026-11-23)
 
-- Added deterministic exponential backoff to the main VeyraVault PIN/Pattern credential verifier: four initial incorrect attempts are unthrottled; subsequent wrong attempts trigger 30 seconds, 1 minute, 5 minutes and a maximum 15-minute cooldown.
+- Added deterministic tiered backoff to the main VeyraVault PIN/Pattern credential verifier: four initial incorrect attempts are unthrottled; subsequent wrong attempts trigger 30 seconds, 1 minute, 5 minutes and a maximum 15-minute cooldown.
 - Active cooldown is checked before PBKDF2 derivation. Repeated submissions during a cooldown neither hash the supplied secret nor increment the count.
 - A successful verification clears attempt metadata and retains the existing legacy-hash upgrade behavior. Setting a new credential or disabling App Lock also resets attempt metadata.
-- The cooldown deadline and attempt count are stored as non-secret metadata in the existing private security preferences, without changing credential hash or mode keys. A monotonic in-process companion prevents wall-clock adjustment from shortening a cooldown while the host process remains alive.
+- The cooldown deadline and attempt count are stored as non-secret metadata in the existing private security preferences, without changing credential hash or mode keys. A process-local monotonic deadline is reconstructed once from persisted wall time and capped at 15 minutes; subsequent reads never rebase it from wall time, so clock changes cannot repeatedly extend or shorten the in-process cooldown.
+- Inconsistent failure-count/deadline pairs fail closed. Corrupt metadata normalization never touches the credential hash or lock mode.
 - Added Persian/English cooldown messaging and cleared a failed PIN from the input field.
-- Added pure-Java boundary tests, extended the KDF test harness, and added CI source-contract coverage.
-- Limitations: this is application-level throttling, not Keystore/hardware-backed rate limiting. A failed preference commit receives only a process-local fallback; reboot/time-tampering behavior is not claimed as tamper-proof.
+- Added pure-Java boundary and wall-clock-adjustment tests, extended the KDF test harness, and added CI source-contract coverage.
+- Limitations: this is application-level throttling, not Keystore/hardware-backed rate limiting. A failed preference commit receives only a process-local fallback; process-recreation behavior still depends on wall time, with reconstruction bounded to 15 minutes.
 - No CloneStore, virtual app package, account/session, profile or Engine state was modified. SharedPreferences remains active; Room remains inactive.
-
 
 ### Stage 8.11 — Restore full app-lock test fixture state (2026-11-23)
 
-- Fixed the existing AppLock lifecycle instrumentation fixture to snapshot and restore the two new attempt-throttling preference keys and both associated in-memory fields.
-- Extended its preference restoration helper to retain Long values exactly.
-- Extended the source contract to require complete cleanup, preserving the original security preference map and in-memory process state.
-- CI's first Android run reached 69/69 tests with one failure in the older lifecycle test's exact preference-map cleanup assertion; ADB also emitted transient offline messages earlier in boot. The observed assertion was caused by the older fixture not knowing about the newly added zero-valued attempt metadata keys.
-- The new attempt-throttling instrumentation itself did not appear among the failed test names. Re-run is required to verify the fixture correction and the new test together.
-- No production credential, CloneStore, Engine, account/session or profile behavior was changed in this correction.
+- Updated the existing AppLock lifecycle and process-isolation instrumentation fixtures to restore the new throttle preference metadata and in-memory process state.
+- The process-isolation fixture restores the complete original credential preference map, including values that existed before the test, and restores the host session-unlocked flag and throttle companion fields.
+- Extended CI's process-isolation source contract to require exact preference-map restoration and restoration of both process-local throttle values.
+- The earlier full Android runs reached 69/69 tests with one failure in this older process-isolation fixture's exact preference-map cleanup assertion. The test expected an empty map, while the fixture had left the new zero-valued throttle metadata keys behind. This was a test cleanup defect; the new attempt-throttling instrumentation itself did not appear among the failed test names.
+- No production credential, CloneStore, Engine, account/session or profile behavior changed as part of the fixture correction.
+

@@ -34,10 +34,16 @@ set_credential = method_body(security, "public static synchronized boolean setLo
 assert set_credential.count("clearAttemptState(editor)") >= 2
 assert "if (saved)" in set_credential
 
-remaining = method_body(security, "public static synchronized long getCredentialLockoutRemainingMillis(")
+remaining = method_body(
+    security, "public static synchronized long getCredentialLockoutRemainingMillis("
+)
 assert "System.currentTimeMillis()" in remaining
 assert "SystemClock.elapsedRealtime()" in remaining
+assert "initializeElapsedDeadline" in remaining
+assert "isPersistedAttemptStateConsistent" in remaining
 assert "processLockoutUntilElapsed" in security
+assert "ELAPSED_DEADLINE_UNINITIALIZED" in security
+assert "ELAPSED_DEADLINE_NONE" in security
 assert "KEY_FAILED_ATTEMPTS" in security
 assert "KEY_LOCKOUT_UNTIL" in security
 assert "commit()" in security
@@ -48,6 +54,11 @@ assert "SECOND_LOCKOUT_MILLIS = 60_000L" in policy
 assert "THIRD_LOCKOUT_MILLIS = 5L * 60_000L" in policy
 assert "MAX_LOCKOUT_MILLIS = 15L * 60_000L" in policy
 assert "MAX_TRACKED_FAILURES" in policy
+assert "boundedRemainingMillis" in policy
+assert "initializeElapsedDeadline" in policy
+assert "isPersistedAttemptStateConsistent" in policy
+assert "currentElapsedDeadline != ELAPSED_DEADLINE_UNINITIALIZED" in policy
+assert "return ELAPSED_DEADLINE_NONE" in policy
 
 assert "showCredentialFailure(fa)" in activity
 assert "Too many incorrect attempts. Try again in " in activity
@@ -70,5 +81,6 @@ assert "restorePreferences(preferences, originalPreferences)" in instrumentation
 
 print("App lock attempt throttling: lockout check precedes credential derivation: PASS")
 print("App lock attempt throttling: failure persistence and success/reset paths are wired: PASS")
-print("App lock attempt throttling: monotonic in-process companion and wall-clock persistence are present: PASS")
+print("App lock attempt throttling: wall deadline is reconstructed once and bounded by 15 minutes: PASS")
+print("App lock attempt throttling: persisted counter/deadline consistency fails closed: PASS")
 print("App lock attempt throttling: Persian/English cooldown feedback is wired: PASS")

@@ -48,6 +48,51 @@ public final class AppLockAttemptPolicyTest {
         check(AppLockAttemptPolicy.deadlineMillis(5, Long.MAX_VALUE - 10L)
                 == Long.MAX_VALUE, "deadline addition must not overflow");
 
+        check(AppLockAttemptPolicy.isPersistedAttemptStateConsistent(0, 0L),
+                "empty attempt state is consistent");
+        check(AppLockAttemptPolicy.isPersistedAttemptStateConsistent(4, 0L),
+                "unthrottled attempts must not have a deadline");
+        check(AppLockAttemptPolicy.isPersistedAttemptStateConsistent(5, 31_000L),
+                "throttled attempts must retain a deadline");
+        check(!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(5, 0L),
+                "throttled count without deadline is malformed");
+        check(!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(4, 31_000L),
+                "unthrottled count with deadline is malformed");
+        check(!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(0, 31_000L),
+                "empty count with deadline is malformed");
+        check(!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(-1, 0L),
+                "negative failure count is malformed");
+
+        long elapsedDeadline = AppLockAttemptPolicy.initializeElapsedDeadline(
+                AppLockAttemptPolicy.ELAPSED_DEADLINE_UNINITIALIZED,
+                deadline, 1_000L, 5_000L);
+        check(elapsedDeadline == 35_000L, "wall deadline is converted to elapsed time once");
+        long afterBackwardWallClockShift = AppLockAttemptPolicy.initializeElapsedDeadline(
+                elapsedDeadline, deadline, -50_000L, 15_000L);
+        check(afterBackwardWallClockShift == elapsedDeadline,
+                "backwards wall-clock changes must not reset the elapsed deadline");
+        check(AppLockAttemptPolicy.remainingMillis(afterBackwardWallClockShift, 15_000L)
+                == 20_000L, "elapsed cooldown continues across a wall-clock rollback");
+
+        check(AppLockAttemptPolicy.boundedRemainingMillis(Long.MAX_VALUE, 1_000L)
+                == AppLockAttemptPolicy.MAX_LOCKOUT_MILLIS,
+                "persisted wall-clock deadlines cannot exceed the 15-minute maximum");
+        long boundedElapsedDeadline = AppLockAttemptPolicy.initializeElapsedDeadline(
+                AppLockAttemptPolicy.ELAPSED_DEADLINE_UNINITIALIZED,
+                Long.MAX_VALUE, 1_000L, 5_000L);
+        check(boundedElapsedDeadline == 905_000L,
+                "fresh process reconstructs a far-future persisted deadline with the cap");
+        check(AppLockAttemptPolicy.initializeElapsedDeadline(
+                AppLockAttemptPolicy.ELAPSED_DEADLINE_UNINITIALIZED,
+                999L, 1_000L, 5_000L)
+                == AppLockAttemptPolicy.ELAPSED_DEADLINE_NONE,
+                "expired wall deadline initializes to no active deadline");
+        check(AppLockAttemptPolicy.initializeElapsedDeadline(
+                AppLockAttemptPolicy.ELAPSED_DEADLINE_NONE,
+                Long.MAX_VALUE, 1_000L, 5_000L)
+                == AppLockAttemptPolicy.ELAPSED_DEADLINE_NONE,
+                "initialized no-deadline state never re-reads wall time");
+
         System.out.println("AppLockAttemptPolicy tests: PASS");
     }
 }

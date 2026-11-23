@@ -15,11 +15,12 @@ public final class SecurityManager {
     // visibility of lock/unlock transitions across the host process threads.
     private static volatile boolean sessionUnlocked = false;
 
-    // Monotonic companion state prevents a wall-clock adjustment from shortening a
-    // cooldown while this host process remains alive. Persisted wall time survives
-    // ordinary process recreation; after reboot it is re-evaluated from wall time.
+    // Monotonic companion prevents wall-clock changes from shortening OR extending
+    // an active cooldown while this process remains alive. Zero means "not loaded yet";
+    // -1 means "loaded and there is no active deadline".
     private static volatile int processFailedAttempts = 0;
-    private static volatile long processLockoutUntilElapsed = 0L;
+    private static volatile long processLockoutUntilElapsed =
+            AppLockAttemptPolicy.ELAPSED_DEADLINE_UNINITIALIZED;
 
     public static final int MODE_NONE = 0;
     public static final int MODE_PIN = 1;
@@ -54,21 +55,15 @@ public final class SecurityManager {
             return activateCorruptAttemptState(p, nowWall, nowElapsed);
         }
 
-        if (storedFailures < 0 || storedFailures > AppLockAttemptPolicy.MAX_TRACKED_FAILURES
-                || storedDeadline < 0L) {
+        if (!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(
+                storedFailures, storedDeadline)) {
             return activateCorruptAttemptState(p, nowWall, nowElapsed);
         }
 
         processFailedAttempts = Math.max(processFailedAttempts, storedFailures);
-        long wallRemaining = AppLockAttemptPolicy.remainingMillis(storedDeadline, nowWall);
-        long elapsedRemaining = AppLockAttemptPolicy.remainingMillis(
-                processLockoutUntilElapsed, nowElapsed);
-        if (wallRemaining > elapsedRemaining) {
-            processLockoutUntilElapsed = safeAdd(
-                    nowElapsed, wallRemaining);
-            elapsedRemaining = wallRemaining;
-        }
-        return Math.max(wallRemaining, elapsedRemaining);
+        processLockoutUntilElapsed = AppLockAttemptPolicy.initializeElapsedDeadline(
+                processLockoutUntilElapsed, storedDeadline, nowWall, nowElapsed);
+        return AppLockAttemptPolicy.remainingMillis(processLockoutUntilElapsed, nowElapsed);
     }
 
     private static long activateCorruptAttemptState(
@@ -92,15 +87,18 @@ public final class SecurityManager {
 
     /** Stores the failure count and its matching cooldown as one durable preference update. */
     private static void recordFailedAttempt(SharedPreferences p) {
-        int storedFailures;
+        final int storedFailures;
+        final long storedDeadline;
         try {
             storedFailures = p.getInt(KEY_FAILED_ATTEMPTS, 0);
+            storedDeadline = p.getLong(KEY_LOCKOUT_UNTIL, 0L);
         } catch (ClassCastException malformedAttemptState) {
             activateCorruptAttemptState(p, System.currentTimeMillis(),
                     SystemClock.elapsedRealtime());
             return;
         }
-        if (storedFailures < 0 || storedFailures > AppLockAttemptPolicy.MAX_TRACKED_FAILURES) {
+        if (!AppLockAttemptPolicy.isPersistedAttemptStateConsistent(
+                storedFailures, storedDeadline)) {
             activateCorruptAttemptState(p, System.currentTimeMillis(),
                     SystemClock.elapsedRealtime());
             return;
@@ -124,6 +122,8 @@ public final class SecurityManager {
             // Storage failure must not permit rapid retries within this process.
             processLockoutUntilElapsed = safeAdd(
                     nowElapsed, AppLockAttemptPolicy.FIRST_LOCKOUT_MILLIS);
+        } else {
+            processLockoutUntilElapsed = AppLockAttemptPolicy.ELAPSED_DEADLINE_NONE;
         }
     }
 
@@ -134,7 +134,7 @@ public final class SecurityManager {
 
     private static void clearProcessAttemptState() {
         processFailedAttempts = 0;
-        processLockoutUntilElapsed = 0L;
+        processLockoutUntilElapsed = AppLockAttemptPolicy.ELAPSED_DEADLINE_NONE;
     }
 
     /** Returns false if secure derivation or durable preference storage fails. */

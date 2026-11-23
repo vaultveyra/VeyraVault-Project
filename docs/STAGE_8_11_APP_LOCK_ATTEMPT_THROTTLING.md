@@ -20,17 +20,18 @@
 
 - Only two non-secret integers/timestamps are added to the existing private `veyra_security_prefs`: failed-attempt count and lockout-until wall-clock milliseconds.
 - Both values are committed together. Credential hash and lock mode keys remain unchanged.
-- A monotonic `SystemClock.elapsedRealtime()` companion is maintained while the host process is alive so a wall-clock adjustment cannot shorten an active cooldown in that process.
-- On process recreation, the persisted wall-clock deadline reconstructs the remaining cooldown. Android reboot/time-change behavior still depends on the device wall clock; this is not claimed as tamper-proof hardware-backed rate limiting.
-- If attempt metadata is malformed, the code fails closed for the bounded maximum cooldown and normalizes only the attempt metadata. It does not clear or rewrite the existing credential.
+- At process creation, the persisted wall-clock deadline is converted once into a monotonic `SystemClock.elapsedRealtime()` deadline. The reconstructed delay is capped at 15 minutes.
+- During that process lifetime, subsequent checks use only the monotonic deadline; they do not keep refreshing it from wall time. Moving the device clock backwards therefore cannot continually restart or extend an active cooldown, and moving it forwards cannot shorten the active in-process cooldown.
+- After ordinary process recreation, the wall-clock deadline is used to reconstruct the remaining delay, but the reconstruction remains capped at 15 minutes. Android reboot/time-change behavior is not claimed to be tamper-proof or hardware-backed.
+- Attempt metadata must contain a consistent pair: counts 0–4 require a zero deadline; counts 5 or higher require a positive deadline. Malformed or inconsistent metadata fails closed for the bounded maximum cooldown and normalizes only the attempt metadata. It does not clear or rewrite the existing credential.
 - If durable preference storage fails after an incorrect attempt, an in-process 30-second fallback prevents rapid retries while that process remains alive. The fallback cannot guarantee persistence across process death when Android reports a storage failure.
 
 ## Verification
 
-- Added deterministic Java tests for every cooldown boundary, saturation, expiry and overflow.
+- Added deterministic Java tests for every cooldown boundary, saturation, expiry, overflow, malformed metadata, bounded wall-clock reconstruction and resistance to repeated backwards wall-clock changes within a process.
 - Added Android instrumentation that verifies four unthrottled failures, the fifth-failure cooldown, rejection of a correct PIN during active cooldown, successful unlock after expiry, and exact restoration of the original security preferences and process flags.
 - Extended the credential test harness to compile/run both the existing KDF migration tests and the new attempt-policy tests.
-- Added a CI source contract requiring lockout-before-derivation ordering, reset behavior, persisted metadata, and localized feedback.
+- Added a CI source contract requiring lockout-before-derivation ordering, reset behavior, persisted metadata consistency, one-time monotonic reconstruction, and localized feedback.
 
 ## Non-destructive invariants
 
@@ -46,9 +47,9 @@
 - It does not replace device-level authentication or prevent a privileged attacker from modifying private app data on a compromised device.
 - Physical-device usability and persistence behavior across reboot/OEM process management remain to be validated.
 
-
 ## Instrumentation fixture compatibility
 
-- The pre-existing app-lock lifecycle instrumentation now snapshots and restores both new attempt-throttling preference keys and both new in-memory monotonic/counter fields.
-- This keeps the historical lifecycle test non-destructive: it restores the full security preference map exactly, including the case where the new keys did not exist before the test.
-- The test failure observed on the first full run was a fixture cleanup assertion (new zero-valued keys were not previously covered by the older test); no failed assertion came from the new attempt-throttling behavior test.
+- The pre-existing app-lock lifecycle instrumentation snapshots and restores both attempt-throttling preference keys and both in-memory monotonic/counter fields.
+- The process-isolation instrumentation fixture now snapshots and restores the entire original credential preference map as well as the host process unlock and throttle state.
+- These fixtures preserve pre-test state exactly, including the case where attempt-throttling keys did not exist before the test. The first CI failures were cleanup assertions in these older fixtures, not failures in the new attempt-throttling behavior assertions.
+- CI must pass both Push and PR runs on the final commit before this stage's automated verification is considered complete.
