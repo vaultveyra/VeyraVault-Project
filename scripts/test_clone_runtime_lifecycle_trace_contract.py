@@ -98,7 +98,7 @@ assert "TARGET_APPLICATION_ONCREATE_COMPLETE" in after_on_create
 assert "CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED" in before_create
 assert '"apply_returned"' in before_create
 assert "PROFILE_APPLIED" not in trace
-assert "Profile apply operation returned" in callback
+assert "profile apply operation returned" in callback
 assert "error.getMessage()" not in callback
 
 assert 'new CheckItem("runtime_trace"' in compatibility
