@@ -34,10 +34,18 @@ for marker in (
     "CountDownLatch",
     "TimeUnit.SECONDS",
     "restoreCredentialPreferences(preferences, originalPreferences)",
+    'SecurityManager.class.getDeclaredField("processFailedAttempts")',
+    'SecurityManager.class.getDeclaredField("processLockoutUntilElapsed")',
+    "int originalFailedAttempts = failedAttemptsField.getInt(null)",
+    "long originalLockoutUntilElapsed = lockoutUntilElapsedField.getLong(null)",
+    "failedAttemptsField.setInt(null, originalFailedAttempts)",
+    "lockoutUntilElapsedField.setLong(null, originalLockoutUntilElapsed)",
+    "preferences.edit().clear()",
+    "editor.putStringSet(key, new java.util.HashSet<>(strings))",
+    'assertEquals("Credential preference values changed during the test"',
     "unlockedField.setBoolean(null, originalUnlockedState)",
-    "assertEquals(\"Credential preference values changed during the test\"",
 ):
-    assert marker in test, f"Missing process-isolation assertion or safe cleanup: {marker}"
+    assert marker in test, f"Missing process-isolation assertion or exact state restoration: {marker}"
 
 for marker in (
     "private static volatile boolean sessionUnlocked = false",
@@ -54,5 +62,6 @@ assert "connectedDebugAndroidTest" in workflow
 assert "test_app_lock_process_isolation_contract.py" in workflow
 
 print("PASS: App-lock session probe is registered only in the Debug manifest and uses a separate Android process.")
-print("PASS: Instrumentation verifies a fresh process starts locked and restores credential preferences and in-process state.")
+print("PASS: Instrumentation verifies a fresh process starts locked and restores the complete credential preference map.")
+print("PASS: Instrumentation restores the host process unlock and throttle companion state exactly.")
 print("PASS: CI runs the wiring contract and Android instrumentation suite.")
