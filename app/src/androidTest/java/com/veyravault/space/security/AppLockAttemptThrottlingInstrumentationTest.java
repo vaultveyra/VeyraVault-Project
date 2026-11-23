@@ -79,7 +79,7 @@ public final class AppLockAttemptThrottlingInstrumentationTest {
             // Simulate the deadline naturally expiring without sleeping for 30 seconds.
             // The real elapsed-time companion is reset only by the test fixture.
             assertTrue("Test must persist the expired-deadline fixture",
-                    preferences.edit().putLong(KEY_LOCKOUT_UNTIL, 0L).commit());
+                    preferences.edit().putLong(KEY_LOCKOUT_UNTIL, System.currentTimeMillis() - 1L).commit());
             elapsedDeadlineField.setLong(null, 0L);
 
             assertTrue("Correct PIN must unlock after cooldown expiry",
