@@ -158,6 +158,9 @@ jobs:
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
+      - name: Test Stage 8.13 pinned Engine ABI and split APK source contract
+        run: python3 scripts/test_stage_8_13_engine_abi_contract.py
+
       - name: Run Room Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         env:
