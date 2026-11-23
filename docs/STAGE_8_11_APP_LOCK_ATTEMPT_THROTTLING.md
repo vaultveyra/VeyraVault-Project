@@ -28,6 +28,7 @@
 ## Verification
 
 - Added deterministic Java tests for every cooldown boundary, saturation, expiry and overflow.
+- Added Android instrumentation that verifies four unthrottled failures, the fifth-failure cooldown, rejection of a correct PIN during active cooldown, successful unlock after expiry, and exact restoration of the original security preferences and process flags.
 - Extended the credential test harness to compile/run both the existing KDF migration tests and the new attempt-policy tests.
 - Added a CI source contract requiring lockout-before-derivation ordering, reset behavior, persisted metadata, and localized feedback.
 

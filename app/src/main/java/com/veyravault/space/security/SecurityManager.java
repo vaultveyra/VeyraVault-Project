@@ -91,7 +91,7 @@ public final class SecurityManager {
     }
 
     /** Stores the failure count and its matching cooldown as one durable preference update. */
-    private static void recordFailedAttempt(Context c, SharedPreferences p) {
+    private static void recordFailedAttempt(SharedPreferences p) {
         int storedFailures;
         try {
             storedFailures = p.getInt(KEY_FAILED_ATTEMPTS, 0);
@@ -182,7 +182,7 @@ public final class SecurityManager {
             SecurityCredentialHasher.Verification result = SecurityCredentialHasher.verify(
                     rawSecret, stored, Build.VERSION.SDK_INT >= Build.VERSION_CODES.O);
             if (!result.valid) {
-                recordFailedAttempt(c, p);
+                recordFailedAttempt(p);
                 return false;
             }
 

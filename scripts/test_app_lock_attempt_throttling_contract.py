@@ -58,6 +58,16 @@ assert "scripts/test_app_lock_attempt_throttling_contract.py" in workflow
 assert "AppLockAttemptPolicy.java" in tests
 assert "AppLockAttemptPolicyTest" in tests
 
+instrumentation = (
+    ROOT / "app/src/androidTest/java/com/veyravault/space/security/"
+    "AppLockAttemptThrottlingInstrumentationTest.java"
+).read_text(encoding="utf-8")
+assert "fifthIncorrectCredentialStartsCooldownAndCorrectCredentialResetsIt" in instrumentation
+assert "A correct PIN must not bypass an active cooldown" in instrumentation
+assert "Credential preference map must be restored exactly" in instrumentation
+assert "CloneStore" not in instrumentation
+assert "restorePreferences(preferences, originalPreferences)" in instrumentation
+
 print("App lock attempt throttling: lockout check precedes credential derivation: PASS")
 print("App lock attempt throttling: failure persistence and success/reset paths are wired: PASS")
 print("App lock attempt throttling: monotonic in-process companion and wall-clock persistence are present: PASS")
