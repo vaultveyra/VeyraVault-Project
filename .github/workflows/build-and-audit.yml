@@ -107,6 +107,8 @@ jobs:
         run: python3 scripts/test_app_lock_lifecycle_contract.py
       - name: Test app-lock deadline math against production Java
         run: python3 scripts/test_app_lock_deadline_contract.py
+      - name: Test app-lock attempt-throttling contract
+        run: python3 scripts/test_app_lock_attempt_throttling_contract.py
       - name: Test app-lock Activity lifecycle state against production Java
         run: python3 scripts/test_app_lock_lifecycle_state_contract.py
       - name: Test app-lock isolated-process instrumentation wiring

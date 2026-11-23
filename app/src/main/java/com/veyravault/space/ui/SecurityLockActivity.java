@@ -72,7 +72,7 @@ public class SecurityLockActivity extends BaseActivity {
                     } else if (SecurityManager.verifyCredential(SecurityLockActivity.this, patternString)) {
                         finish();
                     } else {
-                        Toast.makeText(SecurityLockActivity.this, fa ? "الگو اشتباه است!" : "Incorrect pattern!", Toast.LENGTH_SHORT).show();
+                        showCredentialFailure(fa);
                         patternView.clearPattern();
                     }
                 }
@@ -114,12 +114,28 @@ public class SecurityLockActivity extends BaseActivity {
                     } else if (SecurityManager.verifyCredential(SecurityLockActivity.this, pin)) {
                         finish();
                     } else {
-                        Toast.makeText(SecurityLockActivity.this, fa ? "رمز اشتباه است!" : "Wrong PIN!", Toast.LENGTH_SHORT).show();
+                        showCredentialFailure(fa);
+                        pinInput.setText("");
                     }
                 }
             });
         }
         setContentView(root);
+    }
+
+    private void showCredentialFailure(boolean fa) {
+        long remaining = SecurityManager.getCredentialLockoutRemainingMillis(this);
+        if (remaining > 0L) {
+            long seconds = (remaining + 999L) / 1000L;
+            String message = fa
+                    ? "تلاش‌های ناموفق زیاد است؛ " + seconds + " ثانیه دیگر دوباره امتحان کنید."
+                    : "Too many incorrect attempts. Try again in " + seconds + " seconds.";
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this,
+                fa ? "رمز یا الگو اشتباه است." : "Incorrect PIN or pattern.",
+                Toast.LENGTH_SHORT).show();
     }
 
     @Override

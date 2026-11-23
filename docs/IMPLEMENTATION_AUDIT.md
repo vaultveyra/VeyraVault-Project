@@ -263,3 +263,15 @@ This is a static audit and user-reported acceptance record, not a runtime fix or
 - The callback logs now state that the profile apply operation returned, rather than claiming verified device/runtime application. The applier has no readback API; the trace therefore cannot claim that the target app observed the resolved Locale/TimeZone.
 - Extended the source contract to reject the old over-strong event name and require the conservative event, outcome and documentation.
 - No profile resolution, setting application, fallback behavior, clone launch sequence or persisted data changed.
+
+
+## Stage 8.11 — App-lock failed-attempt throttling (2026-11-23)
+
+- Added deterministic exponential backoff to the main VeyraVault PIN/Pattern credential verifier: four initial incorrect attempts are unthrottled; subsequent wrong attempts trigger 30 seconds, 1 minute, 5 minutes and a maximum 15-minute cooldown.
+- Active cooldown is checked before PBKDF2 derivation. Repeated submissions during a cooldown neither hash the supplied secret nor increment the count.
+- A successful verification clears attempt metadata and retains the existing legacy-hash upgrade behavior. Setting a new credential or disabling App Lock also resets attempt metadata.
+- The cooldown deadline and attempt count are stored as non-secret metadata in the existing private security preferences, without changing credential hash or mode keys. A monotonic in-process companion prevents wall-clock adjustment from shortening a cooldown while the host process remains alive.
+- Added Persian/English cooldown messaging and cleared a failed PIN from the input field.
+- Added pure-Java boundary tests, extended the KDF test harness, and added CI source-contract coverage.
+- Limitations: this is application-level throttling, not Keystore/hardware-backed rate limiting. A failed preference commit receives only a process-local fallback; reboot/time-tampering behavior is not claimed as tamper-proof.
+- No CloneStore, virtual app package, account/session, profile or Engine state was modified. SharedPreferences remains active; Room remains inactive.
