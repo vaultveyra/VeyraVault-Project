@@ -26,7 +26,7 @@ def method_body(source, signature):
 
 verify = method_body(security, "public static synchronized boolean verifyCredential(")
 assert verify.index("getCredentialLockoutRemainingMillis(c)") < verify.index("SecurityCredentialHasher.verify")
-assert "recordFailedAttempt(c, p)" in verify
+assert "recordFailedAttempt(p)" in verify
 assert "clearAttemptState(editor)" in verify
 assert "cryptoFailure" in verify
 
