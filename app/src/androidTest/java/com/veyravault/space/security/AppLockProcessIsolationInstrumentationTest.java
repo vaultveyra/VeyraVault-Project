@@ -53,6 +53,7 @@ public final class AppLockProcessIsolationInstrumentationTest {
         int originalFailedAttempts = failedAttemptsField.getInt(null);
         long originalLockoutUntilElapsed = lockoutUntilElapsedField.getLong(null);
 
+        final CountDownLatch connectedLatch = new CountDownLatch(1);
         final CountDownLatch resultLatch = new CountDownLatch(1);
         final AtomicReference<Boolean> remoteUnlockedState = new AtomicReference<>();
         final AtomicReference<Messenger> remoteMessenger = new AtomicReference<>();
@@ -69,6 +70,7 @@ public final class AppLockProcessIsolationInstrumentationTest {
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
                 remoteMessenger.set(new Messenger(service));
+                connectedLatch.countDown();
                 Message request = Message.obtain(
                         null, AppLockSessionProbeService.MSG_QUERY_SESSION_STATE);
                 request.replyTo = responseMessenger;
@@ -96,8 +98,10 @@ public final class AppLockProcessIsolationInstrumentationTest {
             Intent intent = new Intent(context, AppLockSessionProbeService.class);
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
             assertTrue("Could not bind the isolated app-lock probe process", bound);
-            assertTrue("The isolated process did not return its session state in time",
-                    resultLatch.await(10, TimeUnit.SECONDS));
+            assertTrue("The isolated app-lock process did not connect within 30 seconds",
+                    connectedLatch.await(30, TimeUnit.SECONDS));
+            assertTrue("The connected isolated process did not return its session state within 15 seconds",
+                    resultLatch.await(15, TimeUnit.SECONDS));
             assertNotNull("The isolated process did not return a result", remoteUnlockedState.get());
             assertEquals("A fresh Android process must start fail-closed",
                     Boolean.FALSE, remoteUnlockedState.get());
