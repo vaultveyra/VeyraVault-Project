@@ -358,6 +358,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(scanner.scan(self.PACKAGE), "RECOVERY_REQUIRED")
             self.assertEqual(snapshot_protected_state(scanner, self.PACKAGE), damaged_snapshot)
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             self.assertEqual(
                 scanner.recovery_record(self.PACKAGE)["reason"],
                 "METADATA_MALFORMED",
@@ -384,6 +385,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
                 ("MainActivity", "SyncService"),
             )
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertTrue(scanner.launch_allowed(self.PACKAGE))
 
     def test_startup_scan_without_memory_retains_package_and_marks_recovery_required(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -398,6 +400,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertNotIn(self.PACKAGE, fresh_process.loaded)
             self.assertNotIn(self.PACKAGE, fresh_process.resolver)
             self.assertEqual(fresh_process.uninstall_notifications, [])
+            self.assertFalse(fresh_process.launch_allowed(self.PACKAGE))
             self.assertEqual(
                 fresh_process.recovery_record(self.PACKAGE)["reason"],
                 "METADATA_MALFORMED",
