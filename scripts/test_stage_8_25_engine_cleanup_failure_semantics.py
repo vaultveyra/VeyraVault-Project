@@ -236,7 +236,8 @@ assert "BEnvironment.getAppDir" not in absence_guard, (
 assert "canonicalDirectory.getPath().startsWith(rootPrefix)" in directory_guard
 assert "FileUtils.isSymlink(directory)" in directory_guard
 assert "canonicalDirectory.exists()" in directory_guard
-assert "state == CloneInstallState.ABSENT" in query
+assert "state != CloneInstallState.ABSENT" in query
+assert "return state;" in query
 assert "areCloneDataDirectoriesAbsent(pkg, userId)" in query
 assert "CloneInstallState.UNKNOWN" in query
 assert "dataDirectoriesAbsent ? CloneInstallState.ABSENT : CloneInstallState.UNKNOWN" in classifier
