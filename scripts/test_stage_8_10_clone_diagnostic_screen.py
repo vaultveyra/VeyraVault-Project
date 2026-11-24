@@ -42,7 +42,8 @@ for forbidden in (
 
 assert "AsyncCloneRepository.getInstance(getApplicationContext()).loadClones" in activity
 assert "CompatibilityManager.formatCloneReport(getApplicationContext(), clone)" in activity
-assert "diagnosticsWorker.execute" in activity
+assert "EngineOperationQueue.submit" in activity
+assert "ExecutorService diagnosticsWorker" not in activity
 assert "Intent.ACTION_SEND" in activity
 assert "Intent.EXTRA_TEXT" in activity
 assert "Intent.createChooser" in activity

@@ -94,8 +94,8 @@ query = method_body("private static Boolean queryInstalledAsUser(")
 assert "return null;" in query
 assert "result instanceof Boolean ? (Boolean) result : null" in query
 assert "Boolean.FALSE.equals(queryInstalledAsUser" in uninstall
-single_start = main_ui.index('makeSheetActionBtn("🗑️"')
-single_end = main_ui.index('makeSheetActionBtn("📦"', single_start)
+single_start = main_ui.index("private void confirmUninstallClone(")
+single_end = main_ui.index("private void confirmBatchUninstall(", single_start)
 single = main_ui[single_start:single_end]
 assert "EngineOperationQueue.submit(" in single
 assert "Engine.uninstallClone(item.packageName, item.userId)" in single

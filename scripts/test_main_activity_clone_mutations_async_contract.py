@@ -47,8 +47,8 @@ assert "item.deviceModel = previousModel" in profile
 assert "VirtualHookManager.syncCloneHooks" not in profile
 
 # Single uninstall runs on the shared Engine queue before Registry removal.
-single_start = source.index('makeSheetActionBtn("🗑️"')
-single_end = source.index('makeSheetActionBtn("📦"', single_start)
+single_start = source.index("private void confirmUninstallClone(")
+single_end = source.index("private void confirmBatchUninstall(", single_start)
 single = source[single_start:single_end]
 assert "EngineOperationQueue.submit(" in single
 assert "Engine.uninstallClone(item.packageName, item.userId)" in single

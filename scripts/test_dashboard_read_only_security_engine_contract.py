@@ -15,10 +15,13 @@ assert "hideReadOnlyPlatformStatus();" in resume_block
 assert "dashboardStatusGeneration++;" in resume_block
 assert "Security and Engine status are hidden while this screen is inactive." in source
 assert "refreshReadOnlyPlatformStatus();" in source
-assert "dashboardStatusExecutor = Executors.newSingleThreadExecutor()" in source
-assert "dashboardStatusExecutor.shutdownNow()" in source
+assert "EngineOperationQueue.submit(() ->" in source
+assert "dashboardStatusExecutor" not in source
+assert "ExecutorService" not in source
 assert "generation != dashboardStatusGeneration" in source
 assert "dateRefreshHandler.post(() ->" in source
+assert "EngineOperationQueue.submit(() ->" in loader
+assert "(summary, failure) ->" in loader
 
 # Read-only sources: no credential verification, lock mutation, or Device Admin mutation.
 start = source.index("private void refreshReadOnlyPlatformStatus()")
