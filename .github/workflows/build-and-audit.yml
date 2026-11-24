@@ -161,6 +161,9 @@ jobs:
       - name: Test Stage 8.17 isolated install transaction recovery harness
         run: python3 scripts/test_stage_8_17_install_transaction_recovery.py
 
+      - name: Test Stage 8.18 pinned Engine install failure semantics audit
+        run: python3 scripts/test_stage_8_18_engine_install_failure_semantics.py
+
       - name: Test Stage 8.13 pinned Engine ABI and split APK source contract
         run: python3 scripts/test_stage_8_13_engine_abi_contract.py
 
