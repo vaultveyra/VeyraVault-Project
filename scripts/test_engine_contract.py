@@ -86,7 +86,7 @@ assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.p
     "repository.commitReservedClone(entry"
 )
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_clone
-assert "Engine.isCloneConfirmedAbsent" in add_clone and "releaseReservationAfterEngineAbsence" in add_clone
+assert "Engine.isCloneConfirmedAbsent" in add_clone and "releaseReservationAfterConfirmedEngineAbsence" in add_clone
 assert "repository.allocateNextUserId" not in main_ui + add_ui
 assert "repository.upsertClone(copy" not in main_ui and "repository.upsertClone(entry" not in add_ui
 assert "Engine.installPackageAsUser(copy.packageName, copy.userId)" not in main_ui
