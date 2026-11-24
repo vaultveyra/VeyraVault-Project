@@ -90,6 +90,10 @@ public final class NativeAbiPolicy {
 
     private NativeAbiPolicy() { }
 
+    static Result unknownResult() {
+        return new Result(Decision.UNKNOWN_APK_METADATA);
+    }
+
     public static HostBitness bitnessForAbi(String abi) {
         if (abi == null) return HostBitness.UNKNOWN;
         String value = abi.trim().toLowerCase(Locale.US);
