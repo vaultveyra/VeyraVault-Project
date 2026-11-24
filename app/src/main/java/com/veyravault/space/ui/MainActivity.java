@@ -792,7 +792,7 @@ public class MainActivity extends BaseActivity {
             final NativeAbiPreflight.Result preflight = inspection.getValue();
             if (!preflight.isAllowed()) {
                 Toast.makeText(MainActivity.this,
-                        preflight.getUserMessage(fa) + "\\n[" + preflight.getDiagnosticCode() + "]",
+                        preflight.getUserMessage(fa) + "\n[" + preflight.getDiagnosticCode() + "]",
                         Toast.LENGTH_LONG).show();
                 return;
             }
@@ -831,7 +831,7 @@ public class MainActivity extends BaseActivity {
                                         : (absent
                                             ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
                                             : "Engine absence is unconfirmed; the ID remains reserved to prevent collision."))
-                                        + "\\n" + Engine.getLastInstallDiagnostic(),
+                                        + "\n" + Engine.getLastInstallDiagnostic(),
                                 Toast.LENGTH_LONG).show();
                     }
                     return;
