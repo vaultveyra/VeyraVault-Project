@@ -20,13 +20,12 @@ assert "dashboardStatusExecutor" not in source
 assert "ExecutorService" not in source
 assert "generation != dashboardStatusGeneration" in source
 assert "dateRefreshHandler.post(() ->" in source
-assert "EngineOperationQueue.submit(() ->" in loader
-assert "(summary, failure) ->" in loader
-
 # Read-only sources: no credential verification, lock mutation, or Device Admin mutation.
 start = source.index("private void refreshReadOnlyPlatformStatus()")
 end = source.index("private String describeProfileLifecycle(", start)
 loader = source[start:end]
+assert "EngineOperationQueue.submit(() ->" in loader
+assert "(summary, failure) ->" in loader
 for marker in (
     "SecurityManager",
     ".isLockEnabled(appContext)",
