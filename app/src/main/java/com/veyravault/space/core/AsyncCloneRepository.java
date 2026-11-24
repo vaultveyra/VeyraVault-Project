@@ -106,6 +106,15 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> copyEntries(CloneStore.readAllStrict(appContext)), callback);
     }
 
+    /** Read-only APK/ABI validation on the repository worker; does not reserve or mutate a Clone ID. */
+    public void inspectNativeAbi(String packageName, Callback<NativeAbiPreflight.Result> callback) {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            deliver(callback, Result.<NativeAbiPreflight.Result>failure(
+                    Failure.INVALID_INPUT, "Package name is required"));
+            return;
+        }
+        enqueue(() -> NativeAbiPreflight.inspectInstalledPackage(appContext, packageName), callback);
+    }
 
     /** Durably reserves the next package-scoped virtual user ID before Engine installation. */
     public void reserveNextUserId(String packageName, Callback<CloneStore.CloneReservation> callback) {
