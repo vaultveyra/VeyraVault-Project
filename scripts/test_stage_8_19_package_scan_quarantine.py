@@ -87,7 +87,19 @@ class SafePackageScanner:
         self.records_root = self.recovery_root / "records"
         self.loaded: dict[str, dict] = {}
         self.resolver: dict[str, tuple[str, ...]] = {}
+        self.blocked: set[str] = set()
         self.uninstall_notifications: list[tuple[str, str]] = []
+
+    def launch_allowed(self, package_name: str) -> bool:
+        try:
+            record_path = self._record_path(package_name)
+            if package_name in self.blocked:
+                return False
+            if record_path.is_symlink() or record_path.exists():
+                return False
+            return package_name in self.loaded
+        except (OSError, ValueError):
+            return False
 
     def _package_dir(self, package_name: str) -> Path:
         if not isinstance(package_name, str) or not PACKAGE_RE.fullmatch(package_name):
@@ -197,10 +209,13 @@ class SafePackageScanner:
     ) -> str:
         package_dir = self._package_dir(package_name)
         if self.app_root.is_symlink() or package_dir.is_symlink():
+            self.blocked.add(package_name)
             return "UNSAFE_PACKAGE_PATH"
         if not package_dir.exists():
+            self.blocked.add(package_name)
             return "PACKAGE_NOT_PRESENT"
         if not package_dir.is_dir():
+            self.blocked.add(package_name)
             return "UNSAFE_PACKAGE_PATH"
 
         # A corrupt recovery marker is itself ambiguous. Do not overwrite it,
@@ -210,6 +225,7 @@ class SafePackageScanner:
         except OSError:
             record_valid = False
         if not record_valid:
+            self.blocked.add(package_name)
             return "RECOVERY_RECORD_INVALID"
 
         try:
@@ -217,6 +233,7 @@ class SafePackageScanner:
                 package_dir / "package.conf"
             )
         except OSError:
+            self.blocked.add(package_name)
             reason = "METADATA_UNREADABLE"
             if not self._write_recovery_record(
                 package_name, reason, "PACKAGE_SCAN", record_writer
@@ -227,6 +244,7 @@ class SafePackageScanner:
         try:
             metadata = self._parse_metadata(raw, package_name)
         except RecoveryRequired as error:
+            self.blocked.add(package_name)
             reason = str(error)
             if reason not in VALID_REASONS:
                 reason = "METADATA_SCHEMA_INVALID"
@@ -237,12 +255,14 @@ class SafePackageScanner:
             return "RECOVERY_REQUIRED"
 
         if not self._clear_recovery_record(package_name):
+            self.blocked.add(package_name)
             return "RECOVERY_MARKER_CLEAR_FAILED"
 
         # Publish memory and resolver only after metadata validation and
         # recovery-marker reconciliation have succeeded.
         self.loaded[package_name] = dict(metadata)
         self.resolver[package_name] = tuple(metadata.get("componentNames", []))
+        self.blocked.discard(package_name)
         return "LOADED"
 
     def recovery_record(self, package_name: str) -> Optional[dict]:
@@ -305,6 +325,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             scanner = SafePackageScanner(Path(temp))
             seed_package(scanner, self.PACKAGE)
             self.assertEqual(scanner.scan(self.PACKAGE), "LOADED")
+            self.assertTrue(scanner.launch_allowed(self.PACKAGE))
             before = snapshot_protected_state(scanner, self.PACKAGE)
             old_loaded = dict(scanner.loaded[self.PACKAGE])
             old_resolver = scanner.resolver[self.PACKAGE]
@@ -320,6 +341,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(scanner.loaded[self.PACKAGE], old_loaded)
             self.assertEqual(scanner.resolver[self.PACKAGE], old_resolver)
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             record = scanner.recovery_record(self.PACKAGE)
             self.assertEqual(record["reason"], "METADATA_UNREADABLE")
             self.assertEqual(record["status"], "RECOVERY_REQUIRED")
@@ -351,6 +373,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             (scanner._package_dir(self.PACKAGE) / "package.conf").write_bytes(b"{")
             self.assertEqual(scanner.scan(self.PACKAGE), "RECOVERY_REQUIRED")
             self.assertIsNotNone(scanner.recovery_record(self.PACKAGE))
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
 
             (scanner._package_dir(self.PACKAGE) / "package.conf").write_bytes(original)
             self.assertEqual(scanner.scan(self.PACKAGE), "LOADED")
@@ -404,6 +427,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(scanner.loaded[self.PACKAGE], old_loaded)
             self.assertEqual(scanner.resolver[self.PACKAGE], old_resolver)
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             self.assertFalse(scanner._record_path(self.PACKAGE).exists())
             self.assertTrue((scanner._package_dir(self.PACKAGE) / "base.apk").is_file())
             # Non-package user/host data remains byte-for-byte unchanged.
@@ -425,6 +449,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(snapshot_protected_state(scanner, self.PACKAGE), before)
             self.assertEqual(scanner.loaded[self.PACKAGE]["generationId"], "generation-v1")
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             self.assertTrue(record_path.exists())
 
     def test_invalid_package_path_and_symlink_are_rejected(self):
@@ -443,6 +468,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             except OSError:
                 self.skipTest("Symlink creation is unavailable on this test filesystem")
             self.assertEqual(scanner.scan(self.PACKAGE), "UNSAFE_PACKAGE_PATH")
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             self.assertTrue(outside.is_dir())
             self.assertEqual(list(outside.iterdir()), [])
 
@@ -463,6 +489,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(snapshot_protected_state(scanner, self.PACKAGE), before)
             self.assertEqual(list(outside.iterdir()), [])
             self.assertEqual(scanner.uninstall_notifications, [])
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
 
     def test_missing_metadata_is_quarantined_without_removing_package_directory(self):
         with tempfile.TemporaryDirectory() as temp:
