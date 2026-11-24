@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed source contract for the pinned Engine's known ABI limits.
+"""Source contract for the pinned Engine and VeyraVault's fail-closed ABI guard.
 
-This is a source audit plus a Python model of the audited Java decision paths.
-The ZIP fixtures are synthetic; this is not Android runtime or physical-device
-compatibility testing. Known unsafe behavior is characterized explicitly so CI
-cannot mistake a green source audit for x86 support.
+This audits pinned Engine source, characterizes it with synthetic ZIP fixtures,
+then compiles and runs the production Java ABI policy. It is not Android runtime
+or physical-device compatibility certification.
 """
 from pathlib import Path
 import tempfile
@@ -198,11 +197,12 @@ finally:
 
 print("Stage 8.13 Engine ABI source contract: PASS")
 print("Synthetic ABI decision fixtures: PASS (source-behavior model only)")
-print("Known gap: x86/x86_64-only APKs can pass the current empty-recognized-ABI gate")
-print("Known gap: unmatched native ABI extraction can return without a failure signal")
-print("Known gap: CopyExecutor reads baseCodePath only; split native inputs are not staged")
+print("Pinned Engine source gap: x86/x86_64-only APKs can pass its empty-recognized-ABI gate")
+print("Pinned Engine source gap: unmatched native ABI extraction can return without a failure signal")
+print("Pinned Engine source gap: CopyExecutor reads baseCodePath only; split inputs are not staged")
+print("VeyraVault app-level preflight: incompatible native ABIs and all split packages are rejected before ID reservation")
 print("ARM release packaging: armeabi-v7a + arm64-v8a (physical runtime not certified)")
-print("Split APK Engine installation and physical-device Engine launch: NOT CERTIFIED")
+print("Split-aware Engine installation and physical-device Engine launch: NOT CERTIFIED")
 
 # Compile and execute the actual production NativeAbiPolicy.java using javac.
 # This validates the decision logic, not Android PackageManager or native loading.
