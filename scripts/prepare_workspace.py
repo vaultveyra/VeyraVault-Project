@@ -54,6 +54,10 @@ def verify_engine_source(repository_path):
     if status:
         raise RuntimeError("Engine source working tree is not clean; refusing an unverified build")
 
+    ignored = _git_output(repository_path, "ls-files", "--others", "--ignored", "--exclude-standard")
+    if ignored:
+        raise RuntimeError("Engine source contains ignored untracked files; refusing an unverified build")
+
     print(f"[+] Verified Engine source: {ENGINE_REPOSITORY}@{ENGINE_COMMIT}")
 
 
