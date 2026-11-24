@@ -83,10 +83,22 @@ for source, pkg, entry in ((ADD, "app.pkg", "entry"), (MAIN, "item.packageName",
     assert f"repository.reserveNextUserId({pkg}" in source
     assert f"repository.commitReservedClone({entry}, reservation" in source
     assert "repository.allocateNextUserId" not in source
-assert ADD.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < ADD.index(
+add_clone = ADD[ADD.index("private void cloneSingleApp("):
+                  ADD.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
+assert "repository.inspectNativeAbi(app.pkg" in add_clone
+assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
+assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
+assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index(
     "repository.commitReservedClone(entry, reservation"
 )
-assert MAIN.index("Engine.installPackageAsUser(copy.packageName, copy.userId)") < MAIN.index(
+
+duplicate = MAIN[MAIN.index("private void duplicateCloneWithPreflight("):
+                 MAIN.index("private void showRenameDialog(")]
+assert "repository.inspectNativeAbi(item.packageName" in duplicate
+assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index("repository.reserveNextUserId(item.packageName")
+assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
+assert "copy.packageName, copy.userId, preflight)" in duplicate
+assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index(
     "repository.commitReservedClone(copy, reservation"
 )
 assert "Engine.isCloneConfirmedAbsent" in ADD and "Engine.isCloneConfirmedAbsent" in MAIN
