@@ -76,6 +76,9 @@ jobs:
       - name: Test async clone launch orchestration contract
         run: python3 scripts/test_async_clone_launch_contract.py
 
+      - name: Test serialized asynchronous Clone provisioning contract
+        run: python3 scripts/test_async_clone_provision_contract.py
+
       - name: Test async location persistence UI contract
         run: python3 scripts/test_location_persistence_ui_contract.py
 

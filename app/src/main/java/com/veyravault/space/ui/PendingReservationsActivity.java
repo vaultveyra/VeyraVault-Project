@@ -15,12 +15,11 @@ import android.widget.Toast;
 import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
+import com.veyravault.space.core.EngineOperationQueue;
 import com.veyravault.space.core.LocaleHelper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Read-only diagnostics for durable pending Clone ID reservations.
@@ -32,7 +31,6 @@ import java.util.concurrent.Executors;
  */
 public class PendingReservationsActivity extends BaseActivity {
     private AsyncCloneRepository repository;
-    private ExecutorService engineWorker;
     private LinearLayout rows;
     private TextView status;
     private boolean fa;
@@ -53,11 +51,6 @@ public class PendingReservationsActivity extends BaseActivity {
         super.onCreate(state);
         fa = LocaleHelper.isPersian(this);
         repository = AsyncCloneRepository.getInstance(this);
-        engineWorker = Executors.newSingleThreadExecutor(r -> {
-            Thread thread = new Thread(r, "veyravault-reservation-diagnostics");
-            thread.setDaemon(true);
-            return thread;
-        });
         buildUi();
         refreshReservations();
     }
@@ -135,7 +128,7 @@ public class PendingReservationsActivity extends BaseActivity {
                     : ("Pending reservations: " + pending.size() + " — checking Engine status..."));
 
             try {
-                engineWorker.execute(() -> {
+                EngineOperationQueue.execute(() -> {
                     List<ReservationState> inspected = new ArrayList<ReservationState>();
                     for (CloneStore.CloneReservation reservation : pending) {
                         Engine.CloneInstallState engineState;
@@ -226,7 +219,7 @@ public class PendingReservationsActivity extends BaseActivity {
                 .setPositiveButton(fa ? "تأیید و بررسی" : "Confirm and recheck", (dialog, which) -> {
                     status.setText(fa ? "در حال بررسی دوبارهٔ وضعیت موتور..." : "Rechecking Engine status...");
                     try {
-                        engineWorker.execute(() -> {
+                        EngineOperationQueue.execute(() -> {
                             Engine.CloneInstallState latest;
                             try {
                                 latest = Engine.getCloneInstallState(
@@ -281,7 +274,6 @@ public class PendingReservationsActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         refreshGeneration++;
-        if (engineWorker != null) engineWorker.shutdownNow();
         super.onDestroy();
     }
 }

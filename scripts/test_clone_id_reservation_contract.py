@@ -8,6 +8,8 @@ REPO = (ROOT / "app/src/main/java/com/veyravault/space/core/AsyncCloneRepository
 ENGINE = (ROOT / "app/src/main/java/com/veyravault/space/core/Engine.java").read_text(encoding="utf-8")
 ADD = (ROOT / "app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
 MAIN = (ROOT / "app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
+PROVISION = (ROOT / "app/src/main/java/com/veyravault/space/core/AsyncCloneProvisionRepository.java").read_text(encoding="utf-8")
+QUEUE = (ROOT / "app/src/main/java/com/veyravault/space/core/EngineOperationQueue.java").read_text(encoding="utf-8")
 TEST = (ROOT / "app/src/androidTest/java/com/veyravault/space/core/AsyncCloneRepositoryInstrumentationTest.java").read_text(encoding="utf-8")
 
 
@@ -78,33 +80,23 @@ assert "ENGINE_STATE_UNCONFIRMED" in REPO
 assert "Engine." not in REPO
 assert "ClonePersistenceDatabase" not in REPO
 
-# Both supported clone-creation UIs reserve before install, then commit the exact token.
-for source, pkg, entry in ((ADD, "app.pkg", "entry"), (MAIN, "item.packageName", "copy")):
-    assert f"repository.reserveNextUserId({pkg}" in source
-    assert f"repository.commitReservedClone({entry}, reservation" in source
-    assert "repository.allocateNextUserId" not in source
-add_clone = ADD[ADD.index("private void cloneSingleApp("):
-                  ADD.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
-assert "repository.inspectNativeAbi(app.pkg" in add_clone
-assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
-assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
-assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index(
-    "repository.commitReservedClone(entry, reservation"
-)
-
-duplicate = MAIN[MAIN.index("private void duplicateCloneWithPreflight("):
-                 MAIN.index("private void showRenameDialog(")]
-assert "repository.inspectNativeAbi(item.packageName" in duplicate
-assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index("repository.reserveNextUserId(item.packageName")
-assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
-assert "copy.packageName, copy.userId, preflight)" in duplicate
-assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index(
-    "repository.commitReservedClone(copy, reservation"
-)
-assert "Engine.isCloneConfirmedAbsent" in ADD and "Engine.isCloneConfirmedAbsent" in MAIN
-assert "releaseReservationAfterEngineAbsence" in ADD and "releaseReservationAfterEngineAbsence" in MAIN
-assert "Engine.uninstallClone(entry.packageName, entry.userId)" in ADD
-assert "Engine.uninstallClone(copy.packageName, copy.userId)" in MAIN
+# Both UIs delegate into one service that owns the entire preflight/reservation/install/commit transaction.
+for ui in (ADD, MAIN):
+    assert "provisionRepository.createClone(" in ui
+    assert "Engine.installPackageAsUser(" not in ui
+assert "persistence.inspectNativeAbi(packageName" in PROVISION
+assert "persistence.reserveNextUserId(packageName" in PROVISION
+assert "Engine.installPackageAsUser(" in PROVISION
+assert "persistence.commitReservedClone(entry, reservation" in PROVISION
+assert PROVISION.index("persistence.inspectNativeAbi(packageName") < PROVISION.index("persistence.reserveNextUserId(packageName")
+assert PROVISION.index("persistence.reserveNextUserId(packageName") < PROVISION.index("Engine.installPackageAsUser(")
+assert PROVISION.index("Engine.installPackageAsUser(") < PROVISION.index("persistence.commitReservedClone(entry, reservation")
+assert "Engine.CloneInstallState.ABSENT" in PROVISION
+assert "releaseAfterConfirmedAbsence" in PROVISION
+assert "reservation remains blocked" in PROVISION
+assert "private static final ExecutorService ENGINE" in QUEUE
+assert "veyravault-engine-operations" in QUEUE
+assert "EngineOperationQueue.submit(" in PROVISION
 
 # Concurrency, durable recreation, token mismatch, safe release, and collision protection are instrumented.
 for test_name in (

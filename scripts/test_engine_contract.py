@@ -56,44 +56,35 @@ assert "return launchCloneDetailed(ctx, entry).launched;" in compat
 print("Engine install/launch failure contract: PASS")
 print("Active-launch marker is written only after confirmed engine launch: PASS")
 
-# Both Clone-creation entry points must run read-only ABI preflight before ID reservation.
+# Clone creation entry points use the shared transaction coordinator.
 main_ui = Path("app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 add_ui = Path("app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
+provision = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneProvisionRepository.java").read_text(encoding="utf-8")
+queue = Path("app/src/main/java/com/veyravault/space/core/EngineOperationQueue.java").read_text(encoding="utf-8")
 
 assert "duplicateCloneWithPreflight(item);" in main_ui
 duplicate = main_ui[main_ui.index("private void duplicateCloneWithPreflight("):
-                   main_ui.index("private void showRenameDialog(")]
-assert "repository.inspectNativeAbi(item.packageName" in duplicate
-assert "repository.reserveNextUserId(item.packageName" in duplicate
-assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index(
-    "repository.reserveNextUserId(item.packageName"
-)
-assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
-assert "copy.packageName, copy.userId, preflight)" in duplicate
-assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index(
-    "repository.commitReservedClone(copy"
-)
+                    main_ui.index("private void showRenameDialog(")]
+assert "provisionRepository.createClone(item.packageName, item.displayName, fa" in duplicate
+assert "Engine.installPackageAsUser(" not in duplicate
 
 add_clone = add_ui[add_ui.index("private void cloneSingleApp("):
-                   add_ui.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
-assert "repository.inspectNativeAbi(app.pkg" in add_clone
-assert "repository.reserveNextUserId(app.pkg" in add_clone
-assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index(
-    "repository.reserveNextUserId(app.pkg"
-)
-assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
-assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index(
-    "repository.commitReservedClone(entry"
-)
-assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_clone
-assert "Engine.isCloneConfirmedAbsent" in add_clone and "releaseReservationAfterConfirmedEngineAbsence" in add_clone
+                   add_ui.index("private void showCloneError(")]
+assert "provisionRepository.createClone(app.pkg, app.label, fa" in add_clone
+assert "Engine.installPackageAsUser(" not in add_clone
+assert "Engine.uninstallClone(" not in add_clone
+
+assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("persistence.reserveNextUserId(packageName")
+assert provision.index("persistence.reserveNextUserId(packageName") < provision.index("Engine.installPackageAsUser(")
+assert provision.index("Engine.installPackageAsUser(") < provision.index("persistence.commitReservedClone(entry, reservation")
+assert "Engine.CloneInstallState.ABSENT" in provision
+assert "reservation remains blocked" in provision
+assert "private static final ExecutorService ENGINE" in queue
+assert "veyravault-engine-operations" in queue
 assert "repository.allocateNextUserId" not in main_ui + add_ui
-assert "repository.upsertClone(copy" not in main_ui and "repository.upsertClone(entry" not in add_ui
-assert "Engine.installPackageAsUser(copy.packageName, copy.userId)" not in main_ui
-assert "Engine.installPackageAsUser(entry.packageName, entry.userId)" not in add_ui
 assert "launchRepository.launchClone(item.packageName, item.userId" in main_ui
 assert "Engine.launchClone(MainActivity.this, item)" not in main_ui
-print("Clone creation UI failure handling: PASS")
+print("Clone creation transaction ordering and shared Engine queue: PASS")
 
 uninstall = method_body("public static boolean uninstallClone(")
 assert "queryInstalledAsUser(pkg, userId)" in uninstall
@@ -103,11 +94,15 @@ query = method_body("private static Boolean queryInstalledAsUser(")
 assert "return null;" in query
 assert "result instanceof Boolean ? (Boolean) result : null" in query
 assert "Boolean.FALSE.equals(queryInstalledAsUser" in uninstall
-assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in main_ui
-assert "repository.removeClone(item.packageName, item.userId" in main_ui
-assert main_ui.index("if (!Engine.uninstallClone(item.packageName, item.userId))") < main_ui.index("repository.removeClone(item.packageName, item.userId")
-print("Clone uninstall requires explicit engine absence verification: PASS")
-print("Registry records are retained when uninstall is unconfirmed; removal is async after confirmation: PASS")
+single_start = main_ui.index('makeSheetActionBtn("🗑️"')
+single_end = main_ui.index('makeSheetActionBtn("📦"', single_start)
+single = main_ui[single_start:single_end]
+assert "EngineOperationQueue.submit(" in single
+assert "Engine.uninstallClone(item.packageName, item.userId)" in single
+assert "repository.removeClone(item.packageName, item.userId" in single
+assert single.index("EngineOperationQueue.submit(") < single.index("Engine.uninstallClone(item.packageName, item.userId)") < single.index("repository.removeClone(item.packageName, item.userId")
+assert "EngineOperationQueue.submit(" in main_ui
+print("Clone uninstall requires explicit Engine absence verification and executes off the UI thread: PASS")
 
 settings = Path("app/src/main/java/com/veyravault/space/ui/SettingsHubActivity.java").read_text(encoding="utf-8")
 assert "Backup & Restore" in settings

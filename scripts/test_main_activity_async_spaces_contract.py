@@ -39,15 +39,16 @@ assert "setAllSpacesCollapsed(spaceNumbers, !allCollapsed, 0)" in toggle
 assert "repository.setSpaceCollapsed" in toggle
 assert "some earlier changes may already be saved" in source
 
-# This adoption changes only dashboard persistence reads/collapse writes; Engine install/uninstall flows remain.
+# Clone creation is delegated to the shared transaction coordinator, not run in UI callbacks.
 assert "duplicateCloneWithPreflight(item);" in source
 assert "private void duplicateCloneWithPreflight(final CloneStore.CloneEntry item)" in source
-assert "repository.inspectNativeAbi(item.packageName" in source
-assert "Engine.installPackageAsUser(MainActivity.this," in source
-assert "copy.packageName, copy.userId, preflight)" in source
+assert "provisionRepository.createClone(item.packageName, item.displayName, fa" in source
+assert "Engine.installPackageAsUser(" not in source
+assert "Engine.isCloneConfirmedAbsent(" not in source
+assert "EngineOperationQueue.submit(" in source
 assert "Engine.uninstallClone(item.packageName, item.userId)" in source
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in source
 
 print("PASS: MainActivity uses strict asynchronous repository reads for Spaces and global profile summary.")
 print("PASS: Collapse/expand actions are commit-aware and preserve the last rendered UI on read failure.")
-print("PASS: Batch collapse reports possible partial commits; Engine install/uninstall ordering remains in place.")
+print("PASS: Clone provisioning and uninstall work are delegated to the shared Engine operation queue.")

@@ -1,6 +1,6 @@
 # Stage 8.22 — Read-only Native ABI preflight and install guard
 
-**Status: app-level preflight implemented on the feature branch; production Java policy is covered by a host-JVM test matrix, and Android PackageManager integration has read-only instrumentation smoke tests. CI verification is pending. No physical-device certification is claimed.**
+**Status (2026-11-24): app-level preflight and Engine install guard are implemented at commit `732317564772613826018296c4c512e0cbda939d`. Push CI run `45439570658` completed successfully on this exact SHA, including Android Emulator instrumentation, source audit, unsigned Release APK build/audit, and isolated signed-artifact job. PR run `45439590270` attempt 1 failed before running any instrumentation tests because the hosted Emulator went offline and Android system services (`package`, `activity`, `settings`) were unavailable; the failed PR job was rerun as attempt 2 and was still in progress at the time this report was updated. No physical-device certification is claimed.**
 
 ## Scope and invariant
 
@@ -113,3 +113,13 @@ This makes a slow process start distinguishable from a connected process that fa
 ## Next acceptance gate
 
 Run the complete CI suite on this commit. If the host-JVM policy contract or Android instrumentation fails, fix that before proceeding. After CI succeeds, perform physical ARMv7 and ARM64 validation, beginning with the API 27 Huawei reference device. Until that evidence exists, describe the preflight as an app-level safety guard—not device certification.
+
+
+## CI evidence update — 2026-11-24
+
+- Exact tested feature SHA: `732317564772613826018296c4c512e0cbda939d`.
+- Push run `45439570658` (run #1136): all jobs completed successfully. The build job passed the contract suite, Room Android instrumentation, source audit, unsigned release compilation, APK audit and artifact upload. The isolated signing job also succeeded.
+- Push artifacts: unsigned `14944174166`; signed `14945119649`.
+- PR run `45439590270` (run #1137), attempt 1: contract steps passed; the Emulator became offline, Android system services could not be found, and instrumentation reported zero tests executed. The failure is an infrastructure/Emulator boot-service failure, not an app assertion failure.
+- Only the failed PR job was rerun. Attempt 2 was in progress at report update time; do not mark PR validation green until its final conclusion is fetched.
+- PR #4 remains Open and Draft; no merge or `main` change occurred.

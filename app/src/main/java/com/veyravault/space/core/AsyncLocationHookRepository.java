@@ -5,12 +5,10 @@ import android.os.Handler;
 import android.os.Looper;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Runs synchronous BlackBox location-service IPC away from the UI thread.
+ * Runs synchronous BlackBox location-service IPC on the shared Engine operation queue.
  * Persistence remains owned by AsyncCloneRepository; this class only synchronizes Engine hooks.
  */
 public final class AsyncLocationHookRepository {
@@ -20,7 +18,6 @@ public final class AsyncLocationHookRepository {
 
     private static volatile AsyncLocationHookRepository instance;
     private final Context appContext;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler callbackHandler = new Handler(Looper.getMainLooper());
 
     private AsyncLocationHookRepository(Context context) {
@@ -65,7 +62,7 @@ public final class AsyncLocationHookRepository {
     private <T> void submit(Operation<T> operation, Callback<T> callback) {
         if (callback == null) return;
         try {
-            worker.execute(() -> {
+            EngineOperationQueue.execute(() -> {
                 T value = null;
                 String error = null;
                 try {

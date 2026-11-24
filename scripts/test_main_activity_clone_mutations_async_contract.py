@@ -20,27 +20,17 @@ shortcut = source[shortcut_start:shortcut_end]
 assert "launchRepository.launchClone(pkg, uid" in shortcut
 assert "Engine.launchClone(this, entry)" not in shortcut
 
-# Duplication keeps the Engine install before registry persistence and cleans up on failed save.
+# Duplication delegates to the app-scoped transaction coordinator.
 duplicate_start = source.index('makeSheetActionBtn("⊞+"')
 duplicate_end = source.index('makeSheetActionBtn("📱"', duplicate_start)
 duplicate = source[duplicate_start:duplicate_end]
 assert "duplicateCloneWithPreflight(item);" in duplicate
 clone_creation = source[source.index("private void duplicateCloneWithPreflight("):
                         source.index("private void showRenameDialog(")]
-assert "repository.inspectNativeAbi(item.packageName" in clone_creation
-assert "repository.reserveNextUserId(item.packageName" in clone_creation
-assert clone_creation.index("repository.inspectNativeAbi(item.packageName") < clone_creation.index("repository.reserveNextUserId(item.packageName")
-assert "Engine.installPackageAsUser(MainActivity.this," in clone_creation
-assert "copy.packageName, copy.userId, preflight)" in clone_creation
-assert "repository.commitReservedClone(copy, reservation" in clone_creation
-assert clone_creation.index("Engine.installPackageAsUser(MainActivity.this,") < clone_creation.index("repository.commitReservedClone(copy")
-assert "Engine.uninstallClone(copy.packageName, copy.userId)" in clone_creation
-assert "releaseReservationIfEngineAbsent(reservation)" in clone_creation
+assert "provisionRepository.createClone(item.packageName, item.displayName, fa" in clone_creation
+assert "Engine.installPackageAsUser(" not in clone_creation
+assert "Engine.uninstallClone(" not in clone_creation
 assert "repository.allocateNextUserId" not in source
-assert clone_creation.index("if (!save.isSuccess())") < clone_creation.index("Engine.uninstallClone(copy.packageName, copy.userId)")
-save_callback = clone_creation[clone_creation.index("repository.commitReservedClone(copy"):]
-assert save_callback.index("if (!save.isSuccess())") < save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)")
-assert save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)") < save_callback.index("if (!isFinishing() && !isDestroyed())")
 
 # Rename and per-clone profile writes are commit-aware; in-memory values are reverted on failure.
 rename_start = source.index("private void showRenameDialog")
@@ -56,13 +46,13 @@ assert "item.deviceBrand = previousBrand" in profile
 assert "item.deviceModel = previousModel" in profile
 assert "VirtualHookManager.syncCloneHooks" not in profile
 
-# Uninstall registry removal happens only after Engine confirms absence.
+# Single uninstall runs on the shared Engine queue before Registry removal.
 single_start = source.index('makeSheetActionBtn("🗑️"')
 single_end = source.index('makeSheetActionBtn("📦"', single_start)
 single = source[single_start:single_end]
-assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in single
+assert "EngineOperationQueue.submit(" in single
+assert "Engine.uninstallClone(item.packageName, item.userId)" in single
 assert "repository.removeClone(item.packageName, item.userId" in single
-assert single.index("Engine.uninstallClone") < single.index("repository.removeClone")
 
 # Batch selection is loaded strictly and each Engine removal is followed by an async registry commit.
 batch_start = source.index("private void showBatchUninstallDialog")
@@ -77,6 +67,15 @@ assert batch.index("Engine.uninstallClone(entry.packageName, entry.userId)") < b
 assert "registry failures" in batch
 assert "refreshSpaces();" in batch
 
-print("PASS: MainActivity shortcut, duplicate, rename, profile metadata and uninstall registry persistence use AsyncCloneRepository.")
-print("PASS: Engine install/uninstall ordering and cleanup-on-save-failure are preserved.")
-print("PASS: Batch uninstall is sequential, commit-aware and reports partial outcomes.")
+assert "Engine.installPackageAsUser(" not in source
+assert "Engine.isCloneConfirmedAbsent(" not in source
+assert "EngineOperationQueue.submit(" in source
+for call in ("Engine.stopClone(item.packageName, item.userId)",
+             "Engine.clearCloneData(item.packageName, item.userId)",
+             "Engine.uninstallClone(item.packageName, item.userId)"):
+    pos = source.find(call)
+    assert pos >= 0
+    assert source.rfind("EngineOperationQueue.submit(", 0, pos) > source.rfind("});", 0, pos)
+
+print("PASS: MainActivity delegates Clone provisioning and serializes synchronous Engine operations.")
+print("PASS: Single and batch uninstall remain Engine-first and Registry-commit-aware.")

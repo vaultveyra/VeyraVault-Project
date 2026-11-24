@@ -27,7 +27,8 @@ import com.veyravault.space.core.AsyncCloneLaunchRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
-import com.veyravault.space.core.NativeAbiPreflight;
+import com.veyravault.space.core.AsyncCloneProvisionRepository;
+import com.veyravault.space.core.EngineOperationQueue;
 import com.veyravault.space.core.ShortcutHelper;
 import com.veyravault.space.core.VirtualHookManager;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ public class MainActivity extends BaseActivity {
     private boolean fa;
     private AsyncCloneRepository repository;
     private AsyncCloneLaunchRepository launchRepository;
+    private AsyncCloneProvisionRepository provisionRepository;
     private long refreshGeneration;
     private View toggleAllButton;
     private TextView globalProfileSummary;
@@ -53,6 +55,7 @@ public class MainActivity extends BaseActivity {
         fa = LocaleHelper.isPersian(this);
         repository = AsyncCloneRepository.getInstance(getApplicationContext());
         launchRepository = AsyncCloneLaunchRepository.getInstance(getApplicationContext());
+        provisionRepository = AsyncCloneProvisionRepository.getInstance(getApplicationContext());
         buildDashboardUi();
         handleShortcutLaunch(getIntent());
     }
@@ -100,25 +103,6 @@ public class MainActivity extends BaseActivity {
         }
         Toast.makeText(this, (fa ? "در حال اجرای " : "Launching ") + displayName + "...",
                 Toast.LENGTH_SHORT).show();
-    }
-
-    private void releaseReservationAfterConfirmedEngineAbsence(
-            CloneStore.CloneReservation reservation) {
-        repository.releaseReservationAfterEngineAbsence(reservation, true,
-                new AsyncCloneRepository.Callback<Boolean>() {
-                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
-                        // Explicit Engine absence was already verified by the caller.
-                    }
-                });
-    }
-
-    private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
-        boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
-                reservation.getPackageName(), reservation.getUserId());
-        repository.releaseReservationAfterEngineAbsence(reservation, confirmedAbsent,
-                result -> {
-                    // A failed or unknown Engine query leaves the durable reservation in place.
-                });
     }
 
     @Override
@@ -416,19 +400,45 @@ public class MainActivity extends BaseActivity {
         header.addView(previewBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         final int uid = spaceNum - 1;
-        boolean gmsOn = Engine.isGmsInstalled(uid);
-        TextView gmsChip = makePillChip(gmsOn ? "GMS ✓" : "GMS +", gmsOn ? "#D1FAE5" : "#F3F4F6", gmsOn ? "#065F46" : "#6B7280");
-        gmsChip.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                boolean next = !Engine.isGmsInstalled(uid);
-                Engine.setGmsEnabled(uid, next);
-                Toast.makeText(MainActivity.this,
-                        fa ? ("سرویس گوگل‌پلی (GMS) برای فضای " + spaceNum + (next ? " فعال شد" : " غیرفعال شد"))
-                           : ("Google Play Services for Space " + spaceNum + (next ? " enabled" : " disabled")),
-                        Toast.LENGTH_SHORT).show();
-                refreshSpaces();
+        final TextView gmsChip = makePillChip("GMS …", "#F3F4F6", "#6B7280");
+        gmsChip.setEnabled(false);
+        EngineOperationQueue.submit(() -> Engine.isGmsInstalled(uid), (gmsOn, failure) -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (failure != null || gmsOn == null) {
+                gmsChip.setText("GMS ?");
+                return;
             }
+            gmsChip.setText(gmsOn ? "GMS ✓" : "GMS +");
+            gmsChip.setEnabled(true);
+        });
+        gmsChip.setOnClickListener(v -> {
+            gmsChip.setEnabled(false);
+            EngineOperationQueue.submit(() -> {
+                boolean next = !Engine.isGmsInstalled(uid);
+                boolean changed = Engine.setGmsEnabled(uid, next);
+                return new boolean[]{changed, Engine.isGmsInstalled(uid)};
+            }, (result, failure) -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (failure != null || result == null || !result[0]) {
+                    Toast.makeText(MainActivity.this,
+                            fa ? "تغییر وضعیت GMS تأیید نشد." : "The GMS state change was not confirmed.",
+                            Toast.LENGTH_LONG).show();
+                    EngineOperationQueue.submit(() -> Engine.isGmsInstalled(uid), (actual, queryFailure) -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (queryFailure == null && actual != null) {
+                            gmsChip.setText(actual ? "GMS ✓" : "GMS +");
+                            gmsChip.setEnabled(true);
+                        }
+                    });
+                    return;
+                }
+                gmsChip.setText(result[1] ? "GMS ✓" : "GMS +");
+                gmsChip.setEnabled(true);
+                Toast.makeText(MainActivity.this,
+                        fa ? ("وضعیت سرویس گوگل‌پلی برای فضای " + spaceNum + " به‌روزرسانی شد.")
+                           : ("Google Play Services state updated for Space " + spaceNum + "."),
+                        Toast.LENGTH_SHORT).show();
+            });
         });
         LinearLayout.LayoutParams gmlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         gmlp.setMargins(dp(8), 0, dp(8), 0);
@@ -694,39 +704,62 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("⏻", getString(R.string.stop_app), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                Engine.stopClone(item.packageName, item.userId);
-                Toast.makeText(MainActivity.this, fa ? "برنامه متوقف شد" : "Clone stopped", Toast.LENGTH_SHORT).show();
+                EngineOperationQueue.submit(() -> {
+                    Engine.stopClone(item.packageName, item.userId);
+                    return Boolean.TRUE;
+                }, (ignored, failure) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    Toast.makeText(MainActivity.this,
+                            failure == null
+                                    ? (fa ? "درخواست توقف برنامه ارسال شد." : "Clone stop request was submitted.")
+                                    : (fa ? "ارسال درخواست توقف ناموفق بود." : "Clone stop request failed."),
+                            Toast.LENGTH_SHORT).show();
+                });
             }
         }));
 
         actionGrid.addView(makeSheetActionBtn("🧹", getString(R.string.clear_data), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                Engine.clearCloneData(item.packageName, item.userId);
-                Toast.makeText(MainActivity.this, fa ? "داده‌های کلون پاکسازی شد" : "Clone data cleared", Toast.LENGTH_SHORT).show();
+                EngineOperationQueue.submit(() -> {
+                    Engine.clearCloneData(item.packageName, item.userId);
+                    return Boolean.TRUE;
+                }, (ignored, failure) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    Toast.makeText(MainActivity.this,
+                            failure == null
+                                    ? (fa ? "درخواست پاکسازی دادهٔ کلون ارسال شد." : "Clone data-clear request was submitted.")
+                                    : (fa ? "ارسال درخواست پاکسازی ناموفق بود." : "Clone data-clear request failed."),
+                            Toast.LENGTH_LONG).show();
+                });
             }
         }));
 
         actionGrid.addView(makeSheetActionBtn("🗑️", getString(R.string.uninstall), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                if (!Engine.uninstallClone(item.packageName, item.userId)) {
-                    Toast.makeText(MainActivity.this,
-                            fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
-                               : "The engine did not confirm uninstall; the Space record was preserved.",
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                repository.removeClone(item.packageName, item.userId, result -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    if (!result.isSuccess()) {
-                        Toast.makeText(MainActivity.this,
-                                fa ? "برنامه حذف شد، اما ثبت حذف در فهرست ناموفق بود."
-                                   : "The app was uninstalled, but removing its registry entry failed.",
-                                Toast.LENGTH_LONG).show();
-                    }
-                    refreshSpaces();
-                });
+                EngineOperationQueue.submit(
+                        () -> Engine.uninstallClone(item.packageName, item.userId),
+                        (removed, engineFailure) -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
+                                Toast.makeText(MainActivity.this,
+                                        fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
+                                           : "The engine did not confirm uninstall; the Space record was preserved.",
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            repository.removeClone(item.packageName, item.userId, result -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                if (!result.isSuccess()) {
+                                    Toast.makeText(MainActivity.this,
+                                            fa ? "برنامه حذف شد، اما ثبت حذف در فهرست ناموفق بود."
+                                               : "The app was uninstalled, but removing its registry entry failed.",
+                                            Toast.LENGTH_LONG).show();
+                                }
+                                refreshSpaces();
+                            });
+                        });
             }
         }));
 
@@ -777,87 +810,23 @@ public class MainActivity extends BaseActivity {
             }
             return;
         }
-
-        repository.inspectNativeAbi(item.packageName, inspection -> {
+        // The app-scoped coordinator completes the transaction even if this Activity closes.
+        provisionRepository.createClone(item.packageName, item.displayName, fa, outcome -> {
             if (isFinishing() || isDestroyed()) return;
-            if (!inspection.isSuccess() || inspection.getValue() == null) {
+            if (outcome == null || !outcome.success) {
                 Toast.makeText(MainActivity.this,
-                        (fa ? "بررسی سازگاری APK انجام نشد؛ شناسه‌ای رزرو یا نصبی شروع نشد. "
-                                : "APK compatibility inspection failed; no ID was reserved and no install was started. ")
-                                + inspection.getMessage(),
+                        outcome == null
+                                ? (fa ? "نتیجهٔ تکثیر مشخص نشد؛ رزروهای معلق را بررسی کنید."
+                                      : "The duplication result is unknown; inspect pending reservations.")
+                                : outcome.message,
                         Toast.LENGTH_LONG).show();
                 return;
             }
-
-            final NativeAbiPreflight.Result preflight = inspection.getValue();
-            if (!preflight.isAllowed()) {
-                Toast.makeText(MainActivity.this,
-                        preflight.getUserMessage(fa) + "\n[" + preflight.getDiagnosticCode() + "]",
-                        Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            repository.reserveNextUserId(item.packageName, allocation -> {
-                if (isFinishing() || isDestroyed()) return;
-                if (!allocation.isSuccess() || allocation.getValue() == null) {
-                    Toast.makeText(MainActivity.this,
-                            (fa ? "رزرو شناسهٔ کلون ناموفق بود: " : "Could not reserve a clone ID: ")
-                                    + allocation.getMessage(),
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-
-                final CloneStore.CloneReservation reservation = allocation.getValue();
-                if (isFinishing() || isDestroyed()) {
-                    releaseReservationIfEngineAbsent(reservation);
-                    return;
-                }
-
-                final CloneStore.CloneEntry copy = new CloneStore.CloneEntry();
-                copy.packageName = item.packageName;
-                copy.userId = reservation.getUserId();
-                copy.displayName = item.displayName;
-
-                if (!Engine.installPackageAsUser(MainActivity.this,
-                        copy.packageName, copy.userId, preflight)) {
-                    boolean absent = Engine.isCloneConfirmedAbsent(copy.packageName, copy.userId);
-                    if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
-                    if (!isFinishing() && !isDestroyed()) {
-                        Toast.makeText(MainActivity.this,
-                                (fa
-                                        ? (absent
-                                            ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
-                                            : "وضعیت نصب نامشخص است؛ شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
-                                        : (absent
-                                            ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
-                                            : "Engine absence is unconfirmed; the ID remains reserved to prevent collision."))
-                                        + "\n" + Engine.getLastInstallDiagnostic(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                    return;
-                }
-
-                repository.commitReservedClone(copy, reservation, save -> {
-                    if (!save.isSuccess()) {
-                        boolean cleanupConfirmed = Engine.uninstallClone(copy.packageName, copy.userId);
-                        if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation);
-                        if (!isFinishing() && !isDestroyed()) {
-                            Toast.makeText(MainActivity.this,
-                                    fa
-                                            ? (cleanupConfirmed
-                                                ? "ثبت کلون ناموفق بود؛ حذف نصب تأیید شد و رزرو آزاد می‌شود."
-                                                : "ثبت کلون ناموفق بود؛ حذف نصب تأیید نشد و شناسه رزرو می‌ماند.")
-                                            : (cleanupConfirmed
-                                                ? "Clone registry commit failed; uninstall was confirmed and the reservation is being released."
-                                                : "Clone registry commit failed and uninstall was not confirmed; the reservation remains blocked."),
-                                    Toast.LENGTH_LONG).show();
-                        }
-                        return;
-                    }
-                    if (isFinishing() || isDestroyed()) return;
-                    refreshSpaces();
-                });
-            });
+            refreshSpaces();
+            Toast.makeText(MainActivity.this,
+                    fa ? ("کلون در فضای " + outcome.clone.getSpaceNumber() + " تکثیر شد.")
+                       : ("Clone duplicated into Space " + outcome.clone.getSpaceNumber() + "."),
+                    Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -1021,38 +990,40 @@ public class MainActivity extends BaseActivity {
     }
 
     // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
+    // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
     private void runBatchUninstall(List<CloneStore.CloneEntry> all, boolean[] checked,
                                    int index, int[] counts) {
         if (isFinishing() || isDestroyed()) return;
         int next = index;
-        while (next < all.size()) {
-            if (!checked[next]) {
-                next++;
-                continue;
-            }
-            CloneStore.CloneEntry entry = all.get(next);
-            final int nextIndex = next + 1;
-            if (!Engine.uninstallClone(entry.packageName, entry.userId)) {
-                counts[1]++;
-                next++;
-                continue;
-            }
-            repository.removeClone(entry.packageName, entry.userId, result -> {
-                if (isFinishing() || isDestroyed()) return;
-                if (result.isSuccess()) counts[0]++;
-                else counts[2]++;
-                runBatchUninstall(all, checked, nextIndex, counts);
-            });
-            return; // Wait for the registry commit before uninstalling the next selected clone.
+        while (next < all.size() && !checked[next]) next++;
+        if (next >= all.size()) {
+            String summary = fa
+                    ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
+                            + "، خطای ثبت فهرست: " + counts[2])
+                    : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
+                            + ", registry failures: " + counts[2]);
+            Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
+            refreshSpaces();
+            return;
         }
-
-        String summary = fa
-                ? ("حذف گروهی پایان یافت. حذف موفق: " + counts[0] + "، خطای موتور: " + counts[1]
-                        + "، خطای ثبت فهرست: " + counts[2])
-                : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
-                        + ", registry failures: " + counts[2]);
-        Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
-        refreshSpaces();
+        CloneStore.CloneEntry entry = all.get(next);
+        final int nextIndex = next + 1;
+        EngineOperationQueue.submit(
+                () -> Engine.uninstallClone(entry.packageName, entry.userId),
+                (removed, engineFailure) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
+                        counts[1]++;
+                        runBatchUninstall(all, checked, nextIndex, counts);
+                        return;
+                    }
+                    repository.removeClone(entry.packageName, entry.userId, result -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (result.isSuccess()) counts[0]++;
+                        else counts[2]++;
+                        runBatchUninstall(all, checked, nextIndex, counts);
+                    });
+                });
     }
 
     private Drawable loadAppIcon(String pkg) {

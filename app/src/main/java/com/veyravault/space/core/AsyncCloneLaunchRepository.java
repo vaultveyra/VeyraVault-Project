@@ -5,14 +5,12 @@ import android.os.Handler;
 import android.os.Looper;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Runs the complete clone launch sequence away from the UI thread.
  * Registry lookup, installation, location-hook synchronization, engine launch and
- * active-launch persistence are serialized on one worker to preserve hook-before-launch.
+ * active-launch persistence share the process-wide Engine operation queue.
  */
 public final class AsyncCloneLaunchRepository {
     public interface Callback {
@@ -37,7 +35,6 @@ public final class AsyncCloneLaunchRepository {
 
     private static volatile AsyncCloneLaunchRepository instance;
     private final Context appContext;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private AsyncCloneLaunchRepository(Context context) {
@@ -61,7 +58,7 @@ public final class AsyncCloneLaunchRepository {
             return;
         }
         try {
-            worker.execute(() -> {
+            EngineOperationQueue.execute(() -> {
                 Outcome outcome;
                 try {
                     List<CloneStore.CloneEntry> entries = CloneStore.readAllStrict(appContext);

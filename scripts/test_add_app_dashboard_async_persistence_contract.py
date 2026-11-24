@@ -4,25 +4,12 @@ root = Path(__file__).resolve().parents[1]
 add_app = (root / "app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
 dashboard = (root / "app/src/main/java/com/veyravault/space/ui/DashboardActivity.java").read_text(encoding="utf-8")
 
-# AddApp creation must reserve an identity before touching the virtual Engine.
+# AddApp delegates provisioning to the application-scoped transaction coordinator.
 for forbidden in ("CloneStore.nextFreeUserIdForPackage(", "CloneStore.upsertClone(", "CloneStore.getAll(",
-                  "repository.allocateNextUserId", "repository.upsertClone(entry"):
-    assert forbidden not in add_app, f"Unsafe/direct persistence call remains in AddAppActivity: {forbidden}"
-add_clone = add_app[add_app.index("private void cloneSingleApp("):
-                   add_app.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
-assert "repository.inspectNativeAbi(app.pkg" in add_clone
-assert "repository.reserveNextUserId(app.pkg" in add_clone
-assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
-assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
-assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index("repository.commitReservedClone(entry")
-
-assert "Engine.isCloneConfirmedAbsent" in add_app
-assert "repository.releaseReservationAfterEngineAbsence" in add_app
-assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_app
-assert "if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation)" in add_app
-assert "cloneBatchAt(selected, 0, 0, 0)" in add_app
-assert "batchConfirmBtn.setEnabled(false)" in add_app
-assert "if (!batchMode && !isFinishing() && !isDestroyed())" in add_app
+                  "repository.allocateNextUserId", "repository.upsertClone(entry",
+                  "Engine.installPackageAsUser(", "Engine.uninstallClone(", "Engine.isCloneConfirmedAbsent("):
+    assert forbidden not in add_app, f"Unsafe/direct operation remains in AddAppActivity: {forbidden}"
+assert "provisionRepository.createClone(app.pkg, app.label, fa" in add_app
 
 # Dashboard counts use a strict async snapshot and fail visibly when the registry cannot be read.
 assert "CloneStore.getAll(" not in dashboard
@@ -32,6 +19,5 @@ assert "counts are unavailable" in dashboard
 assert "cloneCount.setText(String.valueOf(result.getValue().size()))" in dashboard
 assert "spaceCount.setText(String.valueOf(spaces.size()))" in dashboard
 
-print("PASS: AddApp uses a durable reservation, Engine-first install and token-bound atomic registry commit.")
-print("PASS: Failed/uncertain Engine cleanup never silently frees the reserved ID.")
+print("PASS: AddApp delegates Clone creation to the application-scoped Engine transaction coordinator.")
 print("PASS: Dashboard counts use strict async registry reads.")

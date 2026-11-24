@@ -8,9 +8,11 @@ assert launch.index('getMethod("launchApk"') < launch.index("CloneStore.recordAc
 assert "public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry)" in launch
 
 repository = Path("app/src/main/java/com/veyravault/space/core/AsyncCloneLaunchRepository.java").read_text(encoding="utf-8")
-assert "Executors.newSingleThreadExecutor()" in repository
+assert "EngineOperationQueue.execute" in repository
+assert "Executors.newSingleThreadExecutor()" not in repository
 assert "CloneStore.readAllStrict(appContext)" in repository
 assert "Engine.launchCloneDetailed(appContext, target)" in repository
+assert "EngineOperationQueue.execute" in repository
 assert "mainHandler.post(() -> callback.onComplete(outcome))" in repository
 assert "CLONE_NOT_FOUND_IN_STRICT_REGISTRY" in repository
 

@@ -22,11 +22,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
-import com.veyravault.space.core.AsyncCloneRepository;
-import com.veyravault.space.core.CloneStore;
-import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
-import com.veyravault.space.core.NativeAbiPreflight;
+import com.veyravault.space.core.AsyncCloneProvisionRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -49,14 +46,14 @@ public class AddAppActivity extends BaseActivity {
     private Button batchConfirmBtn;
     private boolean fa;
     private String currentQuery = "";
-    private AsyncCloneRepository repository;
+    private AsyncCloneProvisionRepository provisionRepository;
     private boolean cloneOperationRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
-        repository = AsyncCloneRepository.getInstance(getApplicationContext());
+        provisionRepository = AsyncCloneProvisionRepository.getInstance(getApplicationContext());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -277,125 +274,29 @@ public class AddAppActivity extends BaseActivity {
     }
 
     private void cloneSingleApp(final InstalledApp app, final CloneCallback callback) {
-        repository.inspectNativeAbi(app.pkg,
-                new AsyncCloneRepository.Callback<NativeAbiPreflight.Result>() {
-            @Override public void onComplete(
-                    AsyncCloneRepository.Result<NativeAbiPreflight.Result> inspection) {
-                if (!inspection.isSuccess() || inspection.getValue() == null) {
-                    showCloneError(fa
-                            ? "بررسی سازگاری APK ناموفق بود؛ هیچ شناسه‌ای رزرو یا نصبی انجام نشد."
-                            : "APK compatibility inspection failed; no Space ID was reserved and no installation was started.");
-                    callback.onComplete(false);
-                    return;
-                }
-                final NativeAbiPreflight.Result preflight = inspection.getValue();
-                if (!preflight.isAllowed()) {
-                    showCloneError(preflight.getUserMessage(fa)
-                            + "\n[" + preflight.getDiagnosticCode() + "]");
-                    callback.onComplete(false);
-                    return;
-                }
-                if (isFinishing() || isDestroyed()) {
-                    callback.onComplete(false);
-                    return;
-                }
-                reserveAndInstallApp(app, callback, preflight);
+        if (app == null || app.pkg == null || app.pkg.trim().isEmpty()) {
+            showCloneError(fa ? "برنامهٔ انتخاب‌شده معتبر نیست." : "The selected app is invalid.");
+            callback.onComplete(false);
+            return;
+        }
+        // The app-scoped coordinator owns install/commit/rollback beyond Activity lifetime.
+        provisionRepository.createClone(app.pkg, app.label, fa, outcome -> {
+            if (outcome == null || !outcome.success) {
+                showCloneError(outcome == null
+                        ? (fa ? "نتیجهٔ نصب مشخص نشد؛ رزروهای معلق را بررسی کنید."
+                              : "The install result is unknown; inspect pending reservations.")
+                        : outcome.message);
+                callback.onComplete(false);
+                return;
             }
-        });
-    }
-
-    private void reserveAndInstallApp(final InstalledApp app, final CloneCallback callback,
-                                      final NativeAbiPreflight.Result preflight) {
-        repository.reserveNextUserId(app.pkg,
-                new AsyncCloneRepository.Callback<CloneStore.CloneReservation>() {
-            @Override public void onComplete(
-                    AsyncCloneRepository.Result<CloneStore.CloneReservation> allocation) {
-                if (!allocation.isSuccess() || allocation.getValue() == null) {
-                    showCloneError(fa
-                            ? "رزرو امن شناسهٔ فضا ناموفق بود؛ نصب شروع نشد."
-                            : "Could not reserve a safe Space ID; installation was not started.");
-                    callback.onComplete(false);
-                    return;
-                }
-                final CloneStore.CloneReservation reservation = allocation.getValue();
-                if (isFinishing() || isDestroyed()) {
-                    releaseReservationIfEngineAbsent(reservation);
-                    callback.onComplete(false);
-                    return;
-                }
-
-                final CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
-                entry.packageName = app.pkg;
-                entry.userId = reservation.getUserId();
-                entry.displayName = app.label;
-
-                if (!Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)) {
-                    boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
-                    if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
-                    String diagnostic = Engine.getLastInstallDiagnostic();
-                    showCloneError((fa
-                            ? (absent
-                                ? "نصب کلون ناموفق بود؛ نبودن آن تأیید شد و رزرو آزاد می‌شود."
-                                : "نصب کلون ناموفق بود؛ وضعیت موتور نامشخص است و شناسه برای جلوگیری از تداخل رزرو می‌ماند.")
-                            : (absent
-                                ? "Clone installation failed; Engine confirmed absence and the reservation is being released."
-                                : "Clone installation failed and Engine absence is unconfirmed; the ID remains reserved to prevent collision."))
-                            + "\n" + diagnostic);
-                    callback.onComplete(false);
-                    return;
-                }
-
-                repository.commitReservedClone(entry, reservation,
-                        new AsyncCloneRepository.Callback<Boolean>() {
-                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> save) {
-                        if (!save.isSuccess()) {
-                            // The durable reservation remains until Engine confirms cleanup.
-                            boolean cleanupConfirmed = Engine.uninstallClone(entry.packageName, entry.userId);
-                            if (cleanupConfirmed) releaseReservationAfterConfirmedEngineAbsence(reservation);
-                            if (!isFinishing() && !isDestroyed()) {
-                                showCloneError(fa
-                                        ? (cleanupConfirmed
-                                            ? "ثبت فضای جدید ناموفق بود؛ حذف نصب تأیید شد و رزرو آزاد می‌شود."
-                                            : "ثبت فضا ناموفق بود و حذف نصب تأیید نشد؛ شناسه رزرو باقی می‌ماند.")
-                                        : (cleanupConfirmed
-                                            ? "Saving the new Space failed; uninstall was confirmed and the reservation is being released."
-                                            : "Saving the new Space failed and uninstall was not confirmed; the reservation remains blocked."));
-                            }
-                            callback.onComplete(false);
-                            return;
-                        }
-                        if (!batchMode && !isFinishing() && !isDestroyed()) {
-                            Toast.makeText(AddAppActivity.this,
-                                    fa ? (app.label + " به فضای " + entry.getSpaceNumber() + " اضافه شد")
-                                       : (app.label + " cloned into Space " + entry.getSpaceNumber()),
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                        callback.onComplete(true);
-                    }
-                });
+            if (!batchMode && !isFinishing() && !isDestroyed()) {
+                Toast.makeText(AddAppActivity.this,
+                        fa ? (app.label + " به فضای " + outcome.clone.getSpaceNumber() + " اضافه شد")
+                           : (app.label + " cloned into Space " + outcome.clone.getSpaceNumber()),
+                        Toast.LENGTH_SHORT).show();
             }
+            callback.onComplete(true);
         });
-    }
-
-    private void releaseReservationAfterConfirmedEngineAbsence(
-            CloneStore.CloneReservation reservation) {
-        repository.releaseReservationAfterEngineAbsence(reservation, true,
-                new AsyncCloneRepository.Callback<Boolean>() {
-                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
-                        // Explicit Engine absence was already verified by the caller.
-                    }
-                });
-    }
-
-    private void releaseReservationIfEngineAbsent(CloneStore.CloneReservation reservation) {
-        boolean confirmedAbsent = Engine.isCloneConfirmedAbsent(
-                reservation.getPackageName(), reservation.getUserId());
-        repository.releaseReservationAfterEngineAbsence(reservation, confirmedAbsent,
-                new AsyncCloneRepository.Callback<Boolean>() {
-                    @Override public void onComplete(AsyncCloneRepository.Result<Boolean> ignored) {
-                        // The reservation API is fail-closed; an unconfirmed Engine state leaves it blocked.
-                    }
-                });
     }
 
     private void showCloneError(String message) {
