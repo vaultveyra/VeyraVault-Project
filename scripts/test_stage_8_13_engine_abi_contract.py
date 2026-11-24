@@ -238,7 +238,7 @@ assert "repository.inspectNativeAbi(app.pkg" in add_app
 assert add_app.index("repository.inspectNativeAbi(app.pkg") < add_app.index("repository.reserveNextUserId(app.pkg"), (
     "ABI preflight must complete before reserving a Clone ID"
 )
-assert "Engine.installPackageAsUser(this, entry.packageName, entry.userId, preflight)" in add_app
+assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_app
 assert "preflight.matchesInstalledPackage(context, pkg)" in engine
 assert engine.index("preflight.matchesInstalledPackage(context, pkg)") < engine.index(
     'getMethod("installPackageAsUser", String.class, int.class)'
