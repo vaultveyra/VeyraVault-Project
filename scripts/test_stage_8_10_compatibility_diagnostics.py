@@ -23,13 +23,17 @@ else:
 
 unknown = launch.index("installState == null || installState == CloneInstallState.UNKNOWN")
 absent = launch.index("installState == CloneInstallState.ABSENT")
-install = launch.index("installPackageAsUser(entry.packageName, entry.userId)")
+preflight = launch.index("NativeAbiPreflight.inspectInstalledPackage(ctx, entry.packageName)")
+install = launch.index("installPackageAsUser(ctx, entry.packageName, entry.userId, preflight)")
 hook = launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)")
 engine_launch = launch.index('getMethod("launchApk", String.class, int.class)')
 persist = launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
 
-assert unknown < absent < install < hook < engine_launch < persist
+assert unknown < absent < preflight < install < hook < engine_launch < persist
 assert 'new CloneLaunchResult(false, "ENGINE_INSTALL_STATE_UNKNOWN", null)' in launch
+assert "if (!preflight.isAllowed())" in launch
+assert '"NATIVE_ABI_PREFLIGHT_BLOCKED:" + preflight.getDiagnosticCode()' in launch
+assert "installPackageAsUser(entry.packageName, entry.userId)" not in launch
 assert "isInstalledAsUser(" not in launch
 
 # The current report's labels must remain explicitly host-scoped.
@@ -44,5 +48,6 @@ assert "physical-device reproduction" in doc.lower()
 
 print("Stage 8.10: UNKNOWN install state fails closed without triggering install: PASS")
 print("Stage 8.10: explicit ABSENT is the only launch-time install trigger: PASS")
+print("Stage 8.10: native ABI preflight precedes launch-time installation: PASS")
 print("Stage 8.10: hook, Engine launch and active-launch persistence ordering preserved: PASS")
 print("Stage 8.10: host-only compatibility scope and per-app evidence boundary documented: PASS")
