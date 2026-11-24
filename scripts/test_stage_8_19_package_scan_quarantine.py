@@ -98,8 +98,8 @@ class SafePackageScanner:
         return package_dir
 
     def _record_path(self, package_name: str) -> Path:
-        if self.records_root.is_symlink():
-            raise OSError("Recovery record root cannot be a symlink")
+        if self.recovery_root.is_symlink() or self.records_root.is_symlink():
+            raise OSError("Recovery record roots cannot be symlinks")
         path = self.records_root / (package_name + ".json")
         if path.parent != self.records_root:
             raise ValueError("Recovery record path escaped reserved root")
@@ -445,6 +445,24 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertEqual(scanner.scan(self.PACKAGE), "UNSAFE_PACKAGE_PATH")
             self.assertTrue(outside.is_dir())
             self.assertEqual(list(outside.iterdir()), [])
+
+    def test_symlinked_recovery_root_fails_closed_and_preserves_package(self):
+        with tempfile.TemporaryDirectory() as temp:
+            scanner = SafePackageScanner(Path(temp))
+            seed_package(scanner, self.PACKAGE)
+            before = snapshot_protected_state(scanner, self.PACKAGE)
+            outside = scanner.root / "outside-recovery"
+            outside.mkdir()
+            scanner.recovery_root.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                scanner.recovery_root.symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("Symlink creation is unavailable on this test filesystem")
+
+            self.assertEqual(scanner.scan(self.PACKAGE), "RECOVERY_RECORD_INVALID")
+            self.assertEqual(snapshot_protected_state(scanner, self.PACKAGE), before)
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertEqual(scanner.uninstall_notifications, [])
 
     def test_missing_metadata_is_quarantined_without_removing_package_directory(self):
         with tempfile.TemporaryDirectory() as temp:
