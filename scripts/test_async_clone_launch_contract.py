@@ -1,7 +1,7 @@
 from pathlib import Path
 
 engine = Path("app/src/main/java/com/veyravault/space/core/Engine.java").read_text(encoding="utf-8")
-launch = engine[engine.index("public static CloneLaunchResult launchCloneDetailed"):engine.index("public static void stopClone")]
+launch = engine[engine.index("public static CloneLaunchResult launchCloneDetailed"):engine.index("public static boolean stopClone")]
 assert "VirtualHookManager.syncCloneHooks(ctx, entry)" in launch
 assert launch.index("VirtualHookManager.syncCloneHooks(ctx, entry)") < launch.index('getMethod("launchApk"')
 assert launch.index('getMethod("launchApk"') < launch.index("CloneStore.recordActiveLaunch(ctx, entry)")
