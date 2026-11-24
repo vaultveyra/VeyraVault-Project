@@ -180,6 +180,9 @@ class EngineCleanupHardeningTests(unittest.TestCase):
         self.assertIn("BEnvironment.getDeDataDir(packageName, userId)", remove_user)
         self.assertIn("BEnvironment.getExternalDataDir(packageName, userId)", remove_user)
         self.assertIn("BEnvironment.getExternalObbDir(packageName, userId)", remove_user)
+        self.assertIn("File[] dataRoots", remove_user)
+        self.assertIn("if (!isSafeDirectoryPath(dataRoots[i], directory))", remove_user)
+        self.assertIn("FileUtils.isSymlink(ancestor)", remove_user)
         self.assertIn("if (appDirectory.exists())", remove_app)
         self.assertIn("if (dataLibraryDirectory.exists())", create_user)
         self.assertIn("BEnvironment.getExternalObbDir(packageName, userId)", create_user)
@@ -235,6 +238,7 @@ assert "BEnvironment.getAppDir" not in absence_guard, (
 )
 assert "canonicalDirectory.getPath().startsWith(rootPrefix)" in directory_guard
 assert "FileUtils.isSymlink(directory)" in directory_guard
+assert "FileUtils.isSymlink(ancestor)" in directory_guard
 assert "canonicalDirectory.exists()" in directory_guard
 assert "state != CloneInstallState.ABSENT" in query
 assert "return state;" in query

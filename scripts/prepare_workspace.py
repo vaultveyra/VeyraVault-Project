@@ -111,27 +111,71 @@ def harden_clone_cleanup_semantics(workspace):
     remove_user = _patch_engine_fragment(
         remove_user,
         "VEYRAVAULT_CHECK_CLONE_USER_DATA_REMOVAL",
-        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;",
+        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;\n    }",
         """        String packageName = ps.pkg.packageName;
         // VEYRAVAULT_CHECK_CLONE_USER_DATA_REMOVAL
+        File[] dataRoots = new File[] {
+                BEnvironment.getVirtualRoot(),
+                BEnvironment.getVirtualRoot(),
+                BEnvironment.getExternalVirtualRoot(),
+                BEnvironment.getExternalVirtualRoot()
+        };
         File[] dataDirectories = new File[] {
                 BEnvironment.getDataDir(packageName, userId),
                 BEnvironment.getDeDataDir(packageName, userId),
                 BEnvironment.getExternalDataDir(packageName, userId),
                 BEnvironment.getExternalObbDir(packageName, userId)
         };
-        for (File directory : dataDirectories) {
+        for (int i = 0; i < dataDirectories.length; i++) {
+            File directory = dataDirectories[i];
+            if (!isSafeDirectoryPath(dataRoots[i], directory)) {
+                return -1;
+            }
             FileUtils.deleteDir(directory);
             if (directory.exists()) {
                 return -1;
             }
         }
-        return 0;""",
-        ("File[] dataDirectories", "directory.exists()", "return -1;",
-         "BEnvironment.getDataDir(packageName, userId)",
-         "BEnvironment.getDeDataDir(packageName, userId)",
-         "BEnvironment.getExternalDataDir(packageName, userId)",
-         "BEnvironment.getExternalObbDir(packageName, userId)"),
+        return 0;
+    }
+
+    /**
+     * Refuses to recurse through paths outside the virtual root or through symlinked
+     * package/user ancestors. Filesystem inspection errors fail closed.
+     */
+    private static boolean isSafeDirectoryPath(File root, File directory) {
+        if (root == null || directory == null) return false;
+        try {
+            File canonicalRoot = root.getCanonicalFile();
+            File canonicalDirectory = directory.getCanonicalFile();
+            if (!canonicalRoot.isDirectory() || !canonicalRoot.canRead()) return false;
+
+            String rootPrefix = canonicalRoot.getPath() + File.separator;
+            if (!canonicalDirectory.getPath().startsWith(rootPrefix)) return false;
+            if (FileUtils.isSymlink(directory)) return false;
+
+            File ancestor = directory.getParentFile();
+            while (ancestor != null) {
+                File canonicalAncestor = ancestor.getCanonicalFile();
+                if (canonicalAncestor.equals(canonicalRoot)) return true;
+                if (FileUtils.isSymlink(ancestor)) return false;
+                if (canonicalAncestor.exists()
+                        && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
+                    return false;
+                }
+                ancestor = ancestor.getParentFile();
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+        return false;
+    }""",
+        ("File[] dataRoots", "File[] dataDirectories",
+         "BEnvironment.getExternalObbDir(packageName, userId)",
+         "isSafeDirectoryPath(dataRoots[i], directory)",
+         "private static boolean isSafeDirectoryPath(",
+         "FileUtils.isSymlink(directory)", "FileUtils.isSymlink(ancestor)",
+         "canonicalDirectory.getPath().startsWith(rootPrefix)", "return -1;"),
         relative["remove_user"],
     )
 

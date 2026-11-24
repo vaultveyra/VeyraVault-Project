@@ -274,6 +274,7 @@ public class Engine {
             boolean reachedRoot = false;
             while (ancestor != null) {
                 File canonicalAncestor = ancestor.getCanonicalFile();
+                if (FileUtils.isSymlink(ancestor)) return false;
                 if (canonicalAncestor.exists()
                         && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
                     return false;
