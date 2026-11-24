@@ -48,15 +48,25 @@ assert "public static List<CloneEntry> getAll(Context c)" in store
 
 assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
 assert "CloneStore.upsertClone(" not in add_ui
-assert "repository.reserveNextUserId(app.pkg" in add_ui
-assert "repository.commitReservedClone(entry, reservation" in add_ui
-assert "if (!Engine.installPackageAsUser(entry.packageName, entry.userId))" in add_ui
-assert add_ui.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < add_ui.index("repository.commitReservedClone(entry")
+add_clone = add_ui[add_ui.index("private void cloneSingleApp("):
+                   add_ui.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
+assert "repository.inspectNativeAbi(app.pkg" in add_clone
+assert "repository.reserveNextUserId(app.pkg" in add_clone
+assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
+assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
+assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index("repository.commitReservedClone(entry")
 assert "repository.allocateNextUserId" not in add_ui
-assert "repository.reserveNextUserId(item.packageName" in main_ui
-assert "repository.commitReservedClone(copy, reservation" in main_ui
+
+assert "duplicateCloneWithPreflight(item);" in main_ui
+duplicate = main_ui[main_ui.index("private void duplicateCloneWithPreflight("):
+                   main_ui.index("private void showRenameDialog(")]
+assert "repository.inspectNativeAbi(item.packageName" in duplicate
+assert "repository.reserveNextUserId(item.packageName" in duplicate
+assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index("repository.reserveNextUserId(item.packageName")
+assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
+assert "copy.packageName, copy.userId, preflight)" in duplicate
+assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index("repository.commitReservedClone(copy")
 assert "repository.allocateNextUserId" not in main_ui
-assert main_ui.index("Engine.installPackageAsUser(copy.packageName, copy.userId)") < main_ui.index("repository.commitReservedClone(copy")
 
 uninstall = body(engine, "public static boolean uninstallClone(")
 assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
