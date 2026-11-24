@@ -116,7 +116,10 @@ print("CONFIRMED: scan failure deletes package files/removes settings; resolver 
 
 # 4. Installer mutates user/package paths before new generation publication is proven.
 user_exec = method_body(create_user, "public int exec(BPackageSettings ps, InstallOption option, int userId)")
-assert "FileUtils.deleteDir(BEnvironment.getDataLibDir(packageName, userId));" in user_exec
+assert "File dataLibraryDirectory = BEnvironment.getDataLibDir(packageName, userId);" in user_exec
+assert "FileUtils.deleteDir(dataLibraryDirectory);" in user_exec
+assert "if (dataLibraryDirectory.exists())" in user_exec
+assert "VEYRAVAULT_VERIFY_CLONE_DATA_RESET" in user_exec
 package_exec = method_body(create_package, "public int exec(BPackageSettings ps, InstallOption option, int userId)")
 assert "FileUtils.deleteDir(BEnvironment.getAppDir(ps.pkg.packageName));" in package_exec
 assert "CreateUserExecutor" in manager or "CreateUserExecutor" in (
