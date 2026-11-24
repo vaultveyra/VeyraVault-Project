@@ -40,7 +40,11 @@ assert "repository.setSpaceCollapsed" in toggle
 assert "some earlier changes may already be saved" in source
 
 # This adoption changes only dashboard persistence reads/collapse writes; Engine install/uninstall flows remain.
-assert "Engine.installPackageAsUser(copy.packageName, copy.userId)" in source
+assert "duplicateCloneWithPreflight(item);" in source
+assert "private void duplicateCloneWithPreflight(final CloneStore.CloneEntry item)" in source
+assert "repository.inspectNativeAbi(item.packageName" in source
+assert "Engine.installPackageAsUser(MainActivity.this," in source
+assert "copy.packageName, copy.userId, preflight)" in source
 assert "Engine.uninstallClone(item.packageName, item.userId)" in source
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in source
 
