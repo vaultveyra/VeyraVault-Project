@@ -53,6 +53,8 @@ single = source[single_start:single_end]
 assert "EngineOperationQueue.submit(" in single
 assert "Engine.uninstallClone(item.packageName, item.userId)" in single
 assert "repository.removeClone(item.packageName, item.userId" in single
+assert single.index("EngineOperationQueue.submit(") < single.index("Engine.uninstallClone(item.packageName, item.userId)") < single.index("repository.removeClone(item.packageName, item.userId")
+assert single.index("repository.removeClone(item.packageName, item.userId") < single.index("if (isFinishing() || isDestroyed()) return;", single.index("repository.removeClone(item.packageName, item.userId"))
 
 # Batch selection is loaded strictly and each Engine removal is followed by an async registry commit.
 batch_start = source.index("private void showBatchUninstallDialog")
@@ -64,6 +66,7 @@ assert "runBatchUninstall(all, checked, 0" in batch
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in batch
 assert "repository.removeClone(entry.packageName, entry.userId" in batch
 assert batch.index("Engine.uninstallClone(entry.packageName, entry.userId)") < batch.index("repository.removeClone(entry.packageName, entry.userId")
+assert batch.index("repository.removeClone(entry.packageName, entry.userId") < batch.index("if (isFinishing() || isDestroyed()) return;", batch.index("repository.removeClone(entry.packageName, entry.userId"))
 assert "registry failures" in batch
 assert "refreshSpaces();" in batch
 

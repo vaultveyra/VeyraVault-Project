@@ -741,14 +741,16 @@ public class MainActivity extends BaseActivity {
                 EngineOperationQueue.submit(
                         () -> Engine.uninstallClone(item.packageName, item.userId),
                         (removed, engineFailure) -> {
-                            if (isFinishing() || isDestroyed()) return;
                             if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
-                                Toast.makeText(MainActivity.this,
-                                        fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
-                                           : "The engine did not confirm uninstall; the Space record was preserved.",
-                                        Toast.LENGTH_LONG).show();
+                                if (!isFinishing() && !isDestroyed()) {
+                                    Toast.makeText(MainActivity.this,
+                                            fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
+                                               : "The engine did not confirm uninstall; the Space record was preserved.",
+                                            Toast.LENGTH_LONG).show();
+                                }
                                 return;
                             }
+                            // Complete the Registry transaction even if the Activity has closed.
                             repository.removeClone(item.packageName, item.userId, result -> {
                                 if (isFinishing() || isDestroyed()) return;
                                 if (!result.isSuccess()) {
@@ -1011,16 +1013,17 @@ public class MainActivity extends BaseActivity {
         EngineOperationQueue.submit(
                 () -> Engine.uninstallClone(entry.packageName, entry.userId),
                 (removed, engineFailure) -> {
-                    if (isFinishing() || isDestroyed()) return;
                     if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
+                        if (isFinishing() || isDestroyed()) return;
                         counts[1]++;
                         runBatchUninstall(all, checked, nextIndex, counts);
                         return;
                     }
+                    // Persist Engine-confirmed removal before checking Activity lifecycle.
                     repository.removeClone(entry.packageName, entry.userId, result -> {
-                        if (isFinishing() || isDestroyed()) return;
                         if (result.isSuccess()) counts[0]++;
                         else counts[2]++;
+                        if (isFinishing() || isDestroyed()) return;
                         runBatchUninstall(all, checked, nextIndex, counts);
                     });
                 });
