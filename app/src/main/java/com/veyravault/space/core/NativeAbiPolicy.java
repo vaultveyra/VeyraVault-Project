@@ -144,6 +144,12 @@ public final class NativeAbiPolicy {
         boolean hasArmV7 = nativeAbiDirectories.contains("armeabi-v7a");
         boolean hasArmeabi = nativeAbiDirectories.contains("armeabi");
 
+        // An APK containing only non-ARM native directories (for example x86,
+        // x86_64, mips or an unknown ABI) is not a pure-Java APK. Do not classify
+        // it as a missing ARM extractor path.
+        if (!hasArm64 && !hasArmV7 && !hasArmeabi)
+            return new Result(Decision.REJECT_UNSUPPORTED_NATIVE_ABI);
+
         if (HostBitness.BIT_64 == hostBitness) {
             return hasArm64
                     ? new Result(Decision.ALLOW_ARM64)
