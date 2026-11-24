@@ -128,9 +128,11 @@ class SafePackageScanner:
 
     def _record_is_valid(self, package_name: str) -> bool:
         path = self._record_path(package_name)
+        if path.is_symlink():
+            return False
         if not path.exists():
             return True
-        if path.is_symlink() or not path.is_file():
+        if not path.is_file():
             return False
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -194,7 +196,7 @@ class SafePackageScanner:
         record_writer: Optional[Callable[[Path, dict], None]] = None,
     ) -> str:
         package_dir = self._package_dir(package_name)
-        if package_dir.is_symlink():
+        if self.app_root.is_symlink() or package_dir.is_symlink():
             return "UNSAFE_PACKAGE_PATH"
         if not package_dir.exists():
             return "PACKAGE_NOT_PRESENT"
@@ -203,7 +205,11 @@ class SafePackageScanner:
 
         # A corrupt recovery marker is itself ambiguous. Do not overwrite it,
         # clear it, or publish new in-memory state on top of it.
-        if not self._record_is_valid(package_name):
+        try:
+            record_valid = self._record_is_valid(package_name)
+        except OSError:
+            record_valid = False
+        if not record_valid:
             return "RECOVERY_RECORD_INVALID"
 
         try:
@@ -241,7 +247,7 @@ class SafePackageScanner:
 
     def recovery_record(self, package_name: str) -> Optional[dict]:
         path = self._record_path(package_name)
-        if not path.exists():
+        if path.is_symlink() or not path.exists() or not path.is_file():
             return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -379,6 +385,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
             scanner = SafePackageScanner(Path(temp))
             seed_package(scanner, self.PACKAGE)
             scanner.scan(self.PACKAGE)
+            before = snapshot_protected_state(scanner, self.PACKAGE)
             old_loaded = dict(scanner.loaded[self.PACKAGE])
             old_resolver = scanner.resolver[self.PACKAGE]
             bad = scanner._package_dir(self.PACKAGE) / "package.conf"
