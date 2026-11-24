@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import tempfile
 import unittest
 import uuid
@@ -92,8 +93,13 @@ class SafePackageScanner:
 
     def launch_allowed(self, package_name: str) -> bool:
         try:
+            package_dir = self._package_dir(package_name)
             record_path = self._record_path(package_name)
+            if self.app_root.is_symlink() or package_dir.is_symlink() or not package_dir.is_dir():
+                return False
             if package_name in self.blocked:
+                return False
+            if (package_dir / "package.conf").is_symlink():
                 return False
             if record_path.is_symlink() or record_path.exists():
                 return False
@@ -175,6 +181,16 @@ class SafePackageScanner:
             return False
 
     @staticmethod
+    def _read_regular_file(path: Path) -> bytes:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        with os.fdopen(os.open(str(path), flags), "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise OSError("Package metadata must be a regular file")
+            return stream.read()
+
+    @staticmethod
     def _parse_metadata(raw: bytes, package_name: str) -> dict:
         try:
             value = json.loads(raw.decode("utf-8"))
@@ -218,6 +234,11 @@ class SafePackageScanner:
             self.blocked.add(package_name)
             return "UNSAFE_PACKAGE_PATH"
 
+        metadata_path = package_dir / "package.conf"
+        if metadata_path.is_symlink():
+            self.blocked.add(package_name)
+            return "UNSAFE_METADATA_PATH"
+
         # A corrupt recovery marker is itself ambiguous. Do not overwrite it,
         # clear it, or publish new in-memory state on top of it.
         try:
@@ -229,9 +250,7 @@ class SafePackageScanner:
             return "RECOVERY_RECORD_INVALID"
 
         try:
-            raw = (reader or (lambda path: path.read_bytes()))(
-                package_dir / "package.conf"
-            )
+            raw = (reader or self._read_regular_file)(metadata_path)
         except OSError:
             self.blocked.add(package_name)
             reason = "METADATA_UNREADABLE"
@@ -474,6 +493,59 @@ class PackageScanQuarantineTests(unittest.TestCase):
             self.assertFalse(scanner.launch_allowed(self.PACKAGE))
             self.assertTrue(outside.is_dir())
             self.assertEqual(list(outside.iterdir()), [])
+
+    def test_symlinked_metadata_file_is_never_read_or_followed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            scanner = SafePackageScanner(Path(temp))
+            seed_package(scanner, self.PACKAGE)
+            self.assertEqual(scanner.scan(self.PACKAGE), "LOADED")
+            old_loaded = dict(scanner.loaded[self.PACKAGE])
+            outside = scanner.root / "outside-package-conf.json"
+            outside.write_bytes(
+                json.dumps({
+                    "packageName": self.PACKAGE,
+                    "generationId": "external-generation",
+                    "installedUsers": [10],
+                    "componentNames": ["ExternalActivity"],
+                }).encode("utf-8")
+            )
+            metadata = scanner._package_dir(self.PACKAGE) / "package.conf"
+            metadata.unlink()
+            try:
+                metadata.symlink_to(outside)
+            except OSError:
+                self.skipTest("Symlink creation is unavailable on this test filesystem")
+
+            self.assertEqual(scanner.scan(self.PACKAGE), "UNSAFE_METADATA_PATH")
+            self.assertEqual(outside.read_bytes(), json.dumps({
+                "packageName": self.PACKAGE,
+                "generationId": "external-generation",
+                "installedUsers": [10],
+                "componentNames": ["ExternalActivity"],
+            }).encode("utf-8"))
+            self.assertEqual(scanner.loaded[self.PACKAGE], old_loaded)
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
+            self.assertEqual(scanner.uninstall_notifications, [])
+
+    def test_symlinked_recovery_record_fails_closed_without_reading_target(self):
+        with tempfile.TemporaryDirectory() as temp:
+            scanner = SafePackageScanner(Path(temp))
+            seed_package(scanner, self.PACKAGE)
+            scanner.scan(self.PACKAGE)
+            outside = scanner.root / "outside-recovery-record.json"
+            outside.write_text('{"schemaVersion":1}', encoding="utf-8")
+            record_path = scanner._record_path(self.PACKAGE)
+            record_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                record_path.symlink_to(outside)
+            except OSError:
+                self.skipTest("Symlink creation is unavailable on this test filesystem")
+
+            self.assertEqual(scanner.scan(self.PACKAGE), "RECOVERY_RECORD_INVALID")
+            self.assertEqual(outside.read_text(encoding="utf-8"), '{"schemaVersion":1}')
+            self.assertFalse(scanner.launch_allowed(self.PACKAGE))
+            self.assertEqual(scanner.loaded[self.PACKAGE]["generationId"], "generation-v1")
+            self.assertEqual(scanner.uninstall_notifications, [])
 
     def test_symlinked_recovery_root_fails_closed_and_preserves_package(self):
         with tempfile.TemporaryDirectory() as temp:
