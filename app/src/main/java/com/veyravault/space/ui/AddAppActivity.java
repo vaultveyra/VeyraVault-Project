@@ -325,7 +325,7 @@ public class AddAppActivity extends BaseActivity {
                 entry.userId = reservation.getUserId();
                 entry.displayName = app.label;
 
-                if (!Engine.installPackageAsUser(this, entry.packageName, entry.userId, preflight)) {
+                if (!Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)) {
                     boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
                     if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
                     String diagnostic = Engine.getLastInstallDiagnostic();
