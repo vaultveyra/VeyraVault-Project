@@ -970,6 +970,11 @@ public class MainActivity extends BaseActivity {
                             + "، خطای ثبت فهرست: " + counts[2])
                     : ("Batch uninstall finished. Removed: " + counts[0] + ", engine failures: " + counts[1]
                             + ", registry failures: " + counts[2]);
+            if (counts[1] > 0) {
+                summary += fa
+                        ? " در حذف‌های ناموفق ممکن است بخشی از فایل‌ها حذف شده باشد؛ پیش از تلاش دوباره هر Clone را بررسی کنید."
+                        : " Failed removals may have partially removed files; inspect each Clone before retrying.";
+            }
             Toast.makeText(this, summary, Toast.LENGTH_LONG).show();
             refreshSpaces();
             return;
@@ -1010,10 +1015,10 @@ public class MainActivity extends BaseActivity {
                                 boolean accepted = failure == null && Boolean.TRUE.equals(dispatched);
                                 Toast.makeText(MainActivity.this,
                                         accepted
-                                                ? (fa ? "درخواست به موتور تحویل شد؛ تکمیل پاک‌سازی فایل‌ها قابل تأیید نیست."
-                                                      : "The request reached the Engine; completion of file cleanup cannot be verified.")
-                                                : (fa ? "ارسال درخواست پاک‌سازی ناموفق بود؛ داده‌ها از طرف رابط تغییر نکردند."
-                                                       : "The clear-data request could not be submitted; the UI made no data changes."),
+                                                ? (fa ? "موتور بازنشانی داده‌ها و ساخت پوشه‌های لازم را موفق گزارش کرد؛ پاک‌سازی امن و غیرقابل‌بازیابی مستقلاً تأیید نشده است."
+                                                      : "The Engine reported the data reset and required directories recreated; forensic erasure is not independently verified.")
+                                                : (fa ? "بازنشانی کامل تأیید نشد؛ ممکن است بخشی از داده‌های Clone قبلاً حذف شده باشد. پیش از تلاش دوباره وضعیت آن را بررسی کنید."
+                                                       : "A complete reset was not confirmed; some Clone data may already have been removed. Inspect the Clone before retrying."),
                                         Toast.LENGTH_LONG).show();
                             });
                 })
@@ -1034,8 +1039,8 @@ public class MainActivity extends BaseActivity {
                                 if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
                                     if (!isFinishing() && !isDestroyed()) {
                                         Toast.makeText(MainActivity.this,
-                                                fa ? "حذف از موتور تأیید نشد؛ رکورد فضا حفظ شد."
-                                                   : "Engine uninstall was not confirmed; the Space record was preserved.",
+                                                fa ? "حذف کامل از موتور تأیید نشد؛ رکورد فضا حفظ شد و ممکن است بخشی از فایل‌ها قبلاً حذف شده باشد."
+                                                   : "Engine uninstall was not confirmed; the Space record was preserved. Some Clone files may already have been removed; inspect before retrying.",
                                                 Toast.LENGTH_LONG).show();
                                     }
                                     return;

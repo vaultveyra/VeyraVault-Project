@@ -43,6 +43,9 @@ jobs:
       - name: Test Stage 8.20 immutable Engine source identity and clean-tree gate
         run: python3 scripts/test_stage_8_20_engine_source_pin.py
 
+      - name: Test Stage 8.25 pinned Engine cleanup failure semantics patch
+        run: python3 scripts/test_stage_8_25_engine_cleanup_failure_semantics.py
+
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
 

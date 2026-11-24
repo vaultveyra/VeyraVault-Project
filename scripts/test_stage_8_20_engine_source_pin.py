@@ -128,9 +128,11 @@ class EngineSourcePinTests(unittest.TestCase):
         bundle_verify = source.index("verify_engine_source(BUNDLED_ENGINE)")
         bundle_copy = source.index("shutil.copytree(BUNDLED_ENGINE, WORKSPACE)")
         workspace_verify = source.index("verify_engine_source(WORKSPACE)")
+        harden_cleanup = source.index("harden_clone_cleanup_semantics(WORKSPACE)")
         disable_logs = source.index("disable_remote_log_upload(WORKSPACE)")
         self.assertLess(bundle_verify, bundle_copy)
-        self.assertLess(workspace_verify, disable_logs)
+        self.assertLess(workspace_verify, harden_cleanup)
+        self.assertLess(harden_cleanup, disable_logs)
         self.assertIn(f'ENGINE_REPOSITORY = "{EXPECTED_REMOTE}"', source)
         self.assertIn(f'ENGINE_COMMIT = "{EXPECTED_COMMIT}"', source)
 

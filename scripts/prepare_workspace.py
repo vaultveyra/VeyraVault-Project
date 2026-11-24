@@ -61,6 +61,197 @@ def verify_engine_source(repository_path):
     print(f"[+] Verified Engine source: {ENGINE_REPOSITORY}@{ENGINE_COMMIT}")
 
 
+
+
+def _read_engine_source_file(workspace, relative_path):
+    path = os.path.join(workspace, *relative_path.split("/"))
+    if not os.path.isfile(path):
+        raise RuntimeError("Pinned Engine cleanup source is missing: " + relative_path)
+    with open(path, "r", encoding="utf-8") as source_file:
+        return path, source_file.read()
+
+
+def _patch_engine_fragment(source, marker, pattern, replacement, required, label):
+    if marker in source:
+        if any(item not in source for item in required):
+            raise RuntimeError("Partially applied or unexpected Engine hardening in " + label)
+        return source
+    updated, count = re.subn(pattern, replacement, source, count=1, flags=re.S)
+    if count != 1:
+        raise RuntimeError("Pinned Engine cleanup source no longer matches the audited layout: " + label)
+    if any(item not in updated for item in required):
+        raise RuntimeError("Engine cleanup patch verification failed in " + label)
+    return updated
+
+
+def _add_engine_file_import(source, label):
+    if "import java.io.File;" in source:
+        return source
+    import_line = "import top.niunaijun.blackbox.utils.FileUtils;"
+    if source.count(import_line) != 1:
+        raise RuntimeError("Pinned Engine import layout changed: " + label)
+    return source.replace(import_line, "import java.io.File;\n" + import_line, 1)
+
+
+def harden_clone_cleanup_semantics(workspace):
+    """Fail closed on incomplete Clone cleanup in the verified, ephemeral Engine build workspace."""
+    relative = {
+        "remove_user": "Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/installer/RemoveUserExecutor.java",
+        "remove_app": "Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/installer/RemoveAppExecutor.java",
+        "create_user": "Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/installer/CreateUserExecutor.java",
+        "installer": "Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/BPackageInstallerService.java",
+        "manager": "Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/BPackageManagerService.java",
+    }
+    paths = {}
+    source = {}
+    for key, value in relative.items():
+        paths[key], source[key] = _read_engine_source_file(workspace, value)
+
+    remove_user = _add_engine_file_import(source["remove_user"], relative["remove_user"])
+    remove_user = _patch_engine_fragment(
+        remove_user,
+        "VEYRAVAULT_CHECK_CLONE_USER_DATA_REMOVAL",
+        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;",
+        """        String packageName = ps.pkg.packageName;
+        // VEYRAVAULT_CHECK_CLONE_USER_DATA_REMOVAL
+        File[] dataDirectories = new File[] {
+                BEnvironment.getDataDir(packageName, userId),
+                BEnvironment.getDeDataDir(packageName, userId),
+                BEnvironment.getExternalDataDir(packageName, userId)
+        };
+        for (File directory : dataDirectories) {
+            FileUtils.deleteDir(directory);
+            if (directory.exists()) {
+                return -1;
+            }
+        }
+        return 0;""",
+        ("File[] dataDirectories", "directory.exists()", "return -1;",
+         "BEnvironment.getDataDir(packageName, userId)",
+         "BEnvironment.getDeDataDir(packageName, userId)",
+         "BEnvironment.getExternalDataDir(packageName, userId)"),
+        relative["remove_user"],
+    )
+
+    remove_app = _add_engine_file_import(source["remove_app"], relative["remove_app"])
+    remove_app = _patch_engine_fragment(
+        remove_app,
+        "VEYRAVAULT_CHECK_CLONE_APP_REMOVAL",
+        r"        FileUtils\.deleteDir\(BEnvironment\.getAppDir\(ps\.pkg\.packageName\)\);\n        return 0;",
+        """        // VEYRAVAULT_CHECK_CLONE_APP_REMOVAL
+        File appDirectory = BEnvironment.getAppDir(ps.pkg.packageName);
+        FileUtils.deleteDir(appDirectory);
+        if (appDirectory.exists()) {
+            return -1;
+        }
+        return 0;""",
+        ("File appDirectory", "FileUtils.deleteDir(appDirectory)",
+         "if (appDirectory.exists())", "return -1;"),
+        relative["remove_app"],
+    )
+
+    create_user = _add_engine_file_import(source["create_user"], relative["create_user"])
+    create_user = _patch_engine_fragment(
+        create_user,
+        "VEYRAVAULT_VERIFY_CLONE_DATA_RESET",
+        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;",
+        """        String packageName = ps.pkg.packageName;
+        // VEYRAVAULT_VERIFY_CLONE_DATA_RESET
+        File dataLibraryDirectory = BEnvironment.getDataLibDir(packageName, userId);
+        FileUtils.deleteDir(dataLibraryDirectory);
+        if (dataLibraryDirectory.exists()) {
+            return -1;
+        }
+
+        File[] requiredDirectories = new File[] {
+                BEnvironment.getDataDir(packageName, userId),
+                BEnvironment.getDataCacheDir(packageName, userId),
+                BEnvironment.getDataFilesDir(packageName, userId),
+                BEnvironment.getDataDatabasesDir(packageName, userId),
+                BEnvironment.getDeDataDir(packageName, userId)
+        };
+        for (File directory : requiredDirectories) {
+            if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
+                return -1;
+            }
+        }
+        return 0;""",
+        ("File dataLibraryDirectory", "dataLibraryDirectory.exists()",
+         "File[] requiredDirectories", "directory.mkdirs()", "directory.isDirectory()",
+         "BEnvironment.getDataCacheDir(packageName, userId)",
+         "BEnvironment.getDataFilesDir(packageName, userId)",
+         "BEnvironment.getDataDatabasesDir(packageName, userId)"),
+        relative["create_user"],
+    )
+
+    installer = _patch_engine_fragment(
+        source["installer"],
+        "VEYRAVAULT_REMOVE_USER_DATA_BEFORE_APP_BINARY",
+        r"        if \(removeApp\) \{\n\s*executors\.add\(new RemoveAppExecutor\(\)\);\n\s*\}\n\s*executors\.add\(new RemoveUserExecutor\(\)\);",
+        """        // VEYRAVAULT_REMOVE_USER_DATA_BEFORE_APP_BINARY
+        executors.add(new RemoveUserExecutor());
+        if (removeApp) {
+            executors.add(new RemoveAppExecutor());
+        }""",
+        ("executors.add(new RemoveUserExecutor());",
+         "executors.add(new RemoveAppExecutor());"),
+        relative["installer"],
+    )
+
+    manager = _patch_engine_fragment(
+        source["manager"],
+        "VEYRAVAULT_KEEP_CLONE_INSTALLED_ON_UNINSTALL_CLEANUP_FAILURE",
+        r"                int i = BPackageInstallerService\.get\(\)\.uninstallPackageAsUser\(ps, removeApp, userId\);\n                if \(i < 0\) \{\s*\}",
+        """                // VEYRAVAULT_KEEP_CLONE_INSTALLED_ON_UNINSTALL_CLEANUP_FAILURE
+                int cleanupResult = BPackageInstallerService.get().uninstallPackageAsUser(ps, removeApp, userId);
+                if (cleanupResult != 0) {
+                    return;
+                }""",
+        ("cleanupResult != 0", "return;"),
+        relative["manager"],
+    )
+    manager = _patch_engine_fragment(
+        manager,
+        "VEYRAVAULT_KEEP_ALL_CLONE_METADATA_ON_BULK_CLEANUP_FAILURE",
+        r"                        int i = BPackageInstallerService\.get\(\)\.uninstallPackageAsUser\(ps, true, userId\);\n                        if \(i < 0\) \{\n                            continue;\n                        \}",
+        """                        // VEYRAVAULT_KEEP_ALL_CLONE_METADATA_ON_BULK_CLEANUP_FAILURE
+                        int cleanupResult = BPackageInstallerService.get().uninstallPackageAsUser(ps, true, userId);
+                        if (cleanupResult != 0) {
+                            return;
+                        }""",
+        ("cleanupResult != 0", "return;"),
+        relative["manager"],
+    )
+    manager = _patch_engine_fragment(
+        manager,
+        "VEYRAVAULT_PROPAGATE_CLONE_CLEAR_DATA_FAILURE",
+        r"        int i = BPackageInstallerService\.get\(\)\.clearPackage\(ps, userId\);",
+        """        // VEYRAVAULT_PROPAGATE_CLONE_CLEAR_DATA_FAILURE
+        int cleanupResult = BPackageInstallerService.get().clearPackage(ps, userId);
+        if (cleanupResult != 0) {
+            throw new IllegalStateException(
+                    "VeyraVault Clone data reset failed; partial cleanup may have occurred. result="
+                            + cleanupResult);
+        }""",
+        ("cleanupResult != 0", "throw new IllegalStateException("),
+        relative["manager"],
+    )
+
+    # All source fragments are verified before any file is written.
+    transformed = {
+        "remove_user": remove_user,
+        "remove_app": remove_app,
+        "create_user": create_user,
+        "installer": installer,
+        "manager": manager,
+    }
+    for key, content in transformed.items():
+        with open(paths[key], "w", encoding="utf-8") as output_file:
+            output_file.write(content)
+
+    print("[+] Pinned Engine Clone cleanup fails closed on residual directories and failed reset-directory recreation.")
+
+
 def accept_android_sdk_licenses():
     print("[*] Accepting Android SDK & NDK licenses...")
     sdk_dirs = []
@@ -208,6 +399,7 @@ def main():
         run(f'git -C "{WORKSPACE}" checkout --detach FETCH_HEAD')
 
     verify_engine_source(WORKSPACE)
+    harden_clone_cleanup_semantics(WORKSPACE)
     disable_remote_log_upload(WORKSPACE)
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")

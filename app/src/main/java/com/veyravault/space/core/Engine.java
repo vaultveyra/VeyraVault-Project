@@ -397,9 +397,10 @@ public class Engine {
     }
 
     /**
-     * Returns true only when clearPackage was invoked without a reflection error.
-     * The pinned upstream API returns void and suppresses its internal file-operation result;
-     * true therefore means "request dispatched", never "all data files verified deleted".
+     * Returns true only when the pinned Engine clearPackage call returns normally.
+     * The build workspace hardens the pinned package manager to throw when targeted data
+     * directories remain or required reset directories cannot be recreated. A false result
+     * may still mean partial deletion occurred; true is not a forensic secure-erasure guarantee.
      */
     public static boolean clearCloneData(String pkg, int userId) {
         if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;

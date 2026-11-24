@@ -1,0 +1,43 @@
+# Stage 8.25 — Pinned Engine cleanup failure semantics
+
+## Problem found in the immutable upstream source
+
+At pinned Engine commit `89b59836c66f173756a4ae258cf379a957649820`:
+
+- `RemoveUserExecutor` discarded the return values from `FileUtils.deleteDir` and always returned success.
+- `RemoveAppExecutor` did the same for the shared APK directory.
+- `CreateUserExecutor` did not verify removal of its old library directory or recreation of required data directories.
+- `BPackageManagerService.uninstallPackageAsUser` ignored a failed installer result and continued removing package/user metadata.
+- `BPackageManagerService.uninstallPackage(String)` continued and then removed package metadata even if an individual cleanup failed.
+- `BPackageManagerService.clearPackage` discarded the installer result while exposing a void API.
+
+An Engine query reporting a package absent was therefore insufficient to prove that the target directories had been removed.
+
+## Build-time hardening
+
+The upstream Git pin and repository identity are unchanged. After verifying the exact clean Engine checkout, `prepare_workspace.py` applies a strict, idempotent patch only to the ephemeral build workspace:
+
+- User-scoped internal, Device-Encrypted, and Android/data roots must be absent after deletion; otherwise the executor returns failure or propagates the filesystem error.
+- The shared APK directory must be absent before uninstall can succeed.
+- Clear Data checks removal of the previous data-library directory and confirms that all required replacement directories exist.
+- Uninstall removes per-user data before deleting the shared APK directory.
+- A nonzero per-user cleanup result returns before package/user install metadata is removed.
+- Bulk uninstall likewise preserves package metadata when any user cleanup reports failure.
+- Clear Data converts nonzero cleanup results to an exception, so the host wrapper returns failure instead of a false success.
+
+The original pinned source is still verified before the VeyraVault transformation. An unexpected source layout fails the build rather than receiving a speculative patch.
+
+## User-facing behavior
+
+- Clear Data warns that a failed reset may have partially removed data; the user must inspect the Clone before retrying.
+- A successful reset message means the hardened Engine path returned normally after its directory checks; it is not a forensic secure-erasure guarantee.
+- Failed uninstall keeps the CloneStore entry because the Engine still reports the package installed. The message warns that some files may already have been removed.
+
+## Validation
+
+- `scripts/test_stage_8_25_engine_cleanup_failure_semantics.py` tests the exact transformation against isolated temporary source fixtures, including idempotence and fail-closed behavior on source drift.
+- CI still performs the full Java/Android build, instrumentation, source audit, APK audit and isolated signing stages.
+- No user Clone, app-data directory, account, session, or credential is touched by the fixture test.
+- No Room activation, migration or cutover is performed.
+- No physical-device certification is claimed.
+- Work remains on `feat/veyra-vault-product-foundation`; PR #4 remains Open and Draft.

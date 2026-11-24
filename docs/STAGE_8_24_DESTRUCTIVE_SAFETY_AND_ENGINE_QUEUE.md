@@ -46,7 +46,8 @@ pending-reservation inspection.
   packaging/audit and the isolated signing job.
 - No Clear Data, Clone uninstall, app-data removal, Room migration, account/session reset or
   startup mutation is executed by this stage.
-- No physical-device certification is claimed. The pinned Engine's void clear API still cannot
-  prove that every filesystem deletion succeeded.
+- No physical-device certification is claimed. Stage 8.25 adds build-time checks for the
+  pinned Engine's data-directory deletion and reset-directory recreation; neither stage promises
+  forensic secure erasure.
 - Room remains inactive and opt-in only. CloneStore remains the active runtime source of truth.
 - Work remains confined to `feat/veyra-vault-product-foundation`; PR #4 stays Open and Draft.
