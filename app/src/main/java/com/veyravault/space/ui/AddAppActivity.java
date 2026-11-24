@@ -276,6 +276,31 @@ public class AddAppActivity extends BaseActivity {
     }
 
     private void cloneSingleApp(final InstalledApp app, final CloneCallback callback) {
+        repository.inspectNativeAbi(app.pkg,
+                new AsyncCloneRepository.Callback<NativeAbiPreflight.Result>() {
+            @Override public void onComplete(
+                    AsyncCloneRepository.Result<NativeAbiPreflight.Result> inspection) {
+                if (!inspection.isSuccess() || inspection.getValue() == null) {
+                    showCloneError(fa
+                            ? "بررسی سازگاری APK ناموفق بود؛ هیچ شناسه‌ای رزرو یا نصبی انجام نشد."
+                            : "APK compatibility inspection failed; no Space ID was reserved and no installation was started.");
+                    callback.onComplete(false);
+                    return;
+                }
+                final NativeAbiPreflight.Result preflight = inspection.getValue();
+                if (!preflight.isAllowed()) {
+                    showCloneError(preflight.getUserMessage(fa)
+                            + "\\n[" + preflight.getDiagnosticCode() + "]");
+                    callback.onComplete(false);
+                    return;
+                }
+                reserveAndInstallApp(app, callback, preflight);
+            }
+        });
+    }
+
+    private void reserveAndInstallApp(final InstalledApp app, final CloneCallback callback,
+                                      final NativeAbiPreflight.Result preflight) {
         repository.reserveNextUserId(app.pkg,
                 new AsyncCloneRepository.Callback<CloneStore.CloneReservation>() {
             @Override public void onComplete(
@@ -299,7 +324,7 @@ public class AddAppActivity extends BaseActivity {
                 entry.userId = reservation.getUserId();
                 entry.displayName = app.label;
 
-                if (!Engine.installPackageAsUser(entry.packageName, entry.userId)) {
+                if (!Engine.installPackageAsUser(this, entry.packageName, entry.userId, preflight)) {
                     boolean absent = Engine.isCloneConfirmedAbsent(entry.packageName, entry.userId);
                     if (absent) releaseReservationAfterConfirmedEngineAbsence(reservation);
                     String diagnostic = Engine.getLastInstallDiagnostic();
