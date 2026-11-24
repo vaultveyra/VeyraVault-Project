@@ -68,8 +68,9 @@ assert "repository.reserveNextUserId(item.packageName" in duplicate
 assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index(
     "repository.reserveNextUserId(item.packageName"
 )
-assert "Engine.installPackageAsUser(MainActivity.this, copy.packageName, copy.userId, preflight)" in duplicate
-assert duplicate.index("Engine.installPackageAsUser(MainActivity.this, copy.packageName, copy.userId, preflight)") < duplicate.index(
+assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
+assert "copy.packageName, copy.userId, preflight)" in duplicate
+assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index(
     "repository.commitReservedClone(copy"
 )
 
