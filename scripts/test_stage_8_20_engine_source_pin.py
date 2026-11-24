@@ -30,11 +30,12 @@ class EngineSourcePinTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def fake_git(self, head=EXPECTED_COMMIT, remote=EXPECTED_REMOTE, status=""):
+    def fake_git(self, head=EXPECTED_COMMIT, remote=EXPECTED_REMOTE, status="", ignored=""):
         outputs = {
             ("rev-parse", "HEAD"): head + "\n",
             ("remote", "get-url", "origin"): remote + "\n",
             ("status", "--porcelain", "--untracked-files=all"): status,
+            ("ls-files", "--others", "--ignored", "--exclude-standard"): ignored,
         }
 
         def run(command, **kwargs):
@@ -72,6 +73,12 @@ class EngineSourcePinTests(unittest.TestCase):
         fake = self.fake_git(status="?? injected-source.java\n")
         with patch.object(prepare.subprocess, "run", side_effect=fake):
             with self.assertRaisesRegex(RuntimeError, "working tree is not clean"):
+                prepare.verify_engine_source(str(self.root))
+
+    def test_ignored_untracked_source_files_are_rejected(self):
+        fake = self.fake_git(ignored="injected/ignored-source.java\\n")
+        with patch.object(prepare.subprocess, "run", side_effect=fake):
+            with self.assertRaisesRegex(RuntimeError, "ignored untracked files"):
                 prepare.verify_engine_source(str(self.root))
 
     def test_missing_git_metadata_is_rejected_without_invoking_git(self):
