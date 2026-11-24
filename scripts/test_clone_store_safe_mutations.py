@@ -80,8 +80,8 @@ assert "private static final ExecutorService ENGINE" in queue
 uninstall = body(engine, "public static boolean uninstallClone(")
 assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
 assert "return false;" in uninstall
-single_start = main_ui.index('makeSheetActionBtn("🗑️"')
-single_end = main_ui.index('makeSheetActionBtn("📦"', single_start)
+single_start = main_ui.index("private void confirmUninstallClone(")
+single_end = main_ui.index("private void confirmBatchUninstall(", single_start)
 single = main_ui[single_start:single_end]
 assert "EngineOperationQueue.submit(" in single
 assert "Engine.uninstallClone(item.packageName, item.userId)" in single
