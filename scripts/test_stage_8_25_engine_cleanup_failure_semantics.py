@@ -16,7 +16,7 @@ SPEC.loader.exec_module(prepare)
 
 BASE = Path("Bcore/src/main/java/top/niunaijun/blackbox")
 FIXTURES = {
-    "system/pm/installer/RemoveUserExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
+    "core/system/pm/installer/RemoveUserExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
 
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.core.system.pm.BPackageSettings;
@@ -37,7 +37,7 @@ public class RemoveUserExecutor implements Executor {
     }
 }
 """,
-    "system/pm/installer/RemoveAppExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
+    "core/system/pm/installer/RemoveAppExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
 
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.core.system.pm.BPackageSettings;
@@ -53,7 +53,7 @@ public class RemoveAppExecutor implements Executor {
     }
 }
 """,
-    "system/pm/installer/CreateUserExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
+    "core/system/pm/installer/CreateUserExecutor.java": """package top.niunaijun.blackbox.core.system.pm.installer;
 
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.core.system.pm.BPackageSettings;
@@ -87,7 +87,7 @@ public class CreateUserExecutor implements Executor {
     }
 }
 """,
-    "system/pm/BPackageInstallerService.java": """package top.niunaijun.blackbox.core.system.pm;
+    "core/system/pm/BPackageInstallerService.java": """package top.niunaijun.blackbox.core.system.pm;
 
 public class BPackageInstallerService {
     public int uninstallPackageAsUser(BPackageSettings ps, boolean removeApp, int userId) {
@@ -113,7 +113,7 @@ public class BPackageInstallerService {
     }
 }
 """,
-    "system/pm/BPackageManagerService.java": """package top.niunaijun.blackbox.core.system.pm;
+    "core/system/pm/BPackageManagerService.java": """package top.niunaijun.blackbox.core.system.pm;
 
 public class BPackageManagerService {
     public void uninstallPackageAsUser(String packageName, int userId) {
@@ -168,11 +168,11 @@ class EngineCleanupHardeningTests(unittest.TestCase):
 
     def test_patch_checks_directory_absence_and_recreation(self):
         prepare.harden_clone_cleanup_semantics(str(self.root))
-        remove_user = self.read("system/pm/installer/RemoveUserExecutor.java")
-        remove_app = self.read("system/pm/installer/RemoveAppExecutor.java")
-        create_user = self.read("system/pm/installer/CreateUserExecutor.java")
-        installer = self.read("system/pm/BPackageInstallerService.java")
-        manager = self.read("system/pm/BPackageManagerService.java")
+        remove_user = self.read("core/system/pm/installer/RemoveUserExecutor.java")
+        remove_app = self.read("core/system/pm/installer/RemoveAppExecutor.java")
+        create_user = self.read("core/system/pm/installer/CreateUserExecutor.java")
+        installer = self.read("core/system/pm/BPackageInstallerService.java")
+        manager = self.read("core/system/pm/BPackageManagerService.java")
 
         self.assertIn("import java.io.File;", remove_user)
         self.assertEqual(remove_user.count("directory.exists()"), 1)
@@ -196,12 +196,12 @@ class EngineCleanupHardeningTests(unittest.TestCase):
         self.assertEqual(before, after)
 
     def test_unexpected_pinned_source_fails_without_partially_writing_other_files(self):
-        original_remove_user = self.read("system/pm/installer/RemoveUserExecutor.java")
-        changed = self.root / BASE / "system/pm/BPackageManagerService.java"
+        original_remove_user = self.read("core/system/pm/installer/RemoveUserExecutor.java")
+        changed = self.root / BASE / "core/system/pm/BPackageManagerService.java"
         changed.write_text("package unexpected; class Changed {}", encoding="utf-8")
         with self.assertRaisesRegex(RuntimeError, "no longer matches|unexpected|verification failed"):
             prepare.harden_clone_cleanup_semantics(str(self.root))
-        self.assertEqual(self.read("system/pm/installer/RemoveUserExecutor.java"), original_remove_user)
+        self.assertEqual(self.read("core/system/pm/installer/RemoveUserExecutor.java"), original_remove_user)
 
 
 if __name__ == "__main__":
