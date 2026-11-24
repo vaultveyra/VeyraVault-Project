@@ -121,9 +121,10 @@ def make_apk_fixture(entries):
     return temp_dir, names
 
 
-def current_native_lib_match(entries, device_cpu_abi):
-    # Mirrors findAndCopyNativeLib: the Engine searches the requested ABI and
-    # then generic armeabi. A ZIP with no lib/ entries is a valid no-native app.
+def current_native_extract_helper_succeeds(entries, device_cpu_abi):
+    # Mirrors the helper's boolean: it returns True for an APK with no lib/
+    # entries (fast skip), or when a matching requested/legacy ABI is found.
+    # This does not mean libraries from an unpassed split APK were examined.
     if not any(name.startswith("lib/") for name in entries):
         return True
     requested = f"lib/{device_cpu_abi}/"
@@ -176,17 +177,20 @@ try:
     for fixture_name in ("x86_only", "x86_64_only"):
         assert current_engine_accepts(fixture_names[fixture_name], False)
         assert current_engine_accepts(fixture_names[fixture_name], True)
-        assert not current_native_lib_match(fixture_names[fixture_name], "armeabi-v7a")
-        assert not current_native_lib_match(fixture_names[fixture_name], "arm64-v8a")
+        assert not current_native_extract_helper_succeeds(fixture_names[fixture_name], "armeabi-v7a")
+        assert not current_native_extract_helper_succeeds(fixture_names[fixture_name], "arm64-v8a")
 
     # Split-only native libraries are not supplied to CopyExecutor: its source
     # is baseCodePath only. This fixture documents the path gap, not APK install
     # behavior across PackageManager/device versions.
-    base_names = ["classes.dex"]
-    split_names = ["lib/arm64-v8a/libfixture.so"]
+    base_temp, base_names = make_apk_fixture(["classes.dex"])
+    split_temp, split_names = make_apk_fixture(["lib/arm64-v8a/libfixture.so"])
+    fixture_dirs.extend((base_temp, split_temp))
     assert current_engine_accepts(base_names, True)
-    assert not current_native_lib_match(base_names, "arm64-v8a")
-    assert current_native_lib_match(split_names, "arm64-v8a")
+    assert current_native_extract_helper_succeeds(base_names, "arm64-v8a")
+    assert current_native_extract_helper_succeeds(split_names, "arm64-v8a")
+    assert not any(name.endswith(".so") for name in base_names)
+    assert any(name.endswith(".so") for name in split_names)
 finally:
     for temp_dir in fixture_dirs:
         temp_dir.cleanup()
