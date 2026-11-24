@@ -14,6 +14,7 @@ import os
 import re
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -45,8 +46,8 @@ def atomic_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.parent.is_symlink():
         raise OSError("Recovery directory cannot be a symlink")
-    temp = path.with_name(path.name + ".tmp")
-    fd = os.open(str(temp), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    temp = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
+    fd = os.open(str(temp), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     try:
         with os.fdopen(fd, "wb") as stream:
             stream.write(json.dumps(value, sort_keys=True).encode("utf-8"))
@@ -146,9 +147,11 @@ class SafePackageScanner:
 
     def _clear_recovery_record(self, package_name: str) -> bool:
         path = self._record_path(package_name)
+        if path.is_symlink():
+            return False
         if not path.exists():
             return True
-        if path.is_symlink() or not path.is_file() or not self._record_is_valid(package_name):
+        if not path.is_file() or not self._record_is_valid(package_name):
             return False
         try:
             path.unlink()
@@ -376,11 +379,11 @@ class PackageScanQuarantineTests(unittest.TestCase):
             scanner = SafePackageScanner(Path(temp))
             seed_package(scanner, self.PACKAGE)
             scanner.scan(self.PACKAGE)
-            before = snapshot_protected_state(scanner, self.PACKAGE)
             old_loaded = dict(scanner.loaded[self.PACKAGE])
             old_resolver = scanner.resolver[self.PACKAGE]
             bad = scanner._package_dir(self.PACKAGE) / "package.conf"
             bad.write_bytes(b"{")
+            before_failure = snapshot_protected_state(scanner, self.PACKAGE)
 
             def fail_writer(_path: Path, _data: dict) -> None:
                 raise OSError("simulated full/read-only recovery storage")
@@ -390,18 +393,7 @@ class PackageScanQuarantineTests(unittest.TestCase):
                 "RECOVERY_MARKER_WRITE_FAILED",
             )
             expected = snapshot_protected_state(scanner, self.PACKAGE)
-            self.assertEqual(
-                expected["data/app/" + self.PACKAGE],
-                hashlib.sha256(
-                    b"".join(
-                        [
-                            # Package digest is separately asserted below.
-                            b"",
-                        ]
-                    )
-                ).hexdigest()
-                if False else expected["data/app/" + self.PACKAGE],
-            )
+            self.assertEqual(expected, before_failure)
             self.assertEqual(scanner.loaded[self.PACKAGE], old_loaded)
             self.assertEqual(scanner.resolver[self.PACKAGE], old_resolver)
             self.assertEqual(scanner.uninstall_notifications, [])
