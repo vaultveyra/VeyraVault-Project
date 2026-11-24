@@ -117,10 +117,10 @@ public class BPackageInstallerService {
 
 public class BPackageManagerService {
     public void uninstallPackageAsUser(String packageName, int userId) {
-        int i = BPackageInstallerService.get().uninstallPackageAsUser(ps, removeApp, userId);
-        if (i < 0) {
-            
-        }
+                int i = BPackageInstallerService.get().uninstallPackageAsUser(ps, removeApp, userId);
+                if (i < 0) {
+                    
+                }
 
         if (removeApp) {
             mSettings.removePackage(packageName);
@@ -133,10 +133,10 @@ public class BPackageManagerService {
 
     public void uninstallPackage(String packageName) {
         for (Integer userId : ps.getUserIds()) {
-            int i = BPackageInstallerService.get().uninstallPackageAsUser(ps, true, userId);
-            if (i < 0) {
-                continue;
-            }
+                        int i = BPackageInstallerService.get().uninstallPackageAsUser(ps, true, userId);
+                        if (i < 0) {
+                            continue;
+                        }
             onPackageUninstalled(packageName, true, userId);
         }
         mSettings.removePackage(packageName);
