@@ -8,6 +8,8 @@ engine = (root / "app/src/main/java/com/veyravault/space/core/Engine.java").read
 main_ui = (root / "app/src/main/java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 add_ui = (root / "app/src/main/java/com/veyravault/space/ui/AddAppActivity.java").read_text(encoding="utf-8")
 test = (root / "app/src/androidTest/java/com/veyravault/space/core/CloneStoreSafetyInstrumentationTest.java").read_text(encoding="utf-8")
+provision = (root / "app/src/main/java/com/veyravault/space/core/AsyncCloneProvisionRepository.java").read_text(encoding="utf-8")
+queue = (root / "app/src/main/java/com/veyravault/space/core/EngineOperationQueue.java").read_text(encoding="utf-8")
 
 def body(source, signature):
     start = source.index(signature)
@@ -49,32 +51,42 @@ assert "public static List<CloneEntry> getAll(Context c)" in store
 assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
 assert "CloneStore.upsertClone(" not in add_ui
 add_clone = add_ui[add_ui.index("private void cloneSingleApp("):
-                   add_ui.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
-assert "repository.inspectNativeAbi(app.pkg" in add_clone
-assert "repository.reserveNextUserId(app.pkg" in add_clone
-assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
-assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
-assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index("repository.commitReservedClone(entry")
+                   add_ui.index("private void showCloneError(")]
+assert "provisionRepository.createClone(app.pkg, app.label, fa" in add_clone
+assert "Engine.installPackageAsUser(" not in add_clone
+assert "Engine.uninstallClone(" not in add_clone
 assert "repository.allocateNextUserId" not in add_ui
 
 assert "duplicateCloneWithPreflight(item);" in main_ui
 duplicate = main_ui[main_ui.index("private void duplicateCloneWithPreflight("):
                    main_ui.index("private void showRenameDialog(")]
-assert "repository.inspectNativeAbi(item.packageName" in duplicate
-assert "repository.reserveNextUserId(item.packageName" in duplicate
-assert duplicate.index("repository.inspectNativeAbi(item.packageName") < duplicate.index("repository.reserveNextUserId(item.packageName")
-assert "Engine.installPackageAsUser(MainActivity.this," in duplicate
-assert "copy.packageName, copy.userId, preflight)" in duplicate
-assert duplicate.index("Engine.installPackageAsUser(MainActivity.this,") < duplicate.index("repository.commitReservedClone(copy")
+assert "provisionRepository.createClone(item.packageName, item.displayName, fa" in duplicate
+assert "Engine.installPackageAsUser(" not in duplicate
+assert "Engine.uninstallClone(" not in duplicate
 assert "repository.allocateNextUserId" not in main_ui
+
+assert "persistence.inspectNativeAbi(packageName" in provision
+assert "persistence.reserveNextUserId(packageName" in provision
+assert "Engine.installPackageAsUser(" in provision
+assert "persistence.commitReservedClone(entry, reservation" in provision
+assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("persistence.reserveNextUserId(packageName")
+assert provision.index("persistence.reserveNextUserId(packageName") < provision.index("Engine.installPackageAsUser(")
+assert provision.index("Engine.installPackageAsUser(") < provision.index("persistence.commitReservedClone(entry, reservation")
+assert "Engine.CloneInstallState.ABSENT" in provision
+assert "releaseAfterConfirmedAbsence" in provision
+assert "reservation remains blocked" in provision
+assert "private static final ExecutorService ENGINE" in queue
 
 uninstall = body(engine, "public static boolean uninstallClone(")
 assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
 assert "return false;" in uninstall
-assert "if (!Engine.uninstallClone(item.packageName, item.userId))" in main_ui
-assert "repository.removeClone(item.packageName, item.userId" in main_ui
-assert main_ui.index("if (!Engine.uninstallClone(item.packageName, item.userId))") < main_ui.index("repository.removeClone(item.packageName, item.userId")
-
+single_start = main_ui.index('makeSheetActionBtn("🗑️"')
+single_end = main_ui.index('makeSheetActionBtn("📦"', single_start)
+single = main_ui[single_start:single_end]
+assert "EngineOperationQueue.submit(" in single
+assert "Engine.uninstallClone(item.packageName, item.userId)" in single
+assert "repository.removeClone(item.packageName, item.userId" in single
+assert single.index("EngineOperationQueue.submit(") < single.index("Engine.uninstallClone(item.packageName, item.userId)") < single.index("repository.removeClone(item.packageName, item.userId")
 for marker in (
     "malformedRegistryBlocksMutationAndUserIdAllocationWithoutChangingBytes",
     "duplicateCompositeIdentityBlocksMutationAndAllocation",
