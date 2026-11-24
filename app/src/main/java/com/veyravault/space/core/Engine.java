@@ -185,7 +185,21 @@ public class Engine {
         return safe.toString().trim();
     }
 
-    public static boolean installPackageAsUser(String pkg, int userId) {
+    public static boolean installPackageAsUser(
+            Context context, String pkg, int userId, NativeAbiPreflight.Result preflight) {
+        if (context == null || pkg == null || pkg.trim().isEmpty() || userId < 0 || preflight == null) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_INVALID_INPUT";
+            return false;
+        }
+        if (!preflight.isAllowed()) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_BLOCKED:" + preflight.getDiagnosticCode();
+            return false;
+        }
+        if (!preflight.matchesInstalledPackage(context, pkg)) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_PACKAGE_CHANGED";
+            return false;
+        }
+
         lastInstallDiagnostic = "INSTALL_STARTED";
         try {
             Object core = getCore();
@@ -288,11 +302,20 @@ public class Engine {
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_REQUIRED,
                     entry.packageName, null, entry.userId, "confirmed_absent");
         }
-        if (installState == CloneInstallState.ABSENT
-                && !installPackageAsUser(entry.packageName, entry.userId)) {
-            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
-                    entry.packageName, null, entry.userId, "install_returned_false");
-            return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
+        if (installState == CloneInstallState.ABSENT) {
+            NativeAbiPreflight.Result preflight =
+                    NativeAbiPreflight.inspectInstalledPackage(ctx, entry.packageName);
+            if (!preflight.isAllowed()) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                        entry.packageName, null, entry.userId, preflight.getDiagnosticCode());
+                return new CloneLaunchResult(false,
+                        "NATIVE_ABI_PREFLIGHT_BLOCKED:" + preflight.getDiagnosticCode(), null);
+            }
+            if (!installPackageAsUser(ctx, entry.packageName, entry.userId, preflight)) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                        entry.packageName, null, entry.userId, "install_returned_false");
+                return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
+            }
         }
 
         // Preserve hook-before-launch ordering and make hook preparation failures observable.
