@@ -9,12 +9,52 @@ OUTPUT_DIR = os.path.join(ROOT, "output_artifacts")
 # NDK pinned to a stable release that builds BOTH armeabi-v7a and arm64-v8a for legacy C++ code
 NDK_VERSION = "27.0.12077973"
 ENGINE_COMMIT = "89b59836c66f173756a4ae258cf379a957649820"
+ENGINE_REPOSITORY = "https://github.com/ALEX5402/NewBlackbox.git"
 NDK_LICENSE_HASH = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
 
 
 def run(cmd, cwd=None, check=True):
     print(f"[+] Executing: {cmd}")
     subprocess.run(cmd, shell=True, cwd=cwd, check=check)
+
+
+
+def _git_output(repository_path, *arguments):
+    try:
+        result = subprocess.run(
+            ["git", "-C", repository_path, *arguments],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise RuntimeError("Could not verify the bundled/pinned Engine Git checkout") from error
+    return result.stdout.strip()
+
+
+def verify_engine_source(repository_path):
+    """Fail closed unless the Engine source is the exact clean pinned upstream checkout."""
+    if os.path.islink(repository_path) or not os.path.isdir(repository_path):
+        raise RuntimeError("Engine source path is missing or is a symbolic link")
+    git_dir = os.path.join(repository_path, ".git")
+    if os.path.islink(git_dir) or not os.path.isdir(git_dir):
+        raise RuntimeError("Engine source must be a full Git checkout; unverified source bundles are refused")
+    if not os.path.isdir(os.path.join(repository_path, "Bcore")):
+        raise RuntimeError("Engine source is missing the expected Bcore module")
+
+    head = _git_output(repository_path, "rev-parse", "HEAD")
+    if head != ENGINE_COMMIT:
+        raise RuntimeError("Engine source HEAD does not match the required immutable pin")
+
+    remote = _git_output(repository_path, "remote", "get-url", "origin")
+    if remote != ENGINE_REPOSITORY:
+        raise RuntimeError("Engine source origin does not match the approved upstream repository")
+
+    status = _git_output(repository_path, "status", "--porcelain", "--untracked-files=all")
+    if status:
+        raise RuntimeError("Engine source working tree is not clean; refusing an unverified build")
+
+    print(f"[+] Verified Engine source: {ENGINE_REPOSITORY}@{ENGINE_COMMIT}")
 
 
 def accept_android_sdk_licenses():
@@ -153,14 +193,17 @@ def main():
         shutil.rmtree(WORKSPACE)
 
     if os.path.exists(os.path.join(BUNDLED_ENGINE, "Bcore")):
+        print("[+] Verifying bundled Engine before copying...")
+        verify_engine_source(BUNDLED_ENGINE)
         print("[+] Copying bundled Bcore engine to build_workspace...")
         shutil.copytree(BUNDLED_ENGINE, WORKSPACE)
     else:
         print("[*] Cloning upstream BlackBox engine into build_workspace...")
-        run(f'git clone --no-checkout https://github.com/ALEX5402/NewBlackbox.git "{WORKSPACE}"')
+        run(f'git clone --no-checkout "{ENGINE_REPOSITORY}" "{WORKSPACE}"')
         run(f'git -C "{WORKSPACE}" fetch --depth 1 origin {ENGINE_COMMIT}')
         run(f'git -C "{WORKSPACE}" checkout --detach FETCH_HEAD')
 
+    verify_engine_source(WORKSPACE)
     disable_remote_log_upload(WORKSPACE)
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")
