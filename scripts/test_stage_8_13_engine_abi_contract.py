@@ -211,12 +211,14 @@ policy_source = project_root / "app/src/main/java/com/veyravault/space/core/Nati
 preflight_source = project_root / "app/src/main/java/com/veyravault/space/core/NativeAbiPreflight.java"
 add_app_source = project_root / "app/src/main/java/com/veyravault/space/ui/AddAppActivity.java"
 async_repository_source = project_root / "app/src/main/java/com/veyravault/space/core/AsyncCloneRepository.java"
+provision_source = project_root / "app/src/main/java/com/veyravault/space/core/AsyncCloneProvisionRepository.java"
+main_activity_source = project_root / "app/src/main/java/com/veyravault/space/ui/MainActivity.java"
 engine_source = project_root / "app/src/main/java/com/veyravault/space/core/Engine.java"
 instrumentation_source = project_root / "app/src/androidTest/java/com/veyravault/space/core/NativeAbiPreflightInstrumentationTest.java"
 
 for path in (
     policy_source, preflight_source, add_app_source,
-    async_repository_source, engine_source, instrumentation_source
+    async_repository_source, provision_source, main_activity_source, engine_source, instrumentation_source
 ):
     assert path.is_file(), f"Native ABI preflight implementation/test missing: {path}"
 
@@ -224,6 +226,8 @@ policy = policy_source.read_text(encoding="utf-8")
 preflight = preflight_source.read_text(encoding="utf-8")
 add_app = add_app_source.read_text(encoding="utf-8")
 async_repository = async_repository_source.read_text(encoding="utf-8")
+provision = provision_source.read_text(encoding="utf-8")
+main_activity = main_activity_source.read_text(encoding="utf-8")
 engine = engine_source.read_text(encoding="utf-8")
 instrumentation = instrumentation_source.read_text(encoding="utf-8")
 
@@ -234,11 +238,25 @@ assert 'Class.forName("dalvik.system.VMRuntime")' in preflight
 assert "CloneStore." not in preflight and "installPackageAsUser(" not in preflight
 assert "NativeAbiPreflight.inspectInstalledPackage(appContext, packageName)" in async_repository
 assert "enqueue(() -> NativeAbiPreflight.inspectInstalledPackage" in async_repository
-assert "repository.inspectNativeAbi(app.pkg" in add_app
-assert add_app.index("repository.inspectNativeAbi(app.pkg") < add_app.index("repository.reserveNextUserId(app.pkg"), (
-    "ABI preflight must complete before reserving a Clone ID"
+
+# Both UI entry points delegate to one application-scoped transaction service.
+# Preflight and durable ID reservation must occur in that service, before Engine install.
+assert "provisionRepository.createClone(app.pkg, app.label, fa" in add_app
+assert "provisionRepository.createClone(item.packageName, item.displayName, fa" in main_activity
+assert "Engine.installPackageAsUser(" not in add_app
+assert "Engine.installPackageAsUser(" not in main_activity
+assert "persistence.inspectNativeAbi(packageName" in provision
+assert "persistence.reserveNextUserId(packageName" in provision
+assert "persistence.commitReservedClone(entry, reservation" in provision
+assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index(
+    "persistence.reserveNextUserId(packageName"
+), "ABI preflight must complete before reserving a Clone ID"
+assert provision.index("persistence.reserveNextUserId(packageName") < provision.index(
+    "Engine.installPackageAsUser("
 )
-assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_app
+assert provision.index("Engine.installPackageAsUser(") < provision.index(
+    "persistence.commitReservedClone(entry, reservation"
+)
 assert "preflight.matchesInstalledPackage(context, pkg)" in engine
 assert engine.index("preflight.matchesInstalledPackage(context, pkg)") < engine.index(
     'getMethod("installPackageAsUser", String.class, int.class)'
