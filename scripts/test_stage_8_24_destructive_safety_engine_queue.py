@@ -30,7 +30,9 @@ assert main.index("confirmBatchUninstall(all, checked, selected)") < main.index(
 # Engine wrappers report dispatch only; they do not fabricate successful completion.
 assert "public static boolean stopClone(String pkg, int userId)" in engine
 assert "public static boolean clearCloneData(String pkg, int userId)" in engine
-assert "The pinned upstream API returns void" in engine
+assert "pinned Engine clearPackage call returns normally" in engine
+assert "may still mean partial deletion occurred" in engine
+assert "forensic secure-erasure guarantee" in engine
 assert "process-termination result" in engine
 assert "Engine.clearCloneData(item.packageName, item.userId),\n                            (dispatched, failure)" in main
 assert "Boolean.TRUE.equals(dispatched)" in main
