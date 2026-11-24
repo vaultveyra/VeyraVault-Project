@@ -57,7 +57,9 @@ for call in ("Engine.uninstallClone(", "Engine.stopClone(", "Engine.clearCloneDa
         close = main.find("});", start)
         assert start >= 0 and close > pos, f"Engine call is not queued: {call}"
 
-assert "app-scoped coordinator" in provision
+assert "private static volatile AsyncCloneProvisionRepository instance" in provision
+assert "context.getApplicationContext()" in provision
+assert "private final Context appContext" in provision
 assert "isFinishing()" not in provision
 assert "isDestroyed()" not in provision
 
