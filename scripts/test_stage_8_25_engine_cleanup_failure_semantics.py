@@ -179,8 +179,10 @@ class EngineCleanupHardeningTests(unittest.TestCase):
         self.assertIn("BEnvironment.getDataDir(packageName, userId)", remove_user)
         self.assertIn("BEnvironment.getDeDataDir(packageName, userId)", remove_user)
         self.assertIn("BEnvironment.getExternalDataDir(packageName, userId)", remove_user)
+        self.assertIn("BEnvironment.getExternalObbDir(packageName, userId)", remove_user)
         self.assertIn("if (appDirectory.exists())", remove_app)
         self.assertIn("if (dataLibraryDirectory.exists())", create_user)
+        self.assertIn("BEnvironment.getExternalObbDir(packageName, userId)", create_user)
         self.assertIn("if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory())", create_user)
         self.assertLess(installer.index("executors.add(new RemoveUserExecutor())"),
                         installer.index("executors.add(new RemoveAppExecutor())"))
@@ -203,6 +205,47 @@ class EngineCleanupHardeningTests(unittest.TestCase):
             prepare.harden_clone_cleanup_semantics(str(self.root))
         self.assertEqual(self.read("core/system/pm/installer/RemoveUserExecutor.java"), original_remove_user)
 
+
+
+# Engine absence requires all package/user data roots to be absent and inspectable.
+ENGINE = (ROOT / "app/src/main/java/com/veyravault/space/core/Engine.java").read_text(encoding="utf-8")
+guard_start = ENGINE.index("private static boolean isDirectoryConfirmedAbsent(")
+state_start = ENGINE.index("private static boolean areCloneDataDirectoriesAbsent(", guard_start)
+state_end = ENGINE.index("static CloneInstallState classifyInstallStateWithDataCheck(", state_start)
+absence_guard = ENGINE[state_start:state_end]
+classifier_start = state_end
+query_start = ENGINE.index("public static CloneInstallState getCloneInstallState(", classifier_start)
+classifier = ENGINE[classifier_start:query_start]
+query_end = ENGINE.index("public static boolean isCloneConfirmedAbsent(", query_start)
+query = ENGINE[query_start:query_end]
+uninstall_start = ENGINE.index("public static boolean uninstallClone(")
+uninstall_end = ENGINE.index("public static boolean isGmsInstalled(", uninstall_start)
+uninstall = ENGINE[uninstall_start:uninstall_end]
+directory_guard = ENGINE[guard_start:state_start]
+
+for required_path in (
+    "BEnvironment.getDataDir(pkg, userId)",
+    "BEnvironment.getDeDataDir(pkg, userId)",
+    "BEnvironment.getExternalDataDir(pkg, userId)",
+    "BEnvironment.getExternalObbDir(pkg, userId)",
+):
+    assert required_path in absence_guard, f"Missing package/user data guard: {required_path}"
+assert "BEnvironment.getAppDir" not in absence_guard, (
+    "Shared package APK storage must not be treated as per-user residue."
+)
+assert "canonicalDirectory.getPath().startsWith(rootPrefix)" in directory_guard
+assert "FileUtils.isSymlink(directory)" in directory_guard
+assert "canonicalDirectory.exists()" in directory_guard
+assert "state == CloneInstallState.ABSENT" in query
+assert "areCloneDataDirectoriesAbsent(pkg, userId)" in query
+assert "CloneInstallState.UNKNOWN" in query
+assert "dataDirectoriesAbsent ? CloneInstallState.ABSENT : CloneInstallState.UNKNOWN" in classifier
+assert "Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))" in uninstall
+assert "areCloneDataDirectoriesAbsent(pkg, userId)" in uninstall
+
+print("PASS: ABSENT requires Engine metadata absence plus all internal, DE, Android/data and OBB roots absent.")
+print("PASS: Per-user inspection excludes the package-shared APK directory.")
+print("PASS: Inaccessible, out-of-root and symlink-escaped paths remain UNKNOWN.")
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(EngineCleanupHardeningTests)

@@ -579,6 +579,21 @@ public class AsyncCloneRepositoryInstrumentationTest {
                 Engine.classifyInstalledQueryResult(null));
     }
 
+    @Test public void engineAbsenceRequiresPackageUserDataDirectoriesToBeAbsent() {
+        assertEquals(Engine.CloneInstallState.UNKNOWN,
+                Engine.classifyInstallStateWithDataCheck(
+                        Engine.CloneInstallState.ABSENT, false));
+        assertEquals(Engine.CloneInstallState.ABSENT,
+                Engine.classifyInstallStateWithDataCheck(
+                        Engine.CloneInstallState.ABSENT, true));
+        assertEquals(Engine.CloneInstallState.INSTALLED,
+                Engine.classifyInstallStateWithDataCheck(
+                        Engine.CloneInstallState.INSTALLED, false));
+        assertEquals(Engine.CloneInstallState.UNKNOWN,
+                Engine.classifyInstallStateWithDataCheck(
+                        Engine.CloneInstallState.UNKNOWN, true));
+    }
+
     @Test public void pendingReservationDiagnosticsAreStrictAndReadOnly() throws Exception {
         String clones = "[{\"pkg\":\"com.example.existing\",\"uid\":0}]";
         String journal = "{\"schemaVersion\":1,\"reservations\":[{\"token\":\"read-only-token\",\"pkg\":\"com.example.pending\",\"uid\":1}]}";

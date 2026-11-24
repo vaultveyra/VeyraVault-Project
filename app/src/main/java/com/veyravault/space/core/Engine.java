@@ -2,8 +2,11 @@ package com.veyravault.space.core;
 
 import android.app.Application;
 import android.content.Context;
+import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import top.niunaijun.blackbox.core.env.BEnvironment;
+import top.niunaijun.blackbox.utils.FileUtils;
 
 public class Engine {
 
@@ -252,11 +255,80 @@ public class Engine {
         }
     }
 
-    /** Returns a tri-state Engine result; reflection/query failures remain UNKNOWN. */
+    /**
+     * Confirms one package/user data directory is absent beneath a readable virtual root.
+     * Canonical-path containment prevents traversal or symlink escape from the expected root.
+     */
+    private static boolean isDirectoryConfirmedAbsent(File root, File directory) {
+        if (root == null || directory == null) return false;
+        try {
+            File canonicalRoot = root.getCanonicalFile();
+            File canonicalDirectory = directory.getCanonicalFile();
+            if (!canonicalRoot.isDirectory() || !canonicalRoot.canRead()) return false;
+
+            String rootPrefix = canonicalRoot.getPath() + File.separator;
+            if (!canonicalDirectory.getPath().startsWith(rootPrefix)) return false;
+            if (FileUtils.isSymlink(directory)) return false;
+
+            File ancestor = directory.getParentFile();
+            boolean reachedRoot = false;
+            while (ancestor != null) {
+                File canonicalAncestor = ancestor.getCanonicalFile();
+                if (canonicalAncestor.exists()
+                        && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
+                    return false;
+                }
+                if (canonicalAncestor.equals(canonicalRoot)) {
+                    reachedRoot = true;
+                    break;
+                }
+                ancestor = ancestor.getParentFile();
+            }
+            return reachedRoot && !canonicalDirectory.exists();
+        } catch (Throwable ignored) {
+            // Permission, canonicalization, and storage errors are UNKNOWN, never ABSENT.
+            return false;
+        }
+    }
+
+    /**
+     * Checks only package/user-scoped app data. The shared APK directory is excluded because
+     * another Clone user for the same package may legitimately retain the package binary.
+     */
+    private static boolean areCloneDataDirectoriesAbsent(String pkg, int userId) {
+        try {
+            File internalRoot = BEnvironment.getVirtualRoot();
+            File externalRoot = BEnvironment.getExternalVirtualRoot();
+            return isDirectoryConfirmedAbsent(internalRoot,
+                            BEnvironment.getDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(internalRoot,
+                            BEnvironment.getDeDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(externalRoot,
+                            BEnvironment.getExternalDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(externalRoot,
+                            BEnvironment.getExternalObbDir(pkg, userId));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** A queried ABSENT result is final only when all scoped data directories are absent. */
+    static CloneInstallState classifyInstallStateWithDataCheck(
+            CloneInstallState installState, boolean dataDirectoriesAbsent) {
+        if (installState == null || installState == CloneInstallState.UNKNOWN)
+            return CloneInstallState.UNKNOWN;
+        if (installState != CloneInstallState.ABSENT) return installState;
+        return dataDirectoriesAbsent ? CloneInstallState.ABSENT : CloneInstallState.UNKNOWN;
+    }
+
+    /** Returns UNKNOWN when Engine state or any package/user data path is indeterminate. */
     public static CloneInstallState getCloneInstallState(String pkg, int userId) {
         if (pkg == null || pkg.trim().isEmpty() || userId < 0)
             return CloneInstallState.UNKNOWN;
-        return classifyInstalledQueryResult(queryInstalledAsUser(pkg, userId));
+        CloneInstallState state = classifyInstalledQueryResult(queryInstalledAsUser(pkg, userId));
+        if (state != CloneInstallState.ABSENT) return state;
+        return classifyInstallStateWithDataCheck(
+                state, areCloneDataDirectoriesAbsent(pkg, userId));
     }
 
     /** True only when the engine explicitly reports that this virtual package is absent. */
@@ -424,7 +496,8 @@ public class Engine {
             m.invoke(core, pkg, userId);
             // A successful reflection call is not enough: confirm the engine reports
             // the virtual package absent. Unknown/error state is never success.
-            return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId));
+            return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))
+                    && areCloneDataDirectoriesAbsent(pkg, userId);
         } catch (Throwable ignored) {
             return false;
         }

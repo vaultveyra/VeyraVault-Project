@@ -1004,8 +1004,8 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(fa ? "پاک‌سازی دائمی داده‌های Clone؟" : "Permanently clear Clone data?")
                 .setMessage(fa
-                        ? "این عملیات قابل بازگشت نیست. داده‌های داخلی برنامه، پایگاه‌های داده، تنظیمات، فایل‌های اختصاصی و مسیر Android/data برای همین برنامه و همین Space حذف می‌شوند. اطلاعات ورود و نشست‌های ذخیره‌شده در این داده‌ها نیز ممکن است از بین بروند. این عملیات APK و رکورد فهرست Clone را حذف نمی‌کند. موتور نتیجهٔ کامل حذف فایل‌ها را گزارش نمی‌کند؛ پیش از ادامه از داده‌های ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
-                        : "This action cannot be undone. It removes this app's private data, databases, preferences, app-specific files, and its Android/data directory for this package and Space. Saved sign-ins and sessions stored there may be lost. It does not uninstall the APK or remove the Clone registry entry. The Engine does not report complete file-cleanup verification; make an independent backup of anything important before continuing.")
+                        ? "این عملیات قابل بازگشت نیست. داده‌های داخلی برنامه، پایگاه‌های داده، تنظیمات، فایل‌های اختصاصی و مسیرهای Android/data و Android/obb برای همین برنامه و همین Space حذف یا بازنشانی می‌شوند. اطلاعات ورود، نشست‌ها و فایل‌های توسعه‌ای ذخیره‌شده در این مسیرها ممکن است از بین بروند. این عملیات APK و رکورد فهرست Clone را حذف نمی‌کند. موتور نبودن پوشه‌های دادهٔ مدیریت‌شده را بررسی می‌کند، اما این بررسی تضمین پاک‌سازی امن و غیرقابل‌بازیابی نیست؛ پیش از ادامه از داده‌های ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
+                        : "This action cannot be undone. It clears this app's private data, databases, preferences, app-specific files, and the package/user-scoped Android/data and potential Android/obb locations for this Space. Saved sign-ins, sessions, and expansion files stored there may be lost. It does not uninstall the APK or remove the Clone registry entry. The Engine checks the managed data directories for absence, but this is not a forensic secure-erasure guarantee; independently back up anything important before continuing.")
                 .setNegativeButton(fa ? "انصراف" : "Cancel", null)
                 .setPositiveButton(fa ? "پاک‌سازی داده‌ها" : "Clear Clone data", (dialog, which) -> {
                     EngineOperationQueue.submit(
@@ -1029,8 +1029,8 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(fa ? "حذف دائمی Clone؟" : "Permanently uninstall this Clone?")
                 .setMessage(fa
-                        ? "برنامهٔ مجازی از این Space حذف می‌شود و داده‌های اختصاصی آن، از جمله اطلاعات ورود، نشست‌ها، پایگاه‌های داده و فایل‌های Android/data ممکن است برای همیشه از دست بروند. حذف برنامه با پاک‌سازی مستقل و تأییدشدهٔ همهٔ فایل‌ها یکسان نیست. این عملیات قابل بازگشت نیست؛ پیش از ادامه از اطلاعات ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
-                        : "The virtual app will be removed from this Space. Its private data, including sign-ins, sessions, databases, and Android/data files, may be permanently lost. Engine uninstall confirmation does not independently verify secure removal of every data file. This cannot be undone; make an independent backup of important information before continuing.")
+                        ? "برنامهٔ مجازی از این Space حذف می‌شود و داده‌های اختصاصی آن، از جمله اطلاعات ورود، نشست‌ها، پایگاه‌های داده و فایل‌های مسیرهای Android/data و Android/obb ممکن است برای همیشه از دست بروند. نبودن پوشه‌های دادهٔ مدیریت‌شده بررسی می‌شود، اما این بررسی تضمین پاک‌سازی امن و غیرقابل‌بازیابی نیست. این عملیات قابل بازگشت نیست؛ پیش از ادامه از اطلاعات ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
+                        : "The virtual app will be removed from this Space. Its private data, including sign-ins, sessions, databases, Android/data files, and potential Android/obb expansion files, may be permanently lost. The Engine checks the managed data directories but does not provide a forensic secure-erasure guarantee. This cannot be undone; independently back up important information before continuing.")
                 .setNegativeButton(fa ? "انصراف" : "Cancel", null)
                 .setPositiveButton(fa ? "حذف Clone" : "Uninstall Clone", (dialog, which) -> {
                     EngineOperationQueue.submit(
@@ -1075,8 +1075,8 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(fa ? "تأیید نهایی حذف گروهی" : "Final confirmation for batch uninstall")
                 .setMessage((fa
-                        ? ("تعداد " + selectedCount + " کلون انتخاب شده است. حذف برنامه‌ها و داده‌های اختصاصی آن‌ها از جمله ورودها، نشست‌ها و فایل‌های محلی ممکن است دائمی باشد. موتور حذف کامل همهٔ فایل‌ها را مستقلاً تأیید نمی‌کند. این عملیات قابل بازگشت نیست.\n\n")
-                        : (selectedCount + " Clones are selected. Their app data, including sign-ins, sessions, databases, and local files, may be permanently lost. The Engine does not independently verify complete deletion of every data file. This action cannot be undone.\n\n"))
+                        ? ("تعداد " + selectedCount + " کلون انتخاب شده است. حذف برنامه‌ها و داده‌های اختصاصی آن‌ها از جمله ورودها، نشست‌ها، پایگاه‌های داده و فایل‌های مسیرهای Android/data و Android/obb ممکن است دائمی باشد. موتور پوشه‌های دادهٔ مدیریت‌شده را بررسی می‌کند، اما پاک‌سازی امن و غیرقابل‌بازیابی را تضمین نمی‌کند. این عملیات قابل بازگشت نیست.\n\n")
+                        : (selectedCount + " Clones are selected. Their app data, including sign-ins, sessions, databases, Android/data files, and potential Android/obb expansion files, may be permanently lost. The Engine checks managed data directories but does not provide a forensic secure-erasure guarantee. This action cannot be undone.\n\n"))
                         + targets)
                 .setNegativeButton(fa ? "انصراف" : "Cancel", null)
                 .setPositiveButton(fa ? "تأیید حذف همه" : "Confirm uninstall", (dialog, which) -> {

@@ -117,7 +117,8 @@ def harden_clone_cleanup_semantics(workspace):
         File[] dataDirectories = new File[] {
                 BEnvironment.getDataDir(packageName, userId),
                 BEnvironment.getDeDataDir(packageName, userId),
-                BEnvironment.getExternalDataDir(packageName, userId)
+                BEnvironment.getExternalDataDir(packageName, userId),
+                BEnvironment.getExternalObbDir(packageName, userId)
         };
         for (File directory : dataDirectories) {
             FileUtils.deleteDir(directory);
@@ -129,7 +130,8 @@ def harden_clone_cleanup_semantics(workspace):
         ("File[] dataDirectories", "directory.exists()", "return -1;",
          "BEnvironment.getDataDir(packageName, userId)",
          "BEnvironment.getDeDataDir(packageName, userId)",
-         "BEnvironment.getExternalDataDir(packageName, userId)"),
+         "BEnvironment.getExternalDataDir(packageName, userId)",
+         "BEnvironment.getExternalObbDir(packageName, userId)"),
         relative["remove_user"],
     )
 
@@ -168,7 +170,8 @@ def harden_clone_cleanup_semantics(workspace):
                 BEnvironment.getDataCacheDir(packageName, userId),
                 BEnvironment.getDataFilesDir(packageName, userId),
                 BEnvironment.getDataDatabasesDir(packageName, userId),
-                BEnvironment.getDeDataDir(packageName, userId)
+                BEnvironment.getDeDataDir(packageName, userId),
+                BEnvironment.getExternalObbDir(packageName, userId)
         };
         for (File directory : requiredDirectories) {
             if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
@@ -180,7 +183,8 @@ def harden_clone_cleanup_semantics(workspace):
          "File[] requiredDirectories", "directory.mkdirs()", "directory.isDirectory()",
          "BEnvironment.getDataCacheDir(packageName, userId)",
          "BEnvironment.getDataFilesDir(packageName, userId)",
-         "BEnvironment.getDataDatabasesDir(packageName, userId)"),
+         "BEnvironment.getDataDatabasesDir(packageName, userId)",
+         "BEnvironment.getExternalObbDir(packageName, userId)"),
         relative["create_user"],
     )
 

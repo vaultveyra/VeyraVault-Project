@@ -10,7 +10,8 @@ pending-reservation inspection.
 
 - Clear Data now requires an explicit confirmation dialog that explains the exact scope:
   private app data, databases, preferences, app-specific files, and the package/user-scoped
-  Android/data directory. It warns that saved sign-ins and sessions may be lost.
+  Android/data and potential Android/obb directories. It warns that saved sign-ins, sessions,
+  and expansion files may be lost.
 - Single Clone uninstall now requires a separate confirmation with a data-loss warning.
 - Batch uninstall has a second final confirmation after selection and lists the selected Clone
   names and Space numbers before any Engine operation is queued.
@@ -27,8 +28,8 @@ pending-reservation inspection.
   The pinned upstream stop/clear APIs do not expose a verified process-termination or complete
   file-cleanup result. The UI must not describe dispatch as verified completion.
 - Uninstall remains fail-closed for registry removal: the app removes the CloneStore record only
-  after the Engine explicitly reports that the package is absent. This is install-state
-  confirmation, not proof of secure erasure of every data file.
+  after the Engine explicitly reports the package absent and the package/user data roots absent.
+  This is not a forensic secure-erasure guarantee.
 
 ## Serialized diagnostic reads
 
