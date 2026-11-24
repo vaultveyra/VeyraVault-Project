@@ -9,6 +9,7 @@ cannot mistake a green source audit for x86 support.
 from pathlib import Path
 import tempfile
 import zipfile
+import subprocess
 
 root = Path("build_workspace")
 app_gradle = root / "app" / "build.gradle"
@@ -201,4 +202,168 @@ print("Known gap: x86/x86_64-only APKs can pass the current empty-recognized-ABI
 print("Known gap: unmatched native ABI extraction can return without a failure signal")
 print("Known gap: CopyExecutor reads baseCodePath only; split native inputs are not staged")
 print("ARM release packaging: armeabi-v7a + arm64-v8a (physical runtime not certified)")
-print("Split APK support and physical-device Engine launch: NOT CERTIFIED")
+print("Split APK Engine installation and physical-device Engine launch: NOT CERTIFIED")
+
+# Compile and execute the actual production NativeAbiPolicy.java using javac.
+# This validates the decision logic, not Android PackageManager or native loading.
+project_root = Path(__file__).resolve().parents[1]
+policy_source = project_root / "app/src/main/java/com/veyravault/space/core/NativeAbiPolicy.java"
+preflight_source = project_root / "app/src/main/java/com/veyravault/space/core/NativeAbiPreflight.java"
+add_app_source = project_root / "app/src/main/java/com/veyravault/space/ui/AddAppActivity.java"
+async_repository_source = project_root / "app/src/main/java/com/veyravault/space/core/AsyncCloneRepository.java"
+engine_source = project_root / "app/src/main/java/com/veyravault/space/core/Engine.java"
+instrumentation_source = project_root / "app/src/androidTest/java/com/veyravault/space/core/NativeAbiPreflightInstrumentationTest.java"
+
+for path in (
+    policy_source, preflight_source, add_app_source,
+    async_repository_source, engine_source, instrumentation_source
+):
+    assert path.is_file(), f"Native ABI preflight implementation/test missing: {path}"
+
+policy = policy_source.read_text(encoding="utf-8")
+preflight = preflight_source.read_text(encoding="utf-8")
+add_app = add_app_source.read_text(encoding="utf-8")
+async_repository = async_repository_source.read_text(encoding="utf-8")
+engine = engine_source.read_text(encoding="utf-8")
+instrumentation = instrumentation_source.read_text(encoding="utf-8")
+
+assert "ApplicationInfo.splitSourceDirs" in preflight or "info.splitSourceDirs" in preflight
+assert "info.sourceDir" in preflight and "new ZipFile(sourcePath)" in preflight
+assert "Process.is64Bit()" in preflight
+assert 'Class.forName("dalvik.system.VMRuntime")' in preflight
+assert "CloneStore." not in preflight and "installPackageAsUser(" not in preflight
+assert "NativeAbiPreflight.inspectInstalledPackage(appContext, packageName)" in async_repository
+assert "enqueue(() -> NativeAbiPreflight.inspectInstalledPackage" in async_repository
+assert "repository.inspectNativeAbi(app.pkg" in add_app
+assert add_app.index("repository.inspectNativeAbi(app.pkg") < add_app.index("repository.reserveNextUserId(app.pkg"), (
+    "ABI preflight must complete before reserving a Clone ID"
+)
+assert "Engine.installPackageAsUser(this, entry.packageName, entry.userId, preflight)" in add_app
+assert "preflight.matchesInstalledPackage(context, pkg)" in engine
+assert engine.index("preflight.matchesInstalledPackage(context, pkg)") < engine.index(
+    'getMethod("installPackageAsUser", String.class, int.class)'
+), "Engine must revalidate the package fingerprint before installation"
+assert "NativeAbiPreflight.inspectInstalledPackage(ctx, entry.packageName)" in engine
+assert "NATIVE_ABI_PREFLIGHT_BLOCKED:" in engine
+assert "ALWAYS" not in policy  # guard against accidental placeholder implementation
+assert "REJECT_SPLIT_APK" in policy
+assert "REJECT_EXTRACTOR_ABI_MISSING" in policy
+assert "UNKNOWN_APK_METADATA" in policy
+assert "debugHarnessApkIsReadAsPureJava" in instrumentation
+assert "missingPackageMetadataFailsClosed" in instrumentation
+assert "matchesInstalledPackage" in instrumentation
+
+harness = r"""
+import com.veyravault.space.core.NativeAbiPolicy;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
+public final class NativeAbiPolicyContractTest {
+    private static Set<String> abis(String... values) {
+        return new HashSet<String>(Arrays.asList(values));
+    }
+
+    private static void expect(NativeAbiPolicy.Decision actual,
+                               NativeAbiPolicy.Decision expected, String label) {
+        if (actual != expected) {
+            throw new AssertionError(label + ": expected " + expected + " but got " + actual);
+        }
+    }
+
+    private static NativeAbiPolicy.Result evaluate(
+            Set<String> dirs, int splits, NativeAbiPolicy.HostBitness bitness,
+            String primary, boolean readable) {
+        return NativeAbiPolicy.evaluate(dirs, splits, bitness, primary, readable);
+    }
+
+    public static void main(String[] args) {
+        NativeAbiPolicy.HostBitness b32 = NativeAbiPolicy.HostBitness.BIT_32;
+        NativeAbiPolicy.HostBitness b64 = NativeAbiPolicy.HostBitness.BIT_64;
+        NativeAbiPolicy.HostBitness unknown = NativeAbiPolicy.HostBitness.UNKNOWN;
+
+        NativeAbiPolicy.Result pureJava = evaluate(Collections.<String>emptySet(), 0,
+                unknown, null, true);
+        expect(pureJava.getDecision(), NativeAbiPolicy.Decision.ALLOW_PURE_JAVA,
+                "pure-Java APK remains compatible without a known process bitness");
+        if (!pureJava.isAllowed()) throw new AssertionError("pure-Java APK must be allowed");
+
+        expect(evaluate(abis("arm64-v8a"), 0, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.ALLOW_ARM64, "ARM64-only APK on 64-bit ARM Engine");
+        expect(evaluate(abis("armeabi-v7a"), 0, b32, "armeabi-v7a", true).getDecision(),
+                NativeAbiPolicy.Decision.ALLOW_ARM32, "ARMv7-only APK on 32-bit ARM Engine");
+        expect(evaluate(abis("armeabi"), 0, b32, "armeabi-v7a", true).getDecision(),
+                NativeAbiPolicy.Decision.ALLOW_ARM32, "generic armeabi extractor fallback");
+        expect(evaluate(abis("arm64-v8a", "armeabi-v7a"), 0, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.ALLOW_ARM64, "dual ARM APK on 64-bit process");
+        expect(evaluate(abis("arm64-v8a", "armeabi-v7a"), 0, b32, "armeabi-v7a", true).getDecision(),
+                NativeAbiPolicy.Decision.ALLOW_ARM32, "dual ARM APK on 32-bit process");
+
+        expect(evaluate(abis("armeabi-v7a"), 0, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_HOST_BITNESS_MISMATCH,
+                "32-bit-only APK on 64-bit Engine process");
+        expect(evaluate(abis("arm64-v8a"), 0, b32, "armeabi-v7a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_HOST_BITNESS_MISMATCH,
+                "64-bit-only APK on 32-bit Engine process");
+        expect(evaluate(abis("arm64-v8a", "armeabi-v7a"), 0, b32, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_HOST_BITNESS_MISMATCH,
+                "process bitness disagrees with Build.CPU_ABI extractor selection");
+        expect(evaluate(abis("armeabi-v7a"), 0, b32, "armeabi", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_EXTRACTOR_ABI_MISSING,
+                "Engine extractor has no v7a fallback when primary ABI is generic armeabi");
+
+        expect(evaluate(abis("x86"), 0, b32, "armeabi-v7a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_UNSUPPORTED_NATIVE_ABI,
+                "x86-only APK on ARM host");
+        expect(evaluate(abis("x86_64"), 0, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_UNSUPPORTED_NATIVE_ABI,
+                "x86_64-only APK on ARM host");
+        expect(evaluate(abis("arm64-v8a"), 0, b64, "x86_64", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_UNSUPPORTED_HOST_ABI,
+                "unsupported x86_64 host architecture");
+        expect(evaluate(abis("riscv64"), 0, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_UNSUPPORTED_NATIVE_ABI,
+                "unknown native ABI must not be treated as pure Java");
+
+        expect(evaluate(Collections.<String>emptySet(), 1, b64, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.REJECT_SPLIT_APK,
+                "split package is blocked even when base is pure Java");
+        expect(evaluate(null, 0, unknown, null, false).getDecision(),
+                NativeAbiPolicy.Decision.UNKNOWN_APK_METADATA,
+                "unreadable APK fails closed");
+        expect(evaluate(abis("arm64-v8a"), 0, unknown, "arm64-v8a", true).getDecision(),
+                NativeAbiPolicy.Decision.UNKNOWN_HOST_BITNESS,
+                "unknown process bitness fails closed for native APK");
+
+        if (NativeAbiPolicy.bitnessForAbi("arm64-v8a") != b64
+                || NativeAbiPolicy.bitnessForAbi("armeabi-v7a") != b32
+                || NativeAbiPolicy.bitnessForAbi("unknown") != unknown) {
+            throw new AssertionError("ABI bitness classification changed");
+        }
+
+        System.out.println("PASS: NativeAbiPolicy production Java decision matrix.");
+        System.out.println("PASS: pure-Java, ARM32/ARM64, x86, split, unreadable and unknown cases.");
+        System.out.println("PASS: Extractor-primary ABI and process-bitness mismatches fail closed.");
+    }
+}
+"""
+
+with tempfile.TemporaryDirectory(prefix="veyravault-native-abi-policy-") as temp:
+    temp_path = Path(temp)
+    harness_path = temp_path / "NativeAbiPolicyContractTest.java"
+    harness_path.write_text(harness, encoding="utf-8")
+    compile_result = subprocess.run(
+        ["javac", "-encoding", "UTF-8", "-d", str(temp_path),
+         str(policy_source), str(harness_path)],
+        cwd=project_root, text=True, capture_output=True
+    )
+    if compile_result.returncode != 0:
+        raise SystemExit(compile_result.stdout + compile_result.stderr)
+    run_result = subprocess.run(
+        ["java", "-cp", str(temp_path), "NativeAbiPolicyContractTest"],
+        cwd=project_root, text=True, capture_output=True
+    )
+    if run_result.returncode != 0:
+        raise SystemExit(run_result.stdout + run_result.stderr)
+    print(run_result.stdout, end="")
