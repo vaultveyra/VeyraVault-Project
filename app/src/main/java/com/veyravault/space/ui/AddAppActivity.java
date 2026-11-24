@@ -295,6 +295,10 @@ public class AddAppActivity extends BaseActivity {
                     callback.onComplete(false);
                     return;
                 }
+                if (isFinishing() || isDestroyed()) {
+                    callback.onComplete(false);
+                    return;
+                }
                 reserveAndInstallApp(app, callback, preflight);
             }
         });
