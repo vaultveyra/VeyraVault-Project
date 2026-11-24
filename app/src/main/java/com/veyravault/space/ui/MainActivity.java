@@ -704,64 +704,32 @@ public class MainActivity extends BaseActivity {
         actionGrid.addView(makeSheetActionBtn("⏻", getString(R.string.stop_app), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                EngineOperationQueue.submit(() -> {
-                    Engine.stopClone(item.packageName, item.userId);
-                    return Boolean.TRUE;
-                }, (ignored, failure) -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    Toast.makeText(MainActivity.this,
-                            failure == null
-                                    ? (fa ? "درخواست توقف برنامه ارسال شد." : "Clone stop request was submitted.")
-                                    : (fa ? "ارسال درخواست توقف ناموفق بود." : "Clone stop request failed."),
-                            Toast.LENGTH_SHORT).show();
-                });
+                EngineOperationQueue.submit(
+                        () -> Engine.stopClone(item.packageName, item.userId),
+                        (dispatched, failure) -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            boolean accepted = failure == null && Boolean.TRUE.equals(dispatched);
+                            Toast.makeText(MainActivity.this,
+                                    accepted
+                                            ? (fa ? "درخواست توقف به موتور تحویل شد؛ پایان فرایند قابل تأیید نیست."
+                                                  : "The stop request reached the Engine; process termination is not verified.")
+                                            : (fa ? "ارسال درخواست توقف ناموفق بود." : "Clone stop request could not be submitted."),
+                                    Toast.LENGTH_LONG).show();
+                        });
             }
         }));
 
         actionGrid.addView(makeSheetActionBtn("🧹", getString(R.string.clear_data), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                EngineOperationQueue.submit(() -> {
-                    Engine.clearCloneData(item.packageName, item.userId);
-                    return Boolean.TRUE;
-                }, (ignored, failure) -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    Toast.makeText(MainActivity.this,
-                            failure == null
-                                    ? (fa ? "درخواست پاکسازی دادهٔ کلون ارسال شد." : "Clone data-clear request was submitted.")
-                                    : (fa ? "ارسال درخواست پاکسازی ناموفق بود." : "Clone data-clear request failed."),
-                            Toast.LENGTH_LONG).show();
-                });
+                confirmClearCloneData(item);
             }
         }));
 
         actionGrid.addView(makeSheetActionBtn("🗑️", getString(R.string.uninstall), btnW, new View.OnClickListener() {
             @Override public void onClick(View v) {
                 sheet.dismiss();
-                EngineOperationQueue.submit(
-                        () -> Engine.uninstallClone(item.packageName, item.userId),
-                        (removed, engineFailure) -> {
-                            if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
-                                if (!isFinishing() && !isDestroyed()) {
-                                    Toast.makeText(MainActivity.this,
-                                            fa ? "حذف کلون از موتور تأیید نشد؛ رکورد فضا حفظ شد."
-                                               : "The engine did not confirm uninstall; the Space record was preserved.",
-                                            Toast.LENGTH_LONG).show();
-                                }
-                                return;
-                            }
-                            // Complete the Registry transaction even if the Activity has closed.
-                            repository.removeClone(item.packageName, item.userId, result -> {
-                                if (isFinishing() || isDestroyed()) return;
-                                if (!result.isSuccess()) {
-                                    Toast.makeText(MainActivity.this,
-                                            fa ? "برنامه حذف شد، اما ثبت حذف در فهرست ناموفق بود."
-                                               : "The app was uninstalled, but removing its registry entry failed.",
-                                            Toast.LENGTH_LONG).show();
-                                }
-                                refreshSpaces();
-                            });
-                        });
+                confirmUninstallClone(item);
             }
         }));
 
@@ -830,6 +798,93 @@ public class MainActivity extends BaseActivity {
                        : ("Clone duplicated into Space " + outcome.clone.getSpaceNumber() + "."),
                     Toast.LENGTH_SHORT).show();
         });
+    }
+
+    private void confirmClearCloneData(final CloneStore.CloneEntry item) {
+        new AlertDialog.Builder(this)
+                .setTitle(fa ? "پاک‌سازی دائمی داده‌های Clone؟" : "Permanently clear Clone data?")
+                .setMessage(fa
+                        ? "این عملیات قابل بازگشت نیست. داده‌های داخلی برنامه، پایگاه‌های داده، تنظیمات، فایل‌های اختصاصی و مسیر Android/data برای همین برنامه و همین Space حذف می‌شوند. اطلاعات ورود و نشست‌های ذخیره‌شده در این داده‌ها نیز ممکن است از بین بروند. این عملیات APK و رکورد فهرست Clone را حذف نمی‌کند. موتور نتیجهٔ کامل حذف فایل‌ها را گزارش نمی‌کند؛ پیش از ادامه از داده‌های ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
+                        : "This action cannot be undone. It removes this app's private data, databases, preferences, app-specific files, and its Android/data directory for this package and Space. Saved sign-ins and sessions stored there may be lost. It does not uninstall the APK or remove the Clone registry entry. The Engine does not report complete file-cleanup verification; make an independent backup of anything important before continuing.")
+                .setNegativeButton(fa ? "انصراف" : "Cancel", null)
+                .setPositiveButton(fa ? "پاک‌سازی داده‌ها" : "Clear Clone data", (dialog, which) -> {
+                    EngineOperationQueue.submit(
+                            () -> Engine.clearCloneData(item.packageName, item.userId),
+                            (dispatched, failure) -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                boolean accepted = failure == null && Boolean.TRUE.equals(dispatched);
+                                Toast.makeText(MainActivity.this,
+                                        accepted
+                                                ? (fa ? "درخواست به موتور تحویل شد؛ تکمیل پاک‌سازی فایل‌ها قابل تأیید نیست."
+                                                      : "The request reached the Engine; completion of file cleanup cannot be verified.")
+                                                : (fa ? "ارسال درخواست پاک‌سازی ناموفق بود؛ داده‌ها از طرف رابط تغییر نکردند."
+                                                       : "The clear-data request could not be submitted; the UI made no data changes."),
+                                        Toast.LENGTH_LONG).show();
+                            });
+                })
+                .show();
+    }
+
+    private void confirmUninstallClone(final CloneStore.CloneEntry item) {
+        new AlertDialog.Builder(this)
+                .setTitle(fa ? "حذف دائمی Clone؟" : "Permanently uninstall this Clone?")
+                .setMessage(fa
+                        ? "برنامهٔ مجازی از این Space حذف می‌شود و داده‌های اختصاصی آن، از جمله اطلاعات ورود، نشست‌ها، پایگاه‌های داده و فایل‌های Android/data ممکن است برای همیشه از دست بروند. حذف برنامه با پاک‌سازی مستقل و تأییدشدهٔ همهٔ فایل‌ها یکسان نیست. این عملیات قابل بازگشت نیست؛ پیش از ادامه از اطلاعات ضروری نسخهٔ پشتیبان مستقل تهیه کنید."
+                        : "The virtual app will be removed from this Space. Its private data, including sign-ins, sessions, databases, and Android/data files, may be permanently lost. Engine uninstall confirmation does not independently verify secure removal of every data file. This cannot be undone; make an independent backup of important information before continuing.")
+                .setNegativeButton(fa ? "انصراف" : "Cancel", null)
+                .setPositiveButton(fa ? "حذف Clone" : "Uninstall Clone", (dialog, which) -> {
+                    EngineOperationQueue.submit(
+                            () -> Engine.uninstallClone(item.packageName, item.userId),
+                            (removed, engineFailure) -> {
+                                if (engineFailure != null || !Boolean.TRUE.equals(removed)) {
+                                    if (!isFinishing() && !isDestroyed()) {
+                                        Toast.makeText(MainActivity.this,
+                                                fa ? "حذف از موتور تأیید نشد؛ رکورد فضا حفظ شد."
+                                                   : "Engine uninstall was not confirmed; the Space record was preserved.",
+                                                Toast.LENGTH_LONG).show();
+                                    }
+                                    return;
+                                }
+                                // Complete the Registry transaction even if the Activity has closed.
+                                repository.removeClone(item.packageName, item.userId, result -> {
+                                    if (isFinishing() || isDestroyed()) return;
+                                    if (!result.isSuccess()) {
+                                        Toast.makeText(MainActivity.this,
+                                                fa ? "برنامه از موتور حذف شد، اما ثبت حذف در فهرست ناموفق بود."
+                                                   : "The Engine reports the app absent, but the registry update failed.",
+                                                Toast.LENGTH_LONG).show();
+                                    }
+                                    refreshSpaces();
+                                });
+                            });
+                })
+                .show();
+    }
+
+    private void confirmBatchUninstall(final List<CloneStore.CloneEntry> all,
+                                       final boolean[] checked, int selectedCount) {
+        StringBuilder targets = new StringBuilder();
+        for (int i = 0; i < all.size(); i++) {
+            if (!checked[i]) continue;
+            CloneStore.CloneEntry entry = all.get(i);
+            if (targets.length() > 0) targets.append("\n");
+            targets.append("• ").append(entry.displayName == null || entry.displayName.trim().isEmpty()
+                    ? entry.packageName : entry.displayName)
+                    .append(" — ").append(fa ? "فضای " : "Space ").append(entry.getSpaceNumber());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(fa ? "تأیید نهایی حذف گروهی" : "Final confirmation for batch uninstall")
+                .setMessage((fa
+                        ? ("تعداد " + selectedCount + " کلون انتخاب شده است. حذف برنامه‌ها و داده‌های اختصاصی آن‌ها از جمله ورودها، نشست‌ها و فایل‌های محلی ممکن است دائمی باشد. موتور حذف کامل همهٔ فایل‌ها را مستقلاً تأیید نمی‌کند. این عملیات قابل بازگشت نیست.\n\n")
+                        : (selectedCount + " Clones are selected. Their app data, including sign-ins, sessions, databases, and local files, may be permanently lost. The Engine does not independently verify complete deletion of every data file. This action cannot be undone.\n\n"))
+                        + targets)
+                .setNegativeButton(fa ? "انصراف" : "Cancel", null)
+                .setPositiveButton(fa ? "تأیید حذف همه" : "Confirm uninstall", (dialog, which) -> {
+                    Toast.makeText(this, fa ? "حذف گروهی آغاز شد..." : "Batch uninstall started...",
+                            Toast.LENGTH_SHORT).show();
+                    runBatchUninstall(all, checked, 0, new int[]{0, 0, 0});
+                })
+                .show();
     }
 
     private void showRenameDialog(final CloneStore.CloneEntry item) {
@@ -983,16 +1038,14 @@ public class MainActivity extends BaseActivity {
                         int selected = 0;
                         for (boolean value : checked) if (value) selected++;
                         if (selected == 0) return;
-                        Toast.makeText(this, fa ? "حذف گروهی آغاز شد..." : "Batch uninstall started...", Toast.LENGTH_SHORT).show();
-                        runBatchUninstall(all, checked, 0, new int[]{0, 0, 0});
+                        confirmBatchUninstall(all, checked, selected);
                     })
                     .setNegativeButton(fa ? "انصراف" : "Cancel", null)
                     .show();
         });
     }
 
-    // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
-    // Counts: [confirmed removals, engine uninstall failures, registry commit failures].
+    // Counts: [Engine-confirmed absences, Engine uninstall failures, registry commit failures].
     private void runBatchUninstall(List<CloneStore.CloneEntry> all, boolean[] checked,
                                    int index, int[] counts) {
         if (isFinishing() || isDestroyed()) return;

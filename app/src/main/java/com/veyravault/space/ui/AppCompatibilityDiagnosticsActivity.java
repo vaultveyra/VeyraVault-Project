@@ -2,8 +2,6 @@ package com.veyravault.space.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -14,15 +12,12 @@ import com.veyravault.space.core.AsyncCloneRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.CompatibilityManager;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.EngineOperationQueue;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /** Read-only per-Clone diagnostic snapshots with an explicit share action. */
 public final class AppCompatibilityDiagnosticsActivity extends BaseActivity {
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService diagnosticsWorker = Executors.newSingleThreadExecutor();
     private LinearLayout cloneList;
     private TextView reportView;
     private Button shareButton;
@@ -131,23 +126,20 @@ public final class AppCompatibilityDiagnosticsActivity extends BaseActivity {
         currentReport = null;
         shareButton.setEnabled(false);
         reportView.setText(fa ? "در حال جمع‌آوری اطلاعات فقط‌خواندنی..." : "Collecting read-only diagnostics...");
-        diagnosticsWorker.execute(() -> {
-            String report;
-            try {
-                report = CompatibilityManager.formatCloneReport(getApplicationContext(), clone);
-            } catch (Throwable failure) {
-                report = "VeyraVault diagnostic generation failed: "
-                        + failure.getClass().getSimpleName()
-                        + "\nNo Clone data or settings were changed.";
-            }
-            final String completedReport = report;
-            mainHandler.post(() -> {
-                if (destroyed || isFinishing() || isDestroyed()) return;
-                currentReport = completedReport;
-                reportView.setText(completedReport);
-                shareButton.setEnabled(!completedReport.trim().isEmpty());
-            });
-        });
+        EngineOperationQueue.submit(
+                () -> CompatibilityManager.formatCloneReport(getApplicationContext(), clone),
+                (completedReport, failure) -> {
+                    if (destroyed || isFinishing() || isDestroyed()) return;
+                    String report = completedReport;
+                    if (failure != null || report == null) {
+                        report = "VeyraVault diagnostic generation failed: "
+                                + (failure == null ? "UNKNOWN" : failure.getClass().getSimpleName())
+                                + "\nNo Clone data or settings were changed.";
+                    }
+                    currentReport = report;
+                    reportView.setText(report);
+                    shareButton.setEnabled(!report.trim().isEmpty());
+                });
     }
 
     private void shareCurrentReport() {
@@ -162,7 +154,6 @@ public final class AppCompatibilityDiagnosticsActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         destroyed = true;
-        diagnosticsWorker.shutdownNow();
         super.onDestroy();
     }
 

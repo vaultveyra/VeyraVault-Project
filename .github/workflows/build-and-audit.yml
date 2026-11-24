@@ -79,6 +79,9 @@ jobs:
       - name: Test serialized asynchronous Clone provisioning contract
         run: python3 scripts/test_async_clone_provision_contract.py
 
+      - name: Test Stage 8.24 destructive safety and serialized Engine diagnostics
+        run: python3 scripts/test_stage_8_24_destructive_safety_engine_queue.py
+
       - name: Test async location persistence UI contract
         run: python3 scripts/test_location_persistence_ui_contract.py
 

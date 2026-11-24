@@ -372,27 +372,46 @@ public class Engine {
         return launchCloneDetailed(ctx, entry).launched;
     }
 
-    public static void stopClone(String pkg, int userId) {
+    /**
+     * Returns true only when a supported stop method was invoked without a reflection error.
+     * The pinned Engine API does not expose a verified process-termination result.
+     */
+    public static boolean stopClone(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
         try {
             Object core = getCore();
-            if (core == null) return;
-            for (Method m : core.getClass().getMethods()) {
-                if ((m.getName().equals("stopPackage") || m.getName().equals("killApplication"))
-                        && m.getParameterTypes().length == 2) {
-                    m.invoke(core, pkg, userId);
-                    return;
+            if (core == null) return false;
+            for (Method method : core.getClass().getMethods()) {
+                if ((method.getName().equals("stopPackage") || method.getName().equals("killApplication"))
+                        && method.getParameterTypes().length == 2
+                        && method.getParameterTypes()[0] == String.class
+                        && method.getParameterTypes()[1] == int.class) {
+                    method.invoke(core, pkg, userId);
+                    return true;
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            return false;
+        }
+        return false;
     }
 
-    public static void clearCloneData(String pkg, int userId) {
+    /**
+     * Returns true only when clearPackage was invoked without a reflection error.
+     * The pinned upstream API returns void and suppresses its internal file-operation result;
+     * true therefore means "request dispatched", never "all data files verified deleted".
+     */
+    public static boolean clearCloneData(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
         try {
             Object core = getCore();
-            if (core == null) return;
-            Method m = core.getClass().getMethod("clearPackage", String.class, int.class);
-            m.invoke(core, pkg, userId);
-        } catch (Throwable ignored) {}
+            if (core == null) return false;
+            Method method = core.getClass().getMethod("clearPackage", String.class, int.class);
+            method.invoke(core, pkg, userId);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public static boolean uninstallClone(String pkg, int userId) {

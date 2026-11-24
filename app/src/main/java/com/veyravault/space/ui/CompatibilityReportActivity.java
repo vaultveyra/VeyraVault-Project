@@ -1,7 +1,5 @@
 package com.veyravault.space.ui;
 
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -10,13 +8,17 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.veyravault.space.core.CompatibilityManager;
+import com.veyravault.space.core.EngineOperationQueue;
 import com.veyravault.space.core.LocaleHelper;
 
 public class CompatibilityReportActivity extends BaseActivity {
+    private LinearLayout diagnosticsRows;
+    private boolean fa;
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        boolean fa = LocaleHelper.isPersian(this);
+        fa = LocaleHelper.isPersian(this);
         int ink = UiPalette.textPrimary(getApplicationContext());
         int muted = UiPalette.textSecondary(getApplicationContext());
         LinearLayout root = new LinearLayout(this);
@@ -26,7 +28,7 @@ public class CompatibilityReportActivity extends BaseActivity {
         TextView title = new TextView(this);
         title.setText(fa ? "گزارش سازگاری" : "Compatibility report");
         title.setTextSize(22);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         title.setTextColor(ink);
         root.addView(title);
 
@@ -39,19 +41,14 @@ public class CompatibilityReportActivity extends BaseActivity {
         intro.setPadding(0, 16, 0, 24);
         root.addView(intro);
 
-        for (CompatibilityManager.CheckItem item : CompatibilityManager.collect(this)) {
-            TextView row = new TextView(this);
-            String status = item.status.name();
-            row.setText(item.key.toUpperCase() + "  •  " + status + "\n" + item.detail);
-            row.setTextSize(14);
-            row.setTextColor(ink);
-            row.setPadding(24, 20, 24, 20);
-            row.setBackgroundColor(UiPalette.surfaceSecondary(getApplicationContext()));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = 16;
-            root.addView(row, lp);
-        }
+        diagnosticsRows = new LinearLayout(this);
+        diagnosticsRows.setOrientation(LinearLayout.VERTICAL);
+        TextView loading = new TextView(this);
+        loading.setText(fa ? "در حال بررسی وضعیت سازگاری..." : "Checking compatibility status...");
+        loading.setTextSize(14);
+        loading.setTextColor(ink);
+        diagnosticsRows.addView(loading);
+        root.addView(diagnosticsRows);
 
         Button cloneDiagnostics = new Button(this);
         cloneDiagnostics.setAllCaps(false);
@@ -73,5 +70,39 @@ public class CompatibilityReportActivity extends BaseActivity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(root);
         setContentView(scroll);
+        loadCompatibilitySnapshot(ink);
+    }
+
+    private void loadCompatibilitySnapshot(final int ink) {
+        EngineOperationQueue.submit(
+                () -> CompatibilityManager.collect(getApplicationContext()),
+                (items, failure) -> {
+                    if (isFinishing() || isDestroyed() || diagnosticsRows == null) return;
+                    diagnosticsRows.removeAllViews();
+                    if (failure != null || items == null) {
+                        TextView error = new TextView(this);
+                        error.setText(fa
+                                ? "خواندن وضعیت سازگاری ناموفق بود؛ هیچ تغییری اعمال نشد."
+                                : "Compatibility diagnostics could not be read; no changes were made.");
+                        error.setTextSize(14);
+                        error.setTextColor(ink);
+                        diagnosticsRows.addView(error);
+                        return;
+                    }
+                    for (CompatibilityManager.CheckItem item : items) {
+                        TextView row = new TextView(this);
+                        String status = item.status.name();
+                        row.setText(item.key.toUpperCase(java.util.Locale.ROOT)
+                                + "  •  " + status + "\n" + item.detail);
+                        row.setTextSize(14);
+                        row.setTextColor(ink);
+                        row.setPadding(24, 20, 24, 20);
+                        row.setBackgroundColor(UiPalette.surfaceSecondary(getApplicationContext()));
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        lp.bottomMargin = 16;
+                        diagnosticsRows.addView(row, lp);
+                    }
+                });
     }
 }

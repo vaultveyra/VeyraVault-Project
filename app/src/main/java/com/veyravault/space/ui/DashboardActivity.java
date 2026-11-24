@@ -27,19 +27,17 @@ import com.veyravault.space.core.ProfileResolver;
 import com.veyravault.space.core.ProfileRuntimeApplier;
 import com.veyravault.space.core.DashboardDateFormatter;
 import com.veyravault.space.core.Engine;
+import com.veyravault.space.core.EngineOperationQueue;
 import com.veyravault.space.security.VaultDeviceAdminReceiver;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class DashboardActivity extends BaseActivity {
     private final Handler dateRefreshHandler = new Handler(Looper.getMainLooper());
     private final List<Runnable> dateRefreshTasks = new ArrayList<>();
-    private final ExecutorService dashboardStatusExecutor = Executors.newSingleThreadExecutor();
     private int dashboardStatusGeneration;
     private TextView platformSecuritySummary;
 
@@ -68,7 +66,6 @@ public class DashboardActivity extends BaseActivity {
 
     @Override protected void onDestroy() {
         dashboardStatusGeneration++;
-        dashboardStatusExecutor.shutdownNow();
         for (Runnable task : dateRefreshTasks) dateRefreshHandler.removeCallbacks(task);
         dateRefreshTasks.clear();
         super.onDestroy();
@@ -296,13 +293,13 @@ public class DashboardActivity extends BaseActivity {
     }
 
     private void refreshReadOnlyPlatformStatus() {
-        if (platformSecuritySummary == null || dashboardStatusExecutor.isShutdown()) return;
+        if (platformSecuritySummary == null) return;
         final int generation = ++dashboardStatusGeneration;
         final Context appContext = getApplicationContext();
         final boolean fa = LocaleHelper.isPersian(this);
 
-        // Engine reflection and Android system-service reads stay off the UI thread.
-        dashboardStatusExecutor.execute(() -> {
+        // Security, system-service, and Engine status reads share one background queue.
+        EngineOperationQueue.submit(() -> {
             String appLockState;
             try {
                 boolean lockEnabled = com.veyravault.space.security.SecurityManager
@@ -337,7 +334,7 @@ public class DashboardActivity extends BaseActivity {
                               : "Core detected; full readiness is not verified")
                         : (fa ? "Core شناسایی نشد" : "Core not detected");
             } catch (RuntimeException failure) {
-                engineCoreState = fa ? "وضعیت Core در دسترس نیست"
+                engineCoreState = fa ? "وضعیت در دسترس نیست"
                         : "Core status unavailable";
             }
 
@@ -350,19 +347,23 @@ public class DashboardActivity extends BaseActivity {
                         : "Callback status unavailable";
             }
 
-            final String summary = (fa ? "قفل برنامه: " : "App lock: ") + appLockState
+            return (fa ? "قفل برنامه: " : "App lock: ") + appLockState
                     + (fa ? "\nمدیر دستگاه Android: " : "\nAndroid Device Admin: ") + deviceAdminState
                     + (fa ? "\nوضعیت Core موتور: " : "\nEngine Core: ") + engineCoreState
                     + (fa ? "\nچرخه عمر پروفایل Clone: " : "\nClone profile lifecycle: ")
                     + profileLifecycleState
                     + (fa ? "\nاین بخش فقط وضعیت را می‌خواند و هیچ تنظیم امنیتی را تغییر نمی‌دهد."
                           : "\nThis panel is read-only and does not change security settings.");
-
+        }, (summary, failure) -> {
+            final String display = failure == null && summary != null
+                    ? summary
+                    : (fa ? "خواندن وضعیت تشخیصی ناموفق بود؛ هیچ تغییری اعمال نشد."
+                          : "Diagnostic status could not be read; no changes were made.");
             dateRefreshHandler.post(() -> {
                 if (isFinishing() || isDestroyed()
                         || generation != dashboardStatusGeneration
                         || platformSecuritySummary == null) return;
-                platformSecuritySummary.setText(summary);
+                platformSecuritySummary.setText(display);
             });
         });
     }
