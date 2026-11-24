@@ -291,7 +291,7 @@ public class AddAppActivity extends BaseActivity {
                 final NativeAbiPreflight.Result preflight = inspection.getValue();
                 if (!preflight.isAllowed()) {
                     showCloneError(preflight.getUserMessage(fa)
-                            + "\\n[" + preflight.getDiagnosticCode() + "]");
+                            + "\n[" + preflight.getDiagnosticCode() + "]");
                     callback.onComplete(false);
                     return;
                 }
