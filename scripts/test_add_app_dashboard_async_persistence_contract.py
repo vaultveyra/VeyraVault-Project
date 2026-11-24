@@ -8,10 +8,14 @@ dashboard = (root / "app/src/main/java/com/veyravault/space/ui/DashboardActivity
 for forbidden in ("CloneStore.nextFreeUserIdForPackage(", "CloneStore.upsertClone(", "CloneStore.getAll(",
                   "repository.allocateNextUserId", "repository.upsertClone(entry"):
     assert forbidden not in add_app, f"Unsafe/direct persistence call remains in AddAppActivity: {forbidden}"
-assert "repository.reserveNextUserId(app.pkg" in add_app
-assert "repository.commitReservedClone(entry, reservation" in add_app
-assert add_app.index("repository.reserveNextUserId(app.pkg") < add_app.index("Engine.installPackageAsUser(entry.packageName, entry.userId)")
-assert add_app.index("Engine.installPackageAsUser(entry.packageName, entry.userId)") < add_app.index("repository.commitReservedClone(entry")
+add_clone = add_app[add_app.index("private void cloneSingleApp("):
+                   add_app.index("private void releaseReservationAfterConfirmedEngineAbsence(")]
+assert "repository.inspectNativeAbi(app.pkg" in add_clone
+assert "repository.reserveNextUserId(app.pkg" in add_clone
+assert add_clone.index("repository.inspectNativeAbi(app.pkg") < add_clone.index("repository.reserveNextUserId(app.pkg")
+assert "Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)" in add_clone
+assert add_clone.index("Engine.installPackageAsUser(AddAppActivity.this, entry.packageName, entry.userId, preflight)") < add_clone.index("repository.commitReservedClone(entry")
+
 assert "Engine.isCloneConfirmedAbsent" in add_app
 assert "repository.releaseReservationAfterEngineAbsence" in add_app
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in add_app
