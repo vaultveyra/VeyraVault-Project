@@ -24,15 +24,21 @@ assert "Engine.launchClone(this, entry)" not in shortcut
 duplicate_start = source.index('makeSheetActionBtn("⊞+"')
 duplicate_end = source.index('makeSheetActionBtn("📱"', duplicate_start)
 duplicate = source[duplicate_start:duplicate_end]
-assert "repository.reserveNextUserId" in duplicate
-assert "Engine.installPackageAsUser" in duplicate
-assert "repository.commitReservedClone(copy, reservation" in duplicate
-assert duplicate.index("Engine.installPackageAsUser") < duplicate.index("repository.commitReservedClone(copy")
-assert "Engine.uninstallClone(copy.packageName, copy.userId)" in duplicate
-assert "releaseReservationIfEngineAbsent(reservation)" in duplicate
+assert "duplicateCloneWithPreflight(item);" in duplicate
+clone_creation = source[source.index("private void duplicateCloneWithPreflight("):
+                        source.index("private void showRenameDialog(")]
+assert "repository.inspectNativeAbi(item.packageName" in clone_creation
+assert "repository.reserveNextUserId(item.packageName" in clone_creation
+assert clone_creation.index("repository.inspectNativeAbi(item.packageName") < clone_creation.index("repository.reserveNextUserId(item.packageName")
+assert "Engine.installPackageAsUser(MainActivity.this," in clone_creation
+assert "copy.packageName, copy.userId, preflight)" in clone_creation
+assert "repository.commitReservedClone(copy, reservation" in clone_creation
+assert clone_creation.index("Engine.installPackageAsUser(MainActivity.this,") < clone_creation.index("repository.commitReservedClone(copy")
+assert "Engine.uninstallClone(copy.packageName, copy.userId)" in clone_creation
+assert "releaseReservationIfEngineAbsent(reservation)" in clone_creation
 assert "repository.allocateNextUserId" not in source
-assert duplicate.index("if (!save.isSuccess())") < duplicate.index("Engine.uninstallClone(copy.packageName, copy.userId)")
-save_callback = duplicate[duplicate.index("repository.commitReservedClone(copy"):]
+assert clone_creation.index("if (!save.isSuccess())") < clone_creation.index("Engine.uninstallClone(copy.packageName, copy.userId)")
+save_callback = clone_creation[clone_creation.index("repository.commitReservedClone(copy"):]
 assert save_callback.index("if (!save.isSuccess())") < save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)")
 assert save_callback.index("Engine.uninstallClone(copy.packageName, copy.userId)") < save_callback.index("if (!isFinishing() && !isDestroyed())")
 
