@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import sys, zipfile, re
+import sys, zipfile, re, os, shutil, subprocess, tempfile
 from collections import Counter
 
 from audit_native_elf import NativeElfError, validate_native_libraries
@@ -64,6 +64,56 @@ def validate_meta_inf_entries(archive):
     return meta_inf_entries
 
 
+def verify_neon_probe_elf(archive):
+    """Require both helper ABIs and prove the ARMv7 probe itself does not use NEON."""
+    required = (
+        "lib/armeabi-v7a/libveyra_neon_probe.so",
+        "lib/arm64-v8a/libveyra_neon_probe.so",
+    )
+    names = set(archive.namelist())
+    missing = [path for path in required if path not in names]
+    if missing:
+        raise ValueError("Missing pre-Engine CPU probe libraries: " + ", ".join(missing))
+
+    readelf = shutil.which("readelf") or shutil.which("llvm-readelf")
+    if not readelf:
+        raise ValueError("readelf is required to verify ARMv7 probe instruction attributes")
+
+    with tempfile.TemporaryDirectory(prefix="veyra-neon-audit-") as directory:
+        def attributes(path, filename):
+            target = os.path.join(directory, filename)
+            with open(target, "wb") as output:
+                output.write(archive.read(path))
+            result = subprocess.run(
+                [readelf, "-A", target],
+                text=True, capture_output=True, check=False
+            )
+            if result.returncode != 0:
+                raise ValueError("Could not inspect ARM ELF attributes for " + path)
+            return result.stdout + result.stderr
+
+        engine = attributes("lib/armeabi-v7a/libblackbox.so", "engine-armv7.so")
+        probe = attributes(required[0], "probe-armv7.so")
+        engine_lines = [line.strip() for line in engine.splitlines()]
+        probe_lines = [line.strip() for line in probe.splitlines()]
+
+        if "Tag_CPU_arch: v7" not in engine_lines:
+            raise ValueError("Engine ARMv7 ELF CPU architecture metadata is missing")
+        if not any(line.startswith("Tag_Advanced_SIMD_arch: NEON") for line in engine_lines):
+            raise ValueError("Pinned Engine ARMv7 NEON requirement changed; re-review the runtime gate")
+
+        if "Tag_CPU_arch: v7" not in probe_lines:
+            raise ValueError("ARMv7 probe ELF CPU architecture metadata is missing")
+        for line in probe_lines:
+            if line.startswith("Tag_Advanced_SIMD_arch:"):
+                value = line.split(":", 1)[1].strip().lower()
+                if value not in ("none", "0", "not permitted"):
+                    raise ValueError("ARMv7 preflight probe unexpectedly contains NEON instructions: " + value)
+
+    print("ARMv7 Engine library declares NEON.")
+    print("Independent ARMv7 preflight probe is built without NEON.")
+
+
 def audit(apk_path, min_api=21):
     print("=== VEYRAVAULT STAGE-2 COMPILED APK AUDIT: {} ===".format(apk_path))
     with zipfile.ZipFile(apk_path, 'r') as z:
@@ -81,6 +131,10 @@ def audit(apk_path, min_api=21):
             native_results = validate_native_libraries(z, min_api)
         except NativeElfError as exc:
             raise SystemExit("APK native ELF audit failed: {}".format(exc))
+        try:
+            verify_neon_probe_elf(z)
+        except (ValueError, OSError) as exc:
+            raise SystemExit("APK NEON preflight audit failed: {}".format(exc))
         print("Native ELF ABI / API compatibility (application minSdk {}):".format(min_api))
         for path, label, metadata in native_results:
             print("  [NATIVE-ELF] {}: {}, Android API {}, NDK {} ({})".format(

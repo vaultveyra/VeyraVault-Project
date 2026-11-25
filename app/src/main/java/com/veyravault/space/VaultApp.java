@@ -7,6 +7,8 @@ import android.util.Log;
 import com.veyravault.space.core.AsyncLocationHookRepository;
 import com.veyravault.space.core.AppearanceManager;
 import com.veyravault.space.core.Engine;
+import com.veyravault.space.core.HostCpuCompatibility;
+import com.veyravault.space.core.NativeAbiPolicy;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileStore;
 import com.veyravault.space.core.ProfileRuntimeApplier;
@@ -22,7 +24,15 @@ public class VaultApp extends Application {
         Context localized = LocaleHelper.applyLocale(base);
         super.attachBaseContext(localized);
         instance = this;
-        Engine.doAttachBaseContext(this, localized);
+
+        // Run before Engine initialization: NativeCore loads libblackbox.so during startup.
+        NativeAbiPolicy.Result hostCompatibility = HostCpuCompatibility.initialize();
+        if (hostCompatibility.isAllowed()) {
+            Engine.doAttachBaseContext(this, localized);
+        } else {
+            Log.e(TAG, "Engine startup blocked by host CPU preflight: "
+                    + hostCompatibility.getDiagnosticCode());
+        }
     }
 
     @Override

@@ -83,6 +83,11 @@ public final class NativeAbiPreflight {
         if (app == null || packageName == null || packageName.trim().isEmpty())
             return unknown(packageName, null);
 
+        // Host Engine compatibility applies even when the target APK is pure Java.
+        NativeAbiPolicy.Result hostCompatibility = HostCpuCompatibility.initialize();
+        if (!hostCompatibility.isAllowed())
+            return new Result(packageName, null, hostCompatibility);
+
         try {
             ApplicationInfo info = getApplicationInfo(app.getPackageManager(), packageName);
             if (info == null || info.sourceDir == null || info.sourceDir.trim().isEmpty())

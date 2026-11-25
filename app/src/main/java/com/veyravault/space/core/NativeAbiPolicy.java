@@ -25,7 +25,10 @@ public final class NativeAbiPolicy {
         REJECT_EXTRACTOR_ABI_MISSING,
         REJECT_UNSUPPORTED_NATIVE_ABI,
         UNKNOWN_HOST_BITNESS,
-        UNKNOWN_APK_METADATA
+        UNKNOWN_APK_METADATA,
+        REJECT_UNSUPPORTED_ENGINE_HOST_ABI,
+        REJECT_ARMV7_NEON_UNSUPPORTED,
+        UNKNOWN_ARMV7_NEON_CAPABILITY
     }
 
     public static final class Result {
@@ -79,6 +82,18 @@ public final class NativeAbiPolicy {
                     return persian
                             ? "نوع پردازش موتور با اطمینان قابل تشخیص نیست؛ نصب امن انجام نشد."
                             : "The Engine process bitness could not be determined safely; installation was blocked.";
+                case REJECT_UNSUPPORTED_ENGINE_HOST_ABI:
+                    return persian
+                            ? "معماری پردازندهٔ میزبان با کتابخانه‌های Native موتور سازگار نیست."
+                            : "The device CPU ABI is not supported by the pinned Engine.";
+                case REJECT_ARMV7_NEON_UNSUPPORTED:
+                    return persian
+                            ? "پردازندهٔ ۳۲ بیتی ARM این دستگاه از NEON پشتیبانی نمی‌کند؛ برای جلوگیری از Crash، موتور بارگذاری نشد."
+                            : "This 32-bit ARM CPU does not support NEON; the Engine was not loaded to prevent a native crash.";
+                case UNKNOWN_ARMV7_NEON_CAPABILITY:
+                    return persian
+                            ? "پشتیبانی NEON در پردازندهٔ ARM قابل تأیید نیست؛ برای ایمنی موتور بارگذاری نشد."
+                            : "ARM NEON capability could not be verified; the Engine was not loaded for safety.";
                 case UNKNOWN_APK_METADATA:
                 default:
                     return persian
@@ -89,6 +104,30 @@ public final class NativeAbiPolicy {
     }
 
     private NativeAbiPolicy() { }
+
+    static Result resultFor(Decision decision) {
+        return new Result(decision == null ? Decision.UNKNOWN_APK_METADATA : decision);
+    }
+
+    /** Pure host-CPU decision policy; native-probe results are injected by the caller. */
+    public static Result evaluateHostCpu(
+            String primaryDeviceAbi, int neonProbeStatus) {
+        String primary = primaryDeviceAbi == null ? ""
+                : primaryDeviceAbi.trim().toLowerCase(Locale.US);
+
+        if ("arm64-v8a".equals(primary))
+            return new Result(Decision.ALLOW_ARM64);
+
+        if ("armeabi-v7a".equals(primary)) {
+            if (neonProbeStatus == 1) return new Result(Decision.ALLOW_ARM32);
+            if (neonProbeStatus == 0)
+                return new Result(Decision.REJECT_ARMV7_NEON_UNSUPPORTED);
+            return new Result(Decision.UNKNOWN_ARMV7_NEON_CAPABILITY);
+        }
+
+        // The Engine's Release APK packages neither x86 nor generic armeabi.
+        return new Result(Decision.REJECT_UNSUPPORTED_ENGINE_HOST_ABI);
+    }
 
     static Result unknownResult() {
         return new Result(Decision.UNKNOWN_APK_METADATA);

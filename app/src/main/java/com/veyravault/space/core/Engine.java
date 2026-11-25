@@ -27,6 +27,8 @@ public class Engine {
     };
 
     public static Object getCore() {
+        // Fail closed before resolving BlackBoxCore or its native initializers.
+        if (!HostCpuCompatibility.isEngineSupported()) return null;
         for (String cn : CORE_CLASSES) {
             try {
                 Class<?> cls = Class.forName(cn);
@@ -38,6 +40,7 @@ public class Engine {
     }
 
     public static void doAttachBaseContext(Application app, final Context base) {
+        if (!HostCpuCompatibility.isEngineSupported()) return;
         try {
             Object core = getCore();
             if (core == null) return;
@@ -76,6 +79,7 @@ public class Engine {
     }
 
     public static void doOnCreate(Application app) {
+        if (!HostCpuCompatibility.isEngineSupported()) return;
         try {
             Object core = getCore();
             if (core == null) return;
