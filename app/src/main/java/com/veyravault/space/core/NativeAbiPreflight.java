@@ -133,7 +133,7 @@ public final class NativeAbiPreflight {
         return packageManager.getApplicationInfo(packageName, 0);
     }
 
-    private static NativeAbiPolicy.HostBitness resolveHostBitness(String primaryAbi) {
+    static NativeAbiPolicy.HostBitness resolveHostBitness(String primaryAbi) {
         if (Build.VERSION.SDK_INT >= 23) {
             return Process.is64Bit()
                     ? NativeAbiPolicy.HostBitness.BIT_64

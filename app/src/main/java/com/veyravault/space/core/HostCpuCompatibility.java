@@ -23,13 +23,16 @@ public final class HostCpuCompatibility {
             }
 
             String primaryAbi = Build.CPU_ABI;
+            NativeAbiPolicy.HostBitness processBitness =
+                    NativeAbiPreflight.resolveHostBitness(primaryAbi);
             int neonStatus = NativeNeonProbe.UNKNOWN;
             if ("armeabi-v7a".equalsIgnoreCase(primaryAbi)) {
                 // Probe the actual 32-bit execution mode even on an arm64-capable handset.
                 neonStatus = NativeNeonProbe.detect();
             }
 
-            cachedResult = NativeAbiPolicy.evaluateHostCpu(primaryAbi, neonStatus);
+            cachedResult = NativeAbiPolicy.evaluateHostCpu(
+                    primaryAbi, processBitness, neonStatus);
             return cachedResult;
         }
     }

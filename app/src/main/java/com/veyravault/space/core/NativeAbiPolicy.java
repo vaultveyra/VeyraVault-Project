@@ -111,9 +111,17 @@ public final class NativeAbiPolicy {
 
     /** Pure host-CPU decision policy; native-probe results are injected by the caller. */
     public static Result evaluateHostCpu(
-            String primaryDeviceAbi, int neonProbeStatus) {
+            String primaryDeviceAbi, HostBitness hostBitness, int neonProbeStatus) {
         String primary = primaryDeviceAbi == null ? ""
                 : primaryDeviceAbi.trim().toLowerCase(Locale.US);
+
+        HostBitness expected = bitnessForAbi(primary);
+        if (hostBitness == null || hostBitness == HostBitness.UNKNOWN)
+            return new Result(Decision.UNKNOWN_HOST_BITNESS);
+        if (expected == HostBitness.UNKNOWN)
+            return new Result(Decision.REJECT_UNSUPPORTED_ENGINE_HOST_ABI);
+        if (expected != hostBitness)
+            return new Result(Decision.REJECT_HOST_BITNESS_MISMATCH);
 
         if ("arm64-v8a".equals(primary))
             return new Result(Decision.ALLOW_ARM64);
@@ -125,7 +133,6 @@ public final class NativeAbiPolicy {
             return new Result(Decision.UNKNOWN_ARMV7_NEON_CAPABILITY);
         }
 
-        // The Engine's Release APK packages neither x86 nor generic armeabi.
         return new Result(Decision.REJECT_UNSUPPORTED_ENGINE_HOST_ABI);
     }
 

@@ -63,7 +63,9 @@ assert vault_app.index(gate) < vault_app.index(engine_attach)
 assert "if (!HostCpuCompatibility.isEngineSupported()) return null;" in engine
 assert "if (!HostCpuCompatibility.isEngineSupported()) return;" in engine
 assert "HostCpuCompatibility.initialize()" in preflight
-assert "evaluateHostCpu(primaryAbi, neonStatus)" in host_java
+assert "NativeAbiPreflight.resolveHostBitness(primaryAbi)" in host_java
+assert "evaluateHostCpu(" in host_java
+assert "static NativeAbiPolicy.HostBitness resolveHostBitness(String primaryAbi)" in preflight
 assert 'if ("armeabi-v7a".equalsIgnoreCase(primaryAbi))' in host_java
 
 assert "REJECT_ARMV7_NEON_UNSUPPORTED" in policy
@@ -85,6 +87,8 @@ for expected in (
     "unknownArmv7CapabilityFailsClosed",
     "unsupportedHostAbiIsRejected",
     "genericArmeabiIsRejectedBecauseReleaseDoesNotPackageIt",
+    "processBitnessMismatchIsRejectedBeforeEngineStartup",
+    "unknownProcessBitnessFailsClosed",
 ):
     assert expected in instrumentation
 
