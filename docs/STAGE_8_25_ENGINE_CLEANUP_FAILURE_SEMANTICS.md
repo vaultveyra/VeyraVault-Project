@@ -18,7 +18,7 @@ An Engine query reporting a package absent was therefore insufficient to prove t
 The upstream Git pin and repository identity are unchanged. After verifying the exact clean Engine checkout, `prepare_workspace.py` applies a strict, idempotent patch only to the ephemeral build workspace:
 
 - User-scoped internal, Device-Encrypted, Android/data, and Android/obb roots must be absent after deletion; otherwise the executor returns failure or propagates the filesystem error.
-- Before recursive deletion, the Engine verifies canonical containment beneath the expected virtual root and rejects symlinked package/user ancestors. Inspection failures stop cleanup before traversal.
+- Before recursive deletion, the Engine rejects a symlinked virtual root itself, verifies canonical containment beneath that root, and rejects symlinked package/user ancestors. Inspection failures stop cleanup before traversal.
 - The shared APK directory must be absent before uninstall can succeed.
 - Clear Data checks removal of the previous data-library directory and confirms that all required replacement directories, including the package/user-scoped OBB directory, exist.
 - Uninstall removes per-user data before deleting the shared APK directory.
@@ -50,5 +50,5 @@ The original pinned source is still verified before the VeyraVault transformatio
 - `Engine.getCloneInstallState` returns `UNKNOWN`, not `ABSENT`, when the Engine says a package is not installed but any package/user-scoped internal, Device-Encrypted, Android/data, or Android/obb directory remains or cannot be safely inspected.
 - Failed-install rollback and manual pending-reservation release already depend on `getCloneInstallState`; the new guard prevents ID release when orphaned package/user data remains.
 - The shared package APK directory is deliberately excluded from the per-user data check because another Clone user may legitimately retain the same package binary.
-- Filesystem roots must be readable, canonical paths must remain beneath the expected virtual root, and symlink escapes or inspection errors fail closed. Diagnostics never delete orphan data.
+- Filesystem roots must be readable and must not themselves be symlinks; canonical paths must remain beneath the expected virtual root, and symlink escapes or inspection errors fail closed. Diagnostics never delete orphan data.
 - Uninstall is confirmed only when the Engine reports the package absent and all four package/user data roots are confirmed absent.

@@ -262,6 +262,8 @@ public class Engine {
     private static boolean isDirectoryConfirmedAbsent(File root, File directory) {
         if (root == null || directory == null) return false;
         try {
+            // Reject a redirected root before using its canonical target as the trust boundary.
+            if (FileUtils.isSymlink(root)) return false;
             File canonicalRoot = root.getCanonicalFile();
             File canonicalDirectory = directory.getCanonicalFile();
             if (!canonicalRoot.isDirectory() || !canonicalRoot.canRead()) return false;
