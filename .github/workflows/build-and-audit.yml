@@ -240,6 +240,14 @@ jobs:
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
 
+      - name: Inspect Release runtime dependency provenance
+        working-directory: ./build_workspace
+        run: |
+          set -euo pipefail
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency kotlinx-coroutines-android --no-daemon --console=plain
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency kotlinx-coroutines-core --no-daemon --console=plain
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency androidx.room:room-runtime --no-daemon --console=plain
+
       - name: Compile unsigned release APK
         working-directory: ./build_workspace
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
