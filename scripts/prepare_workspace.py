@@ -426,11 +426,11 @@ def align_native_application_platform(workspace, min_sdk):
         raise RuntimeError("Pinned Engine Application.mk is missing; native API level is unverified")
     with open(application_mk, "r", encoding="utf-8", errors="ignore") as source_file:
         content = source_file.read()
-    pattern = r"^[ \\t]*APP_PLATFORM[ \\t]*:=.*(?:\\r?\\n|$)"
+    pattern = r"^[ \t]*APP_PLATFORM[ \t]*:=.*(?:\r?\n|$)"
     updated, count = re.subn(pattern, "", content, flags=re.M)
     if count > 1:
         raise RuntimeError("Application.mk contains multiple APP_PLATFORM overrides")
-    if re.search(r"^[ \\t]*APP_PLATFORM[ \\t]*:=", updated, flags=re.M):
+    if re.search(r"^[ \t]*APP_PLATFORM[ \t]*:=", updated, flags=re.M):
         raise RuntimeError("APP_PLATFORM override remained after normalization")
     if count:
         with open(application_mk, "w", encoding="utf-8") as output_file:
@@ -515,7 +515,7 @@ def detect_workspace_min_sdk(workspace):
         "Engine root": os.path.join(workspace, "build.gradle"),
     }
     values = {}
-    pattern = r"^[ \\t]*minSdk(?:Version)?[ \\t]*(?:=[ \\t]*)?(\\d+)"
+    pattern = r"^[ \t]*minSdk(?:Version)?[ \t]*(?:=[ \t]*)?(\d+)"
     for label, path in candidates.items():
         if not os.path.isfile(path):
             raise RuntimeError("{} Gradle file is missing; cannot verify minSdk".format(label))

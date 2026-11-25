@@ -13,25 +13,25 @@ import prepare_workspace
 
 def make_android_elf(elf_class, machine, api_level):
     endian = "<"
-    ident = b"\\x7fELF" + bytes((elf_class, 1, 1)) + b"\\0" * 9
-    owner = b"Android\\0"
+    ident = b"\x7fELF" + bytes((elf_class, 1, 1)) + b"\0" * 9
+    owner = b"Android\0"
     descriptor = (
         struct.pack(endian + "I", api_level)
-        + b"r27\\0".ljust(64, b"\\0")
-        + b"12077973\\0".ljust(64, b"\\0")
+        + b"r27\0".ljust(64, b"\0")
+        + b"12077973\0".ljust(64, b"\0")
     )
     note = (
         struct.pack(endian + "III", len(owner), len(descriptor), 1)
-        + owner + b"\\0" * ((-len(owner)) % 4)
-        + descriptor + b"\\0" * ((-len(descriptor)) % 4)
+        + owner + b"\0" * ((-len(owner)) % 4)
+        + descriptor + b"\0" * ((-len(descriptor)) % 4)
     )
-    names = b"\\0.note.android.ident\\0.shstrtab\\0"
+    names = b"\0.note.android.ident\0.shstrtab\0"
     if elf_class == 1:
         header_size, section_size = 52, 40
         note_offset = header_size
         names_offset = (note_offset + len(note) + 3) & ~3
         section_offset = names_offset + len(names)
-        null = b"\\0" * section_size
+        null = b"\0" * section_size
         note_section = struct.pack(endian + "IIIIIIIIII", 1, 7, 0, 0,
                                    note_offset, len(note), 0, 0, 4, 0)
         names_section = struct.pack(endian + "IIIIIIIIII", names.index(b".shstrtab"), 3, 0, 0,
@@ -43,7 +43,7 @@ def make_android_elf(elf_class, machine, api_level):
         note_offset = header_size
         names_offset = (note_offset + len(note) + 3) & ~3
         section_offset = names_offset + len(names)
-        null = b"\\0" * section_size
+        null = b"\0" * section_size
         note_section = struct.pack(endian + "IIQQQQIIQQ", 1, 7, 0, 0,
                                    note_offset, len(note), 0, 0, 4, 0)
         names_section = struct.pack(endian + "IIQQQQIIQQ", names.index(b".shstrtab"), 3, 0, 0,
@@ -52,7 +52,7 @@ def make_android_elf(elf_class, machine, api_level):
                              section_offset, 0, header_size, 0, 0, section_size, 3, 2)
     else:
         raise ValueError("ELF class must be 1 or 2")
-    return ident + header + note + b"\\0" * (names_offset - (note_offset + len(note))) + names + null + note_section + names_section
+    return ident + header + note + b"\0" * (names_offset - (note_offset + len(note))) + names + null + note_section + names_section
 
 
 class FakeArchive:
@@ -117,9 +117,9 @@ with tempfile.TemporaryDirectory() as directory:
     application_mk = workspace / "Bcore/src/main/cpp/Application.mk"
     application_mk.parent.mkdir(parents=True)
     application_mk.write_text(
-        "APP_ABI := armeabi-v7a arm64-v8a\\n"
-        "APP_PLATFORM := android-24\\n"
-        "APP_STL := c++_static\\n", encoding="utf-8"
+        "APP_ABI := armeabi-v7a arm64-v8a\n"
+        "APP_PLATFORM := android-24\n"
+        "APP_STL := c++_static\n", encoding="utf-8"
     )
     prepare_workspace.align_native_application_platform(str(workspace), 21)
     updated = application_mk.read_text(encoding="utf-8")
