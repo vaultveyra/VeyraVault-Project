@@ -210,7 +210,10 @@ jobs:
             echo "=== MERGED DEBUG NATIVE LIBRARY INPUTS ==="
             find app/build/intermediates/merged_native_libs/debug -type f -name '*.so' -print 2>/dev/null || true
             echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
-            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+            # Keep the API-21-only smoke class out of this API-34 instrumentation suite.
+            # It is executed separately by the dedicated API-21 emulator step below.
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace \
+              -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
 
       - name: Run Android API 21 legacy compatibility smoke tests
         uses: reactivecircus/android-emulator-runner@v2

@@ -69,11 +69,21 @@ for marker in (
     assert marker in instrumentation, f"Missing API-21 runtime coverage: {marker}"
 
 # CI must exercise both the declared minimum API and the API-34 instrumentation image.
-api21 = workflow[workflow.index("Run Android API 21 legacy compatibility smoke tests"):]
+# The minimum-API test class is excluded from the API-34 full suite, then run alone
+# on the dedicated API-21 emulator. This prevents a false failure on API 34 while
+# preserving a real assertion that the smoke test executes on API 21.
+api34_start = workflow.index("Run Room Android instrumentation tests")
+api21_start = workflow.index("Run Android API 21 legacy compatibility smoke tests")
+api34 = workflow[api34_start:api21_start]
+api21 = workflow[api21_start:]
+api21_class = "com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest"
+assert "api-level: 34" in api34
+assert "notClass=" + api21_class in api34, "API-21-only tests must be excluded from API-34 full instrumentation"
 assert "api-level: 21" in api21
 assert "arch: x86_64" in api21
-assert "LegacyApi21CompatibilityInstrumentationTest" in api21
-assert "api-level: 34" in workflow
+assert "-Pandroid.testInstrumentationRunnerArguments.class=" + api21_class in api21, (
+    "The API-21 emulator must explicitly execute the minimum-API instrumentation class."
+)
 
 # Explicit signature policy: V1 for API 21/22 and V2/V3 for newer Android releases.
 for marker in (
@@ -104,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix="veyra-stage-827-javac-") as temp:
         raise SystemExit(result.stdout + result.stderr)
 
 print("PASS: App Java compatibility is read from app/build.gradle and isolated from Engine Java 21.")
-print("PASS: Android API 23/33 calls are guarded; API-21-specific test covers the legacy path.")
-print("PASS: ServiceLoader resources remain packaged and are checked on an API-21 emulator.")
+print("PASS: Android API 23/33 calls are guarded; API-21 smoke tests are isolated to the API-21 emulator.")
+print("PASS: API-34 suite excludes the API-21-only class; ServiceLoader resources are checked on API 21.")
 print("PASS: CI explicitly verifies V1, V2 and V3 signatures for minSdk 21.")
 print("PASS: Native ABI policy and date formatter compile under Java 8.")

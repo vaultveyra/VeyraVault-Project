@@ -14,8 +14,9 @@ The app declares minSdkVersion 21 (Android 5.0). Stage 8.27 makes minimum-API va
 
 ## API-21 runtime coverage
 
-- CI retains the API-34 Android instrumentation run.
-- A separate API-21 x86_64 emulator run executes LegacyApi21CompatibilityInstrumentationTest.
+- CI retains the API-34 Android instrumentation run for the broader Room and app instrumentation suite.
+- The API-34 run uses AndroidJUnitRunner's `notClass` filter to exclude LegacyApi21CompatibilityInstrumentationTest; that class has an explicit SDK-21 assertion and must not run on API 34.
+- A separate API-21 x86_64 emulator run uses the runner's `class` filter to execute LegacyApi21CompatibilityInstrumentationTest directly on the declared minimum API.
 - The API-21 test exercises the legacy PackageManager overload, ApplicationInfo splitSourceDirs, APK ZIP preflight, package fingerprint revalidation and the pre-API-23 host-bitness path.
 - It also exercises the Calendar-based date formatter and checks that both Kotlin Coroutines ServiceLoader resources remain readable and their provider classes load.
 - NativeAbiPreflight keeps Process.is64Bit behind the API-23 guard and PackageManager.ApplicationInfoFlags behind the API-33 guard.
