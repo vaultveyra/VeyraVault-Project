@@ -45,6 +45,8 @@ jobs:
 
       - name: Test Stage 8.25 pinned Engine cleanup failure semantics patch
         run: python3 scripts/test_stage_8_25_engine_cleanup_failure_semantics.py
+      - name: Test Stage 8.27 legacy Android compatibility contract
+        run: python3 scripts/test_stage_8_27_legacy_android_api_compatibility.py
 
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
@@ -210,6 +212,24 @@ jobs:
             echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
+      - name: Run Android API 21 legacy compatibility smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 21
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.class=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
+
       - name: Test source audit contract
         run: python3 scripts/test_source_audit_contract.py
 
@@ -270,12 +290,25 @@ jobs:
           mkdir -p signed
           cp unsigned/VeyraVault-release.apk signed/VeyraVault-release.apk
           "$APKSIGNER" sign \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
             --ks "$RUNNER_TEMP/veyravault-release.keystore" \
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KS_PASS \
             --key-pass env:KEY_PASS \
             signed/VeyraVault-release.apk
-          "$APKSIGNER" verify --verbose signed/VeyraVault-release.apk
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          for REQUIRED_SIGNATURE in \
+            "Verified using v1 scheme (JAR signing): true" \
+            "Verified using v2 scheme (APK Signature Scheme v2): true" \
+            "Verified using v3 scheme (APK Signature Scheme v3): true"; do
+            if ! grep -Fq "$REQUIRED_SIGNATURE" <<< "$VERIFY_OUTPUT"; then
+              echo "ERROR: Required APK signature scheme verification failed: $REQUIRED_SIGNATURE" >&2
+              exit 1
+            fi
+          done
           cp unsigned/source_audit_report.txt signed/ 2>/dev/null || true
           cp unsigned/apk_audit_report.txt signed/ 2>/dev/null || true
           echo "signed=true" >> "$GITHUB_OUTPUT"

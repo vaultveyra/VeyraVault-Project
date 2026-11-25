@@ -481,6 +481,16 @@ def post_build():
     print("[+] All release artifacts collected in output_artifacts/!")
 
 
+def detect_app_java_version(app_gradle_path):
+    """Read Java source compatibility from VeyraVault's app module, not the pinned Engine."""
+    if not os.path.isfile(app_gradle_path):
+        return "VERSION_1_8"
+    with open(app_gradle_path, "r", encoding="utf-8", errors="ignore") as app_gradle:
+        content = app_gradle.read()
+    match = re.search(r'JavaVersion\.(VERSION_[0-9_]+)', content)
+    return match.group(1) if match else "VERSION_1_8"
+
+
 def main():
     if "--post-build" in sys.argv:
         post_build()
@@ -518,7 +528,8 @@ def main():
 
     compile_sdk = "34"
     min_sdk = "21"
-    java_ver = "VERSION_1_8"
+    # Keep VeyraVault app compatibility independent from the pinned Engine module.
+    app_java_ver = detect_app_java_version(os.path.join(ROOT, "app", "build.gradle"))
 
     for gpath in [orig_app_gradle, bcore_gradle, root_gradle, toml_path]:
         if os.path.exists(gpath):
@@ -530,11 +541,8 @@ def main():
             m = re.search(r'minSdk(?:Version)?\s*[=:]?\s*["\']?(\d+)["\']?', txt)
             if m:
                 min_sdk = m.group(1)
-            m = re.search(r'JavaVersion\.(VERSION_[0-9_]+)', txt)
-            if m:
-                java_ver = m.group(1)
 
-    print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}, Java: {java_ver}")
+    print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}; app Java: {app_java_ver}")
 
     bcore_manifest = os.path.join(WORKSPACE, "Bcore", "src", "main", "AndroidManifest.xml")
     if os.path.exists(bcore_manifest):
@@ -610,8 +618,8 @@ android {{
     }}
 
     compileOptions {{
-        sourceCompatibility JavaVersion.{java_ver}
-        targetCompatibility JavaVersion.{java_ver}
+        sourceCompatibility JavaVersion.{app_java_ver}
+        targetCompatibility JavaVersion.{app_java_ver}
     }}
 
     buildFeatures {{
