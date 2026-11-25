@@ -8,9 +8,11 @@ room_root = java_root / "com/veyravault/space/core/persistence"
 prepare = (root / "scripts/prepare_workspace.py").read_text(encoding="utf-8")
 clone_store = (java_root / "com/veyravault/space/core/CloneStore.java").read_text(encoding="utf-8")
 
-assert "androidx.room:room-runtime:2.6.1" in prepare
-assert "androidx.room:room-compiler:2.6.1" in prepare
-assert "annotationProcessor" in prepare
+assert "debugImplementation 'androidx.room:room-runtime:2.6.1'" in prepare
+assert "releaseCompileOnly 'androidx.room:room-runtime:2.6.1'" in prepare
+assert "implementation 'androidx.room:room-runtime:2.6.1'" not in prepare
+assert "debugAnnotationProcessor 'androidx.room:room-compiler:2.6.1'" in prepare
+assert "annotationProcessor 'androidx.room:room-compiler:2.6.1'" not in prepare
 assert '"room.schemaLocation": "$projectDir/schemas".toString()' in prepare
 
 expected = {
@@ -54,7 +56,7 @@ assert "exportSchema = true" in database
 assert "LegacyMigrationMetadataEntity.class" in database
 assert (root / "app/schemas/README.md").is_file()
 
-print("Room 2.6.1 generated Gradle dependency contract: PASS")
+print("Room 2.6.1 Debug-only runtime and annotation-processor dependency contract: PASS")
 print("Room entities, DAOs and database schema inventory: PASS")
 print("Legacy CloneStore remains the only active persistence path: PASS")
 print("No destructive migration or main-thread query escape hatch: PASS")

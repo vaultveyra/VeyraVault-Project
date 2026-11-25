@@ -8,6 +8,14 @@ def audit(apk_path):
     print("=== VEYRAVAULT STAGE-2 COMPILED APK AUDIT: {} ===".format(apk_path))
     with zipfile.ZipFile(apk_path, 'r') as z:
         names = z.namelist()
+        meta_inf_entries = sorted(
+            n for n in names if n.startswith('META-INF/') and not n.endswith('/')
+        )
+        print("Unprotected META-INF resources in unsigned Release APK: {}".format(len(meta_inf_entries)))
+        for entry in meta_inf_entries:
+            print("  [META-INF] {}".format(entry))
+        if meta_inf_entries:
+            raise SystemExit("APK audit failed: Release APK contains META-INF resources outside V1 integrity coverage")
         libs = [n for n in names if n.endswith('.so')]
         dexs = [n for n in names if n.endswith('.dex')]
         print("Native C++ Virtualization Libraries (.so): {}".format(len(libs)))

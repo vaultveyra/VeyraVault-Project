@@ -637,6 +637,10 @@ android {{
         exclude 'META-INF/DEPENDENCIES'
         exclude 'META-INF/LICENSE'
         exclude 'META-INF/NOTICE'
+        // These AGP/AndroidX markers are build metadata, not app runtime resources.
+        exclude 'META-INF/*.version'
+        exclude 'META-INF/com/android/build/gradle/app-metadata.properties'
+        exclude 'META-INF/version-control-info.textproto'
     }}
 }}
 
@@ -650,8 +654,11 @@ dependencies {{
     implementation 'androidx.recyclerview:recyclerview:1.3.1'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'org.osmdroid:osmdroid-android:6.1.14'
-    implementation 'androidx.room:room-runtime:2.6.1'
-    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    // Room is an opt-in migration/test foundation: package it only in Debug.
+    // Release keeps compile-time types while CloneStore remains the active runtime store.
+    debugImplementation 'androidx.room:room-runtime:2.6.1'
+    releaseCompileOnly 'androidx.room:room-runtime:2.6.1'
+    debugAnnotationProcessor 'androidx.room:room-compiler:2.6.1'
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test:core:1.5.0'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

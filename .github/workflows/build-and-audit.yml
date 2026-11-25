@@ -47,6 +47,8 @@ jobs:
         run: python3 scripts/test_stage_8_25_engine_cleanup_failure_semantics.py
       - name: Test Stage 8.27 legacy Android compatibility contract
         run: python3 scripts/test_stage_8_27_legacy_android_api_compatibility.py
+      - name: Test Stage 8.28 Room runtime Release isolation
+        run: python3 scripts/test_stage_8_28_room_release_isolation.py
 
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
@@ -300,8 +302,12 @@ jobs:
             --ks-pass env:KS_PASS \
             --key-pass env:KEY_PASS \
             signed/VeyraVault-release.apk
-          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk)"
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk 2>&1)"
           printf '%s\n' "$VERIFY_OUTPUT"
+          if grep -Fq "not protected by signature" <<< "$VERIFY_OUTPUT"; then
+            echo "ERROR: Release APK contains a META-INF entry not protected by the V1 signature scheme." >&2
+            exit 1
+          fi
           for REQUIRED_SIGNATURE in \
             "Verified using v1 scheme (JAR signing): true" \
             "Verified using v2 scheme (APK Signature Scheme v2): true" \

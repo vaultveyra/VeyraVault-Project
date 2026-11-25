@@ -1,4 +1,6 @@
 # Stage 8.27 — Minimum Android API and legacy signing verification
+> Follow-up: The Release packaging/signature warning found during this stage is addressed by Stage 8.28. See `STAGE_8_28_ROOM_RUNTIME_RELEASE_ISOLATION.md`.
+
 
 ## Scope
 
