@@ -42,3 +42,12 @@ This stage changes only build-time dependency scopes, precise packaging exclusio
 
 Validation is CI/emulator-based. API-21 x86_64 smoke coverage is not physical-device certification for ARM hardware, Huawei firmware, or native Engine virtualization.
 
+
+
+## Stage 8.29 follow-up
+
+Both Stage 8.28 CI runs passed API-34 and API-21 tests but the Release APK audit still found four entries: two Kotlin Coroutines ServiceLoader descriptors, AGP app metadata, and AGP VCS metadata. Stage 8.29 migrates the generated build file to AGP's current packaging DSL and disables Release VCS metadata explicitly.
+
+The two Coroutines service descriptors are not removed. CI now records Gradle dependency insight against the actual `releaseRuntimeClasspath` for Coroutines and Room so their origin can be resolved before any release-only exclusion or dependency change is considered.
+
+The strict Release APK audit and signing gate remain active. No final Release validation is claimed until the APK passes the metadata audit and V1/V2/V3 signature verification.
