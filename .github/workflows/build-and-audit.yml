@@ -212,8 +212,7 @@ jobs:
             echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
             # Keep the API-21-only smoke class out of this API-34 instrumentation suite.
             # It is executed separately by the dedicated API-21 emulator step below.
-            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace \
-              -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
 
       - name: Run Android API 21 legacy compatibility smoke tests
         uses: reactivecircus/android-emulator-runner@v2

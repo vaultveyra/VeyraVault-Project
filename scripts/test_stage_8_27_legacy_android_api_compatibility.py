@@ -79,6 +79,10 @@ api21 = workflow[api21_start:]
 api21_class = "com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest"
 assert "api-level: 34" in api34
 assert "notClass=" + api21_class in api34, "API-21-only tests must be excluded from API-34 full instrumentation"
+api34_connected_commands = [line.strip() for line in api34.splitlines() if line.strip().startswith("./gradlew :app:connectedDebugAndroidTest")]
+assert api34_connected_commands == ["./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=" + api21_class], (
+    "API-34 Gradle invocation must keep the notClass filter on one shell-safe command line."
+)
 assert "api-level: 21" in api21
 assert "arch: x86_64" in api21
 assert "-Pandroid.testInstrumentationRunnerArguments.class=" + api21_class in api21, (
