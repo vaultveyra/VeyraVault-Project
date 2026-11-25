@@ -19,6 +19,7 @@ The upstream Git pin and repository identity are unchanged. After verifying the 
 
 - User-scoped internal, Device-Encrypted, Android/data, and Android/obb roots must be absent after deletion; otherwise the executor returns failure or propagates the filesystem error.
 - Before recursive deletion, the Engine rejects a symlinked virtual root itself, verifies canonical containment beneath that root, and rejects symlinked package/user ancestors. Inspection failures stop cleanup before traversal.
+- `CreateUserExecutor` applies the same root/containment/symlink checks before deleting the old data-library directory and prevalidates every reset target before creating any replacement directory. Symlink aliases are rejected even when they resolve back to the expected root.
 - The shared APK directory must be absent before uninstall can succeed.
 - Clear Data checks removal of the previous data-library directory and confirms that all required replacement directories, including the package/user-scoped OBB directory, exist.
 - Uninstall removes per-user data before deleting the shared APK directory.
@@ -50,5 +51,5 @@ The original pinned source is still verified before the VeyraVault transformatio
 - `Engine.getCloneInstallState` returns `UNKNOWN`, not `ABSENT`, when the Engine says a package is not installed but any package/user-scoped internal, Device-Encrypted, Android/data, or Android/obb directory remains or cannot be safely inspected.
 - Failed-install rollback and manual pending-reservation release already depend on `getCloneInstallState`; the new guard prevents ID release when orphaned package/user data remains.
 - The shared package APK directory is deliberately excluded from the per-user data check because another Clone user may legitimately retain the same package binary.
-- Filesystem roots must be readable and must not themselves be symlinks; canonical paths must remain beneath the expected virtual root, and symlink escapes or inspection errors fail closed. Diagnostics never delete orphan data.
+- Filesystem roots must be readable and must not themselves be symlinks; canonical paths must remain beneath the expected virtual root, and symlink escapes or inspection errors fail closed. The build-time `CreateUserExecutor` reset path now enforces the same containment checks before its library deletion and directory creation. Diagnostics never delete orphan data.
 - Uninstall is confirmed only when the Engine reports the package absent and all four package/user data roots are confirmed absent.

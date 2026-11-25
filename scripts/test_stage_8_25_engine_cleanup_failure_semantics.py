@@ -188,6 +188,25 @@ class EngineCleanupHardeningTests(unittest.TestCase):
         self.assertIn("if (dataLibraryDirectory.exists())", create_user)
         self.assertIn("BEnvironment.getExternalObbDir(packageName, userId)", create_user)
         self.assertIn("if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory())", create_user)
+        self.assertIn("import java.io.File;", create_user)
+        self.assertIn("isSafeDirectoryPath(internalRoot, dataLibraryDirectory)", create_user)
+        self.assertIn("File[] requiredRoots", create_user)
+        self.assertIn("isSafeDirectoryPath(requiredRoots[i], requiredDirectories[i])", create_user)
+        self.assertIn("FileUtils.isSymlink(root)", create_user)
+        self.assertIn("FileUtils.isSymlink(directory)", create_user)
+        self.assertIn("FileUtils.isSymlink(ancestor)", create_user)
+        self.assertLess(
+            create_user.index("for (int i = 0; i < requiredDirectories.length; i++) {"),
+            create_user.index("if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory())")
+        )
+        self.assertLess(
+            create_user.index("if (FileUtils.isSymlink(ancestor)) return false;"),
+            create_user.index("if (canonicalAncestor.equals(canonicalRoot)) return true;")
+        )
+        self.assertLess(
+            remove_user.index("if (FileUtils.isSymlink(ancestor)) return false;"),
+            remove_user.index("if (canonicalAncestor.equals(canonicalRoot)) return true;")
+        )
         self.assertLess(installer.index("executors.add(new RemoveUserExecutor())"),
                         installer.index("executors.add(new RemoveAppExecutor())"))
         self.assertIn("if (cleanupResult != 0) {\n                    return;", manager)

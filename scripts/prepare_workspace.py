@@ -159,8 +159,8 @@ def harden_clone_cleanup_semantics(workspace):
             File ancestor = directory.getParentFile();
             while (ancestor != null) {
                 File canonicalAncestor = ancestor.getCanonicalFile();
-                if (canonicalAncestor.equals(canonicalRoot)) return true;
                 if (FileUtils.isSymlink(ancestor)) return false;
+                if (canonicalAncestor.equals(canonicalRoot)) return true;
                 if (canonicalAncestor.exists()
                         && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
                     return false;
@@ -202,15 +202,28 @@ def harden_clone_cleanup_semantics(workspace):
     create_user = _patch_engine_fragment(
         create_user,
         "VEYRAVAULT_VERIFY_CLONE_DATA_RESET",
-        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;",
+        r"        String packageName = ps\.pkg\.packageName;\n[\s\S]*?        return 0;\n    }",
         """        String packageName = ps.pkg.packageName;
         // VEYRAVAULT_VERIFY_CLONE_DATA_RESET
+        File internalRoot = BEnvironment.getVirtualRoot();
+        File externalRoot = BEnvironment.getExternalVirtualRoot();
         File dataLibraryDirectory = BEnvironment.getDataLibDir(packageName, userId);
+        if (!isSafeDirectoryPath(internalRoot, dataLibraryDirectory)) {
+            return -1;
+        }
         FileUtils.deleteDir(dataLibraryDirectory);
         if (dataLibraryDirectory.exists()) {
             return -1;
         }
 
+        File[] requiredRoots = new File[] {
+                internalRoot,
+                internalRoot,
+                internalRoot,
+                internalRoot,
+                internalRoot,
+                externalRoot
+        };
         File[] requiredDirectories = new File[] {
                 BEnvironment.getDataDir(packageName, userId),
                 BEnvironment.getDataCacheDir(packageName, userId),
@@ -219,18 +232,59 @@ def harden_clone_cleanup_semantics(workspace):
                 BEnvironment.getDeDataDir(packageName, userId),
                 BEnvironment.getExternalObbDir(packageName, userId)
         };
-        for (File directory : requiredDirectories) {
+        // Validate every target before the first mkdir to avoid following an
+        // existing symlink or creating part of the reset tree under a bad root.
+        for (int i = 0; i < requiredDirectories.length; i++) {
+            if (!isSafeDirectoryPath(requiredRoots[i], requiredDirectories[i])) {
+                return -1;
+            }
+        }
+        for (int i = 0; i < requiredDirectories.length; i++) {
+            File directory = requiredDirectories[i];
             if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
                 return -1;
             }
         }
-        return 0;""",
-        ("File dataLibraryDirectory", "dataLibraryDirectory.exists()",
-         "File[] requiredDirectories", "directory.mkdirs()", "directory.isDirectory()",
-         "BEnvironment.getDataCacheDir(packageName, userId)",
-         "BEnvironment.getDataFilesDir(packageName, userId)",
-         "BEnvironment.getDataDatabasesDir(packageName, userId)",
-         "BEnvironment.getExternalObbDir(packageName, userId)"),
+        return 0;
+    }
+
+    /**
+     * Validates reset targets beneath their expected virtual roots. Symlinked roots,
+     * final directories, and package/user ancestors are rejected; inspection errors fail closed.
+     */
+    private static boolean isSafeDirectoryPath(File root, File directory) {
+        if (root == null || directory == null) return false;
+        try {
+            if (FileUtils.isSymlink(root)) return false;
+            File canonicalRoot = root.getCanonicalFile();
+            File canonicalDirectory = directory.getCanonicalFile();
+            if (!canonicalRoot.isDirectory() || !canonicalRoot.canRead()) return false;
+            String rootPrefix = canonicalRoot.getPath() + File.separator;
+            if (!canonicalDirectory.getPath().startsWith(rootPrefix)) return false;
+            if (FileUtils.isSymlink(directory)) return false;
+
+            File ancestor = directory.getParentFile();
+            while (ancestor != null) {
+                File canonicalAncestor = ancestor.getCanonicalFile();
+                if (FileUtils.isSymlink(ancestor)) return false;
+                if (canonicalAncestor.equals(canonicalRoot)) return true;
+                if (canonicalAncestor.exists()
+                        && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
+                    return false;
+                }
+                ancestor = ancestor.getParentFile();
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+        return false;
+    }""",
+        ("File dataLibraryDirectory", "isSafeDirectoryPath(internalRoot, dataLibraryDirectory)",
+         "File[] requiredRoots", "File[] requiredDirectories",
+         "BEnvironment.getExternalObbDir(packageName, userId)",
+         "isSafeDirectoryPath(requiredRoots[i], requiredDirectories[i])",
+         "FileUtils.isSymlink(root)", "FileUtils.isSymlink(directory)",
+         "FileUtils.isSymlink(ancestor)", "directory.mkdirs()", "return -1;"),
         relative["create_user"],
     )
 
