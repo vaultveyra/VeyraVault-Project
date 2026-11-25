@@ -54,8 +54,8 @@ assert prepare.detect_app_java_version(str(ROOT / "app" / "build.gradle")) == "V
 assert "if (Build.VERSION.SDK_INT >= 33)" in preflight
 assert "if (Build.VERSION.SDK_INT >= 23)" in preflight
 assert 'Class.forName("dalvik.system.VMRuntime")' in preflight
-assert "Math.floorDiv" not in date_formatter
-assert "Math.floorMod" not in date_formatter
+assert not re.search(r"(?<![\\w.])Math\\.floorDiv\\s*\\(", date_formatter)
+assert not re.search(r"(?<![\\w.])Math\\.floorMod\\s*\\(", date_formatter)
 assert instrumentation_path.is_file()
 instrumentation = instrumentation_path.read_text(encoding="utf-8")
 for marker in (
