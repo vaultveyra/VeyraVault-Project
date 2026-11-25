@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+import argparse
 import sys, zipfile, re
 from collections import Counter
+
+from audit_native_elf import NativeElfError, validate_native_libraries
 
 URL_RE = re.compile(rb'https?://[a-zA-Z0-9./?&=_:-]{6,120}')
 FORBIDDEN_ENDPOINTS = (b'logs-sender-api.vercel.app',)
@@ -61,7 +64,7 @@ def validate_meta_inf_entries(archive):
     return meta_inf_entries
 
 
-def audit(apk_path):
+def audit(apk_path, min_api=21):
     print("=== VEYRAVAULT STAGE-2 COMPILED APK AUDIT: {} ===".format(apk_path))
     with zipfile.ZipFile(apk_path, 'r') as z:
         try:
@@ -73,6 +76,17 @@ def audit(apk_path):
         for entry in meta_inf_entries:
             print("  [EXPECTED-META-INF] {}".format(entry))
         print("All other META-INF resources remain rejected; signed Release separately verifies V1, V2 and V3.")
+
+        try:
+            native_results = validate_native_libraries(z, min_api)
+        except NativeElfError as exc:
+            raise SystemExit("APK native ELF audit failed: {}".format(exc))
+        print("Native ELF ABI / API compatibility (application minSdk {}):".format(min_api))
+        for path, label, metadata in native_results:
+            print("  [NATIVE-ELF] {}: {}, Android API {}, NDK {} ({})".format(
+                path, label, metadata["android_api"],
+                metadata["ndk_version"], metadata["ndk_build"]
+            ))
 
         libs = [n for n in z.namelist() if n.endswith('.so')]
         dexs = [n for n in z.namelist() if n.endswith('.dex')]
@@ -102,4 +116,8 @@ def audit(apk_path):
 
 
 if __name__ == '__main__':
-    audit(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("apk")
+    parser.add_argument("--min-api", type=int, default=21)
+    args = parser.parse_args()
+    audit(args.apk, args.min_api)

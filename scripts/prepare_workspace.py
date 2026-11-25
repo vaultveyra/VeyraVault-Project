@@ -417,6 +417,29 @@ def pin_ndk_version(gradle_file, label):
 
 
 
+def align_native_application_platform(workspace, min_sdk):
+    """Let Gradle externalNativeBuild derive APP_PLATFORM from minSdkVersion."""
+    application_mk = os.path.join(
+        workspace, "Bcore", "src", "main", "cpp", "Application.mk"
+    )
+    if not os.path.isfile(application_mk):
+        raise RuntimeError("Pinned Engine Application.mk is missing; native API level is unverified")
+    with open(application_mk, "r", encoding="utf-8", errors="ignore") as source_file:
+        content = source_file.read()
+    pattern = r"^[ \\t]*APP_PLATFORM[ \\t]*:=.*(?:\\r?\\n|$)"
+    updated, count = re.subn(pattern, "", content, flags=re.M)
+    if count > 1:
+        raise RuntimeError("Application.mk contains multiple APP_PLATFORM overrides")
+    if re.search(r"^[ \\t]*APP_PLATFORM[ \\t]*:=", updated, flags=re.M):
+        raise RuntimeError("APP_PLATFORM override remained after normalization")
+    if count:
+        with open(application_mk, "w", encoding="utf-8") as output_file:
+            output_file.write(updated)
+        print("[+] Removed stale Application.mk APP_PLATFORM override; Gradle minSdk {} controls externalNativeBuild.".format(min_sdk))
+    else:
+        print("[+] Application.mk has no APP_PLATFORM override; Gradle minSdk {} controls externalNativeBuild.".format(min_sdk))
+
+
 def disable_remote_log_upload(workspace):
     """Disable upstream BlackBox log transmission before compiling the engine."""
     config_path = os.path.join(workspace, "Bcore", "src", "main", "java", "top", "niunaijun", "blackbox", "app", "configuration", "ClientConfiguration.java")
@@ -473,12 +496,39 @@ def post_build():
     if os.path.exists(src_rep):
         shutil.copy2(src_rep, os.path.join(OUTPUT_DIR, "source_audit_report.txt"))
 
-    run(f'python3 "{os.path.join(ROOT, "scripts", "audit_apk.py")}" "{apk_out}"')
+    min_sdk = detect_workspace_min_sdk(WORKSPACE)
+    run(
+        f'python3 "{os.path.join(ROOT, "scripts", "audit_apk.py")}" '
+        f'"{apk_out}" --min-api {min_sdk}'
+    )
 
     apk_rep = os.path.join(ROOT, "apk_audit_report.txt")
     if os.path.exists(apk_rep):
         shutil.copy2(apk_rep, os.path.join(OUTPUT_DIR, "apk_audit_report.txt"))
     print("[+] All release artifacts collected in output_artifacts/!")
+
+
+def detect_workspace_min_sdk(workspace):
+    """Require application and Engine root Gradle minSdk values to agree."""
+    candidates = {
+        "application": os.path.join(workspace, "app", "build.gradle"),
+        "Engine root": os.path.join(workspace, "build.gradle"),
+    }
+    values = {}
+    pattern = r"^[ \\t]*minSdk(?:Version)?[ \\t]*(?:=[ \\t]*)?(\\d+)"
+    for label, path in candidates.items():
+        if not os.path.isfile(path):
+            raise RuntimeError("{} Gradle file is missing; cannot verify minSdk".format(label))
+        with open(path, "r", encoding="utf-8", errors="ignore") as source_file:
+            match = re.search(pattern, source_file.read(), flags=re.M)
+        if not match:
+            raise RuntimeError("{} minSdk is not a numeric literal".format(label))
+        values[label] = int(match.group(1))
+    if values["application"] != values["Engine root"]:
+        raise RuntimeError("Application minSdk {} differs from Engine minSdk {}".format(
+            values["application"], values["Engine root"]
+        ))
+    return values["application"]
 
 
 def detect_app_java_version(app_gradle_path):
@@ -543,6 +593,7 @@ def main():
                 min_sdk = m.group(1)
 
     print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}; app Java: {app_java_ver}")
+    align_native_application_platform(WORKSPACE, int(min_sdk))
 
     bcore_manifest = os.path.join(WORKSPACE, "Bcore", "src", "main", "AndroidManifest.xml")
     if os.path.exists(bcore_manifest):

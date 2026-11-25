@@ -53,6 +53,8 @@ jobs:
         run: python3 scripts/test_stage_8_29_release_meta_inf_provenance.py
       - name: Test Stage 8.30 exact V1 META-INF policy
         run: python3 scripts/test_stage_8_30_v1_meta_inf_policy.py
+      - name: Test Stage 8.31 Native ELF compatibility
+        run: python3 scripts/test_stage_8_31_native_elf_compatibility.py
 
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
