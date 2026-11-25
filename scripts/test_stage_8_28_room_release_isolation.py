@@ -19,7 +19,7 @@ assert "implementation 'androidx.room:room-runtime:2.6.1'" not in prepare
 assert "debugAnnotationProcessor 'androidx.room:room-compiler:2.6.1'" in prepare
 assert "annotationProcessor 'androidx.room:room-compiler:2.6.1'" not in prepare
 
-# Remove only known build-time metadata. Never remove ServiceLoader resources.
+# Exclude only known metadata with AGP's modern DSL. Do not remove ServiceLoader files.
 for marker in (
     '"META-INF/*.version"',
     '"META-INF/com/android/build/gradle/app-metadata.properties"',
@@ -34,12 +34,18 @@ assert "META-INF/services/" not in prepare
 assert "META-INF/**" not in prepare, "Broad META-INF exclusion is forbidden"
 assert "packagingOptions {{" not in prepare, "Deprecated AGP packagingOptions block must not return"
 
-# The unsigned Release APK is audited before signing: no ordinary META-INF entry
-# may be shipped outside the V1 JAR coverage area.
-for marker in ("meta_inf_entries = sorted(", "n.startswith('META-INF/')", "if meta_inf_entries:", "outside V1 integrity coverage"):
-    assert marker in audit, f"Missing Release APK META-INF audit: {marker}"
+# The unsigned APK audit has an exact allowlist and rejects unknown/duplicate META-INF files.
+for marker in (
+    "EXPECTED_META_INF_ENTRIES",
+    "REQUIRED_SERVICE_PROVIDERS",
+    "validate_meta_inf_entries",
+    "Unexpected META-INF entries",
+    "Duplicate META-INF entries",
+):
+    assert marker in audit, f"Missing strict META-INF inventory rule: {marker}"
+assert "outside V1 integrity coverage" not in audit
 
-# API-21 instrumentation continues to exercise the Debug test APK's service discovery.
+# API-21 instrumentation continues to exercise the Debug variant's service discovery.
 for marker in (
     "coroutineServiceDescriptorsRemainDiscoverableOnApi21",
     "META-INF/services/",
@@ -50,9 +56,16 @@ for marker in (
 ):
     assert marker in api21_test, f"Debug ServiceLoader regression guard missing: {marker}"
 
-# Signing must fail closed if apksigner still reports any V1-unprotected META-INF entry.
+# Signing keeps V1 verification and the V2/V3 full-APK signature requirements.
 assert 'verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk 2>&1' in workflow
-assert 'grep -Fq "not protected by signature" <<< "$VERIFY_OUTPUT"' in workflow
+for marker in (
+    "UNPROTECTED_WARNINGS=",
+    "not protected by signature",
+    "Verified using v1 scheme (JAR signing): true",
+    "Verified using v2 scheme (APK Signature Scheme v2): true",
+    "Verified using v3 scheme (APK Signature Scheme v3): true",
+):
+    assert marker in workflow, f"Missing signature validation marker: {marker}"
 
 # Room remains dormant in the production source graph; no production caller may
 # activate the provider while its implementation is compile-only in Release.
@@ -69,8 +82,8 @@ assert "ClonePersistenceDatabaseProvider.get(" not in vault_app
 
 assert doc.is_file()
 print("PASS: Room runtime and Room code generation are Debug-only; Release has compile-time types only.")
-print("PASS: Only known build metadata is excluded through AGP's modern resources DSL; ServiceLoader resources are preserved.")
-print("PASS: Unsigned Release APK audit rejects every non-directory META-INF entry.")
-print("PASS: API-21 Debug instrumentation still validates both coroutine service descriptors.")
-print("PASS: Signing fails closed if apksigner reports any V1-unprotected META-INF entry.")
+print("PASS: Packaging excludes only precise metadata; ServiceLoader resources are preserved.")
+print("PASS: Unsigned Release APK allows only exact required META-INF resources and rejects unknown entries.")
+print("PASS: API-21 Debug instrumentation validates both coroutine service descriptors.")
+print("PASS: V1 is verified and V2/V3 remain mandatory; only the exact expected META-INF V1 warnings are allowed.")
 print("PASS: CloneStore remains the active production persistence source; no Room provider caller exists.")

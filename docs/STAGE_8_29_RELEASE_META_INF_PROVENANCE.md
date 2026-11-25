@@ -1,35 +1,45 @@
 # Stage 8.29 — Release META-INF provenance and AGP metadata controls
 
-## Stage 8.28 verification result
+## Stage 8.28 context
 
-Both Push and Pull Request CI on commit `6d6093c6fb5e3a2f4cd4177346eb069f627887df` reached the Release packaging audit and failed on the same four entries. Before that point, both runs passed the Stage 8.28 contract, API-34 Android instrumentation, API-21 minimum-API smoke tests, source audit, and unsigned Release compilation.
+Stage 8.28 isolated Room runtime and code generation from Release. It also replaced broad packaging removal with targeted exclusions. The follow-up investigation in this stage uses Gradle's resolved `releaseRuntimeClasspath` rather than relying on a dependency's published metadata in isolation.
 
-The exact Release APK audit findings were:
-
-- `META-INF/com/android/build/gradle/app-metadata.properties`
-- `META-INF/version-control-info.textproto`
-- `META-INF/services/kotlinx.coroutines.CoroutineExceptionHandler`
-- `META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory`
-
-The earlier explicit exclusions removed AndroidX `.version` entries, but did not remove these four entries.
-
-## Changes in this stage
+## Changes
 
 - Configure Release `vcsInfo.include = false` through the AGP BuildType VcsInfo API.
 - Replace deprecated `packagingOptions` configuration with AGP's `packaging.resources.excludes` DSL.
 - Keep exact exclusions for known build metadata only; no broad `META-INF/**` or `META-INF/services/**` removal.
 - Preserve API-21 Debug instrumentation that validates the two Coroutines service descriptors and provider class loadability.
 - Add CI Gradle dependency insight for `kotlinx-coroutines-android`, `kotlinx-coroutines-core`, and `androidx.room:room-runtime` against `releaseRuntimeClasspath`.
-- Keep the Release APK audit and signer warning gate fail-closed.
+- Keep APK inventory and signing checks fail-closed.
 
-## Coroutines investigation policy
+## Stage 8.29 CI findings
 
-The service descriptor resources are not excluded. The precise transitive dependency path in the generated Release variant must first be captured from Gradle's resolved configuration. If a runtime dependency is required by Release, preserve its runtime behavior; if it is only test/debug infrastructure, isolate that dependency in its Gradle configuration rather than deleting resources after packaging.
+Both Push run `45657908733` and Pull Request run `45657920735`, for commit `1c214ffc8982994d686320125460bda001b2115e`, completed the API-34 instrumentation suite, API-21 legacy smoke test, source audit, dependency inspection, and unsigned Release compilation. Both stopped at the APK package audit with exactly three entries remaining:
 
-## Validation gate
+- `META-INF/com/android/build/gradle/app-metadata.properties`
+- `META-INF/services/kotlinx.coroutines.CoroutineExceptionHandler`
+- `META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory`
 
-The unsigned Release APK must pass the exact META-INF inventory audit. The signed APK must verify V1, V2 and V3 with minimum SDK 21 and produce no `not protected by signature` warnings. API-21 and API-34 tests must remain green. A successful compile alone does not meet this gate.
+The prior `META-INF/version-control-info.textproto` entry was removed by disabling Release VCS metadata. Room did not appear in `releaseRuntimeClasspath`. The Coroutines path was:
+
+```
+project :Bcore
+└─ com.google.android.material:material:1.9.0
+   └─ androidx.fragment:fragment:1.3.6
+      └─ androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1
+         └─ org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1
+            └─ org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1
+```
+
+This confirms that the two service descriptors are part of the current Release runtime graph and should be preserved. The earlier hypothesis that Room was their sole source was not supported by this resolved configuration.
+
+## V1 audit correction carried into Stage 8.30
+
+The Stage 8.29 builds exposed a flaw in the pre-sign audit: it rejected every non-directory `META-INF/` file in an unsigned APK and called it a V1 integrity failure. AOSP's V1 verifier intentionally treats ordinary `META-INF/` files as outside JAR/V1 coverage and emits a warning for them. That warning is not evidence that the whole APK is unprotected: V2/V3 verify the APK signing block and full APK content.
+
+Stage 8.30 therefore uses a strict exact-path allowlist for the AGP provenance file and the two required Coroutines service descriptors, validates the provider contents, and rejects any unexpected or duplicate `META-INF/` entry. The signer accepts only warnings for those exact paths; V1 remains enabled and required, and V2/V3 remain mandatory. This corrects the verification model without removing runtime resources or weakening the unknown-entry gate.
 
 ## Scope and safety
 
-Only build workspace generation, CI diagnostics, source contracts and engineering docs change. The pinned Engine source is unchanged. CloneStore remains the active production persistence source; Room remains opt-in/debug-only. No user Clone data, account, credential, or session is accessed or modified.
+No broad resource exclusion is added. The pinned Engine source, CloneStore runtime behavior, Room schema/data, user Clone data, accounts, credentials, and sessions are not modified. Physical Huawei DUB-LX1/ARM hardware validation remains outstanding; emulator results are not device certification.

@@ -24,7 +24,7 @@ for marker in (
 assert "META-INF/**" not in prepare
 assert "META-INF/services/" not in prepare
 
-# Debug still proves ServiceLoader resources are discoverable on API 21.
+# Debug still proves both ServiceLoader resources and provider classes on API 21.
 for marker in (
     "META-INF/services/",
     "kotlinx.coroutines.internal.MainDispatcherFactory",
@@ -34,7 +34,7 @@ for marker in (
 ):
     assert marker in api21
 
-# Record the exact dependency paths from the Release runtime configuration.
+# Record exact dependency paths from the generated Release runtime configuration.
 for marker in (
     "Inspect Release runtime dependency provenance",
     "--configuration releaseRuntimeClasspath --dependency kotlinx-coroutines-android",
@@ -43,13 +43,27 @@ for marker in (
 ):
     assert marker in workflow, f"Missing dependency provenance diagnostic: {marker}"
 
-# Keep the package and signer gates fail-closed until the resources are explained.
-assert "outside V1 integrity coverage" in audit
-assert 'grep -Fq "not protected by signature" <<< "$VERIFY_OUTPUT"' in workflow
+# Stage 8.30 supersedes the original blanket META-INF rejection with an exact policy.
+for marker in (
+    "EXPECTED_META_INF_ENTRIES",
+    "REQUIRED_SERVICE_PROVIDERS",
+    "validate_meta_inf_entries",
+    "Unexpected META-INF entries",
+):
+    assert marker in audit
+assert "outside V1 integrity coverage" not in audit
+assert "UNPROTECTED_WARNINGS=" in workflow
+assert "not protected by signature" in workflow
+for signature in (
+    "Verified using v1 scheme (JAR signing): true",
+    "Verified using v2 scheme (APK Signature Scheme v2): true",
+    "Verified using v3 scheme (APK Signature Scheme v3): true",
+):
+    assert signature in workflow
 assert doc.is_file()
 
-print("PASS: Release VCS metadata is explicitly disabled through AGP BuildType VcsInfo.")
-print("PASS: Packaging uses current AGP resources DSL and exact metadata exclusions only.")
-print("PASS: ServiceLoader resources remain in API-21 Debug tests and are not blindly excluded.")
-print("PASS: CI records Release runtime dependencyInsight for Coroutines and Room.")
-print("PASS: APK audit and V1 signing warning guards remain fail-closed.")
+print("PASS: Release VCS metadata is disabled with AGP BuildType VcsInfo.")
+print("PASS: Current AGP resources DSL uses exact metadata exclusions only.")
+print("PASS: API-21 Debug ServiceLoader descriptors and provider classes remain covered.")
+print("PASS: CI captures Coroutines and Room dependency provenance for releaseRuntimeClasspath.")
+print("PASS: Stage 8.30 exact META-INF policy and V1/V2/V3 verification supersede the impossible blanket V1 warning ban.")
