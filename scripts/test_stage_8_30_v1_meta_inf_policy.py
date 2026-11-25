@@ -15,8 +15,9 @@ doc = ROOT / "docs/STAGE_8_30_V1_META_INF_POLICY.md"
 
 class FakeArchive:
     def __init__(self, entries):
-        self.entries = list(entries)
-        self.contents = dict(entries)
+        pairs = list(entries)
+        self.entries = [name for name, _ in pairs]
+        self.contents = dict(pairs)
 
     def namelist(self):
         return list(self.entries)

@@ -316,7 +316,7 @@ jobs:
             --key-pass env:KEY_PASS \
             signed/VeyraVault-release.apk
           VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk 2>&1)"
-          printf '%s\\n' "$VERIFY_OUTPUT"
+          printf '%s\n' "$VERIFY_OUTPUT"
 
           # AOSP apksig deliberately warns that ordinary META-INF entries are not V1-covered.
           # Keep V1 enabled and verified; V2/V3 verify the complete APK, including these files.
