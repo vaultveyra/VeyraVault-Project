@@ -602,6 +602,10 @@ android {{
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Do not embed AGP's VCS metadata in the distributable APK.
+            vcsInfo {{
+                include = false
+            }}
         }}
         // Debug instrumentation exercises Room without starting the virtual engine.
         debug {{
@@ -631,16 +635,21 @@ android {{
         abortOnError false
     }}
 
-    packagingOptions {{
-        pickFirst 'lib/armeabi-v7a/*.so'
-        pickFirst 'lib/arm64-v8a/*.so'
-        exclude 'META-INF/DEPENDENCIES'
-        exclude 'META-INF/LICENSE'
-        exclude 'META-INF/NOTICE'
-        // These AGP/AndroidX markers are build metadata, not app runtime resources.
-        exclude 'META-INF/*.version'
-        exclude 'META-INF/com/android/build/gradle/app-metadata.properties'
-        exclude 'META-INF/version-control-info.textproto'
+    packaging {{
+        jniLibs {{
+            pickFirsts += ["lib/armeabi-v7a/*.so", "lib/arm64-v8a/*.so"]
+        }}
+        resources {{
+            // Exclude only known non-runtime metadata. Do not remove META-INF/services.
+            excludes += [
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/NOTICE",
+                "META-INF/*.version",
+                "META-INF/com/android/build/gradle/app-metadata.properties",
+                "META-INF/version-control-info.textproto"
+            ]
+        }}
     }}
 }}
 
