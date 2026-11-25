@@ -27,7 +27,7 @@ for marker in (
 ):
     assert marker in prepare, f"Missing precise metadata exclusion: {marker}"
 assert "META-INF/services/" not in prepare
-assert not re.search(r"exclude\\s+['\"]META-INF/\\*\\*", prepare), "Broad META-INF exclusion is forbidden"
+assert "exclude 'META-INF/**" not in prepare, "Broad META-INF exclusion is forbidden"
 
 # The unsigned Release APK is audited before signing: no ordinary META-INF entry
 # may be shipped outside the V1 JAR coverage area.
