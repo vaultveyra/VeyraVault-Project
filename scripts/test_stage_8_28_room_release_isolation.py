@@ -21,13 +21,18 @@ assert "annotationProcessor 'androidx.room:room-compiler:2.6.1'" not in prepare
 
 # Remove only known build-time metadata. Never remove ServiceLoader resources.
 for marker in (
-    "exclude 'META-INF/*.version'",
-    "exclude 'META-INF/com/android/build/gradle/app-metadata.properties'",
-    "exclude 'META-INF/version-control-info.textproto'",
+    '"META-INF/*.version"',
+    '"META-INF/com/android/build/gradle/app-metadata.properties"',
+    '"META-INF/version-control-info.textproto"',
+    "resources {{",
+    "excludes += [",
+    "vcsInfo {{",
+    "include = false",
 ):
     assert marker in prepare, f"Missing precise metadata exclusion: {marker}"
 assert "META-INF/services/" not in prepare
-assert "exclude 'META-INF/**" not in prepare, "Broad META-INF exclusion is forbidden"
+assert "META-INF/**" not in prepare, "Broad META-INF exclusion is forbidden"
+assert "packagingOptions {{" not in prepare, "Deprecated AGP packagingOptions block must not return"
 
 # The unsigned Release APK is audited before signing: no ordinary META-INF entry
 # may be shipped outside the V1 JAR coverage area.
@@ -64,7 +69,7 @@ assert "ClonePersistenceDatabaseProvider.get(" not in vault_app
 
 assert doc.is_file()
 print("PASS: Room runtime and Room code generation are Debug-only; Release has compile-time types only.")
-print("PASS: Only known build metadata is excluded; ServiceLoader resources are preserved in Debug.")
+print("PASS: Only known build metadata is excluded through AGP's modern resources DSL; ServiceLoader resources are preserved.")
 print("PASS: Unsigned Release APK audit rejects every non-directory META-INF entry.")
 print("PASS: API-21 Debug instrumentation still validates both coroutine service descriptors.")
 print("PASS: Signing fails closed if apksigner reports any V1-unprotected META-INF entry.")
