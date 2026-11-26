@@ -77,8 +77,10 @@ public final class ProfileDocumentContractTest {
         } catch (IllegalArgumentException expected) { rejected = true; }
         check(rejected, "metadata-only fields cannot be reported applied without an adapter");
 
+        ProfileDocument allClone = new ProfileDocument();
+        check(allClone.put("timeZoneId", "America/Los_Angeles"), "resolveAll Clone fixture");
         java.util.Map<String, ProfileDocumentResolver.FieldResult> all =
-                ProfileDocumentResolver.resolveAll(new ProfileDocument(), global);
+                ProfileDocumentResolver.resolveAll(allClone, global);
         check(all.size() == ProfileFieldRegistry.all().size(), "resolveAll must cover every registered field");
         check(all.get("timeZoneId").source == ProfileDocumentResolver.Source.CLONE,
                 "resolveAll must preserve Clone precedence");
