@@ -111,6 +111,19 @@ public final class ProfileFieldRegistry {
         return Collections.unmodifiableList(new ArrayList<>(FIELDS.values()));
     }
 
+    /** Builds the canonical deterministic defaults without consulting Android host state. */
+    public static ProfileDocument createSafeDefaults() {
+        ProfileDocument defaults = new ProfileDocument();
+        for (Field field : all()) {
+            if (field.safeDefault != null && isValidValue(field, field.safeDefault)) {
+                if (!defaults.put(field.key, field.safeDefault)) {
+                    throw new IllegalStateException("Invalid registry safe default: " + field.key);
+                }
+            }
+        }
+        return defaults;
+    }
+
     public static boolean isValidValue(Field field, Object value) {
         if (field == null || value == null || !field.canBeStoredAsProfileInput()) return false;
         switch (field.type) {
