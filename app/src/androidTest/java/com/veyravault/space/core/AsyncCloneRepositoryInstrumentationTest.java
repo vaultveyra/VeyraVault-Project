@@ -41,6 +41,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
     @After public void tearDown() {
         preferences.edit().clear().commit();
         profilePreferences.edit().clear().commit();
+        profileDocumentPreferences.edit().clear().commit();
     }
 
     @Test public void queuedUpsertThenReadPreservesSubmissionOrder() throws Exception {
@@ -870,6 +871,48 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("Europe/Paris", typedClone.get("timeZoneId"));
         assertEquals("America/Chicago", legacyGlobal.timeZoneId);
         assertEquals("America/New_York", typedGlobal.get("timeZoneId"));
+    }
+
+    @Test public void locationRuntimeResolverUsesTypedCloneAndGlobalValuesPerField() throws Exception {
+        String packageName = "com.example.typedlocation";
+        int userId = 7;
+
+        ProfileSettings legacyClone = new ProfileSettings();
+        legacyClone.locationEnabled = Boolean.FALSE;
+        legacyClone.latitude = 12.5d;
+        assertTrue(ProfileStore.saveCloneOverride(context, packageName, userId, legacyClone));
+
+        ProfileSettings legacyGlobal = new ProfileSettings();
+        legacyGlobal.longitude = 44.5d;
+        assertTrue(ProfileStore.saveGlobal(context, legacyGlobal));
+
+        assertTrue(ProfileDocumentStore.saveCloneField(
+                context, packageName, userId, "locationEnabled", Boolean.TRUE));
+        assertTrue(ProfileDocumentStore.saveCloneField(
+                context, packageName, userId, "latitude", 31.25d));
+        assertTrue(ProfileDocumentStore.saveGlobalField(context, "longitude", 48.75d));
+
+        ProfileResolver.ResolvedProfile resolved = ProfileRuntimeProvider.resolveMergedProfile(
+                context, packageName, userId, ProfileRuntimeApplier.systemFallback());
+
+        assertEquals(Boolean.TRUE, resolved.locationEnabled);
+        assertEquals(ProfileResolver.Source.CLONE, resolved.locationEnabledSource);
+        assertEquals(Double.valueOf(31.25d), resolved.latitude);
+        assertEquals(ProfileResolver.Source.CLONE, resolved.latitudeSource);
+        assertEquals(Double.valueOf(48.75d), resolved.longitude);
+        assertEquals(ProfileResolver.Source.GLOBAL, resolved.longitudeSource);
+
+        // Resolution is read-only: neither legacy nor typed persisted values are rewritten.
+        assertEquals(Boolean.FALSE,
+                ProfileStore.readCloneOverrideStrict(context, packageName, userId).locationEnabled);
+        assertEquals(Double.valueOf(12.5d),
+                ProfileStore.readCloneOverrideStrict(context, packageName, userId).latitude);
+        assertEquals(Boolean.TRUE, ProfileDocumentStore.readCloneStrict(
+                context, packageName, userId).get("locationEnabled"));
+        assertEquals(Double.valueOf(31.25d), ProfileDocumentStore.readCloneStrict(
+                context, packageName, userId).get("latitude"));
+        assertEquals(Double.valueOf(44.5d), ProfileStore.readGlobalStrict(context).longitude);
+        assertEquals(Double.valueOf(48.75d), ProfileDocumentStore.readGlobalStrict(context).get("longitude"));
     }
 
     private interface AsyncRepositoryOperation<T> {
