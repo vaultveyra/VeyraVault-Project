@@ -259,7 +259,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
             ProfileResolver.ResolvedProfile globalFallback =
                     ProfileResolver.resolve(new ProfileSettings(), globalAfterReset.getValue(), system);
             assertEquals("en-US", globalFallback.localeTag);
-            assertEquals(ProfileResolver.Source.SYSTEM, globalFallback.localeSource);
+            assertEquals(ProfileResolver.Source.SAFE_DEFAULT, globalFallback.localeSource);
             assertEquals("Europe/Paris", globalFallback.timeZoneId);
             assertEquals(ProfileResolver.Source.GLOBAL, globalFallback.timeZoneSource);
         } finally {
