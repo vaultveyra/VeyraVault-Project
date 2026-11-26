@@ -90,6 +90,26 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         return response;
     }
 
+    /**
+     * Resolves the authoritative five runtime fields from both typed and legacy stores.
+     * This is shared by process IPC and Engine-scoped hooks so Location cannot lag behind
+     * the typed profile document while older settings screens are being migrated.
+     */
+    static ProfileResolver.ResolvedProfile resolveMergedProfile(
+            Context context, String packageName, int userId,
+            ProfileSettings safeDefault) throws Exception {
+        if (context == null || packageName == null || packageName.trim().isEmpty() || userId < 0) {
+            throw new IllegalArgumentException("Clone identity and context are required");
+        }
+        ProfileSettings legacyClone = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
+        ProfileSettings legacyGlobal = ProfileStore.readGlobalStrict(context);
+        ProfileDocument typedClone = ProfileDocumentStore.readCloneStrict(context, packageName, userId);
+        ProfileDocument typedGlobal = ProfileDocumentStore.readGlobalStrict(context);
+        ProfileSettings clone = mergeDocumentFields(legacyClone, typedClone);
+        ProfileSettings global = mergeDocumentFields(legacyGlobal, typedGlobal);
+        return ProfileResolver.resolve(clone, global, safeDefault);
+    }
+
     /** Add legacy supported values only where the typed document has no field override. */
     static ProfileDocument mergeLegacyFields(ProfileDocument document, ProfileSettings legacy) {
         ProfileDocument merged = document == null ? new ProfileDocument() : document.copy();
