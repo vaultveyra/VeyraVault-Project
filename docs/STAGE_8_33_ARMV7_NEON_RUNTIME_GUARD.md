@@ -9,7 +9,7 @@ The ordering is critical: the pinned Engine's NativeCore class loads libblackbox
 ## Implementation contract
 
 - Build a separate libveyra_neon_probe.so in the temporary Engine workspace. It is not linked into or merged with libblackbox.so.
-- Keep the Probe separate from the pinned Engine. NDK r24+ rejects `LOCAL_ARM_NEON := false`; therefore, for `armeabi-v7a` only, compile the Probe's C and C++ sources with `-mfpu=vfpv3-d16`. Do not apply that ARMv7 flag to the ARM64 build. Only the ARMv7 Probe includes Google's C99 runtime CPU-feature implementation. The isolated ARMv7 module selects cpu_features' `HAVE_STRONG_GETAUXVAL` path: Android's `getauxval()` is available from API 18, so the project's API 21 minimum can use `<sys/auxv.h>` directly instead of the optional `dlopen` fallback. This also ensures the ELF auxiliary-vector `AT_HWCAP` constants come from the NDK headers.
+- Keep the Probe separate from the pinned Engine. For the `armeabi-v7a` module only, set `LOCAL_ARM_NEON := false` (the documented ndk-build per-module opt-out) and compile the Probe's C and C++ sources with `-mfpu=vfpv3-d16`. Do not apply that ARMv7 flag to the ARM64 build. Only the ARMv7 Probe includes Google's C99 runtime CPU-feature implementation. The isolated ARMv7 module selects cpu_features' `HAVE_STRONG_GETAUXVAL` path: Android's `getauxval()` is available from API 18, so the project's API 21 minimum can use `<sys/auxv.h>` directly instead of the optional `dlopen` fallback. This also ensures the ELF auxiliary-vector `AT_HWCAP` constants come from the NDK headers.
 - Pin google/cpu_features to immutable commit 4814778e45acc394b37ca0837441ad32a2305bb1 and verify its repository URL, HEAD, and clean worktree before copying its sources and Apache-2.0 license into the ephemeral workspace.
 - Read ARMv7 feature flags using cpu_features::GetArmInfo(). A positive NEON result allows the ARMv7 Engine; an explicit negative result rejects it; an unknown or unloadable probe also rejects it.
 - Accept arm64-v8a directly because Advanced SIMD is mandatory for the Android arm64 ABI. A 32-bit process on ARM64-capable hardware still probes its active ARMv7 execution ABI rather than assuming that the 64-bit ABI list proves NEON in 32-bit mode.
@@ -20,7 +20,7 @@ The ordering is critical: the pinned Engine's NativeCore class loads libblackbox
 ## Validation boundary
 
 - Pure policy instrumentation covers ARM64, ARMv7 supported, unsupported, unknown, unsupported host ABI, and generic armeabi cases.
-- CI must cross-compile the probe for both ARM ABIs, verify that the ARMv7 compile configuration uses `-mfpu=vfpv3-d16` without `LOCAL_ARM_NEON := false`, inspect the packaged ELF attributes to prove the probe contains no NEON, and run the existing API 21/API 34 suites and APK audits.
+- CI must cross-compile the probe for both ARM ABIs, verify that the ARMv7 module has `LOCAL_ARM_NEON := false` and `-mfpu=vfpv3-d16`, inspect the packaged ELF attributes to prove the probe contains no NEON, and run the existing API 21/API 34 suites and APK audits.
 - Android emulator x86_64 does not exercise the real ARMv7 hardware path. A physical ARMv7 device without NEON is still needed to validate the negative hardware case.
 - Huawei DUB-LX1 has not been physically tested. The actual ABI and runtime outcome must be read from the handset before making a compatibility claim.
 - The probe does not load libblackbox.so, install or launch target apps, reserve Clone IDs, or read/write CloneStore data.
