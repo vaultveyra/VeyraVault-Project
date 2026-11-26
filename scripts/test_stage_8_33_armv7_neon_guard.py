@@ -50,6 +50,8 @@ assert "Independent ARMv7 preflight probe is built without NEON." in audit
 assert "Install isolated NDK r23 for baseline CPU probe" in workflow
 assert "Build independent ARMv7/ARM64 NEON probe" in workflow
 assert "build_neon_probe.py" in workflow
+assert 'yes | "$SDKMANAGER" --licenses' not in workflow
+assert "android-ndk-license" in workflow
 assert "Test Stage 8.33 ARMv7 NEON preflight guard" in workflow
 
 for expected in (
