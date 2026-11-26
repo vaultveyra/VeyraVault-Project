@@ -267,7 +267,7 @@ assert "ALWAYS" not in policy  # guard against accidental placeholder implementa
 assert "REJECT_SPLIT_APK" in policy
 assert "REJECT_EXTRACTOR_ABI_MISSING" in policy
 assert "UNKNOWN_APK_METADATA" in policy
-assert "debugHarnessApkIsReadAsPureJava" in instrumentation
+assert "instrumentationHarnessApkIsReadAsPureJava" in instrumentation
 assert "missingPackageMetadataFailsClosed" in instrumentation
 assert "matchesInstalledPackage" in instrumentation
 
