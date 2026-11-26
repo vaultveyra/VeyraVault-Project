@@ -6,8 +6,6 @@ import android.content.SharedPreferences;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Map;
-
 /**
  * Additive, versioned persistence for the expanded typed profile documents.
  *
