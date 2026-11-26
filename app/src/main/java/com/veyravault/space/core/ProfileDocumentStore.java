@@ -134,6 +134,7 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
+            parseDocument(existing); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
 
             // Replace only registered profile-input fields. Unknown future keys remain intact.
@@ -173,6 +174,7 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
+            parseDocument(existing); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.put(fieldKey, value);
             return commitProfile(context, root, cloneIdentity, updated);
@@ -200,6 +202,7 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
+            parseDocument(existing); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.remove(fieldKey);
             if (cloneIdentity != null && updated.length() == 0) {
