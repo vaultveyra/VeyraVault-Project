@@ -81,9 +81,12 @@ assert "Engine.doOnCreate" not in debug_app.read_text(encoding="utf-8")
 assert 'testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"' in prepare
 for dep in ("androidx.test:runner:1.5.2", "androidx.test:core:1.5.0", "androidx.test.ext:junit:1.1.5"):
     assert dep in prepare, f"Missing instrumentation dependency: {dep}"
-assert 'excludes += ["**/*.so"]' in prepare
+assert 'excludes += ["**/*.so"]' not in prepare, "Debug APK must retain its x86_64 test-only Probe library"
 assert "releaseImplementation project(':Bcore')" in prepare and "debugCompileOnly project(':Bcore')" in prepare
 assert 'abiFilters "x86_64"' in prepare
+assert 'debugCompileOnly project(\':Bcore\')' in prepare
+assert 'releaseImplementation project(\':Bcore\')' in prepare
+assert '("x86_64", "x86_64-linux-android21"' in (ROOT / "scripts/build_neon_probe.py").read_text(encoding="utf-8")
 assert "reactivecircus/android-emulator-runner@v2" in workflow
 assert 'ANDROID_I_WANT_MY_TCG: "yes"' in workflow, "Hosted Linux emulator must explicitly allow TCG when KVM is unavailable"
 assert ":app:connectedDebugAndroidTest" in workflow
