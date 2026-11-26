@@ -9,13 +9,13 @@ public final class ProfileDocumentContractTest {
     public static void main(String[] args) {
         ProfileDocument clone = new ProfileDocument();
         ProfileDocument global = new ProfileDocument();
-        ProfileDocument safe = new ProfileDocument();
+        ProfileDocument safe = ProfileFieldRegistry.createSafeDefaults();
         check(clone.put("timeZoneId", "America/Los_Angeles"), "valid clone timezone");
         check(global.put("localeTag", "en-US"), "valid global locale");
         check(global.put("timeZoneId", "America/New_York"), "valid global timezone");
-        check(safe.put("localeTag", "en-US"), "safe locale");
-        check(safe.put("timeZoneId", "UTC"), "safe timezone");
-        check(safe.put("locationEnabled", Boolean.FALSE), "safe location disabled");
+        check("en-US".equals(safe.get("localeTag")), "registry safe locale");
+        check("UTC".equals(safe.get("timeZoneId")), "registry safe timezone");
+        check(Boolean.FALSE.equals(safe.get("locationEnabled")), "registry safe location disabled");
 
         ProfileDocumentResolver.FieldResult tz =
                 ProfileDocumentResolver.resolve("timeZoneId", clone, global, safe);
@@ -76,6 +76,19 @@ public final class ProfileDocumentContractTest {
             ProfileDocumentResolver.withRuntimeStatus(country, ProfileFieldRegistry.ApplyStatus.APPLIED);
         } catch (IllegalArgumentException expected) { rejected = true; }
         check(rejected, "metadata-only fields cannot be reported applied without an adapter");
+
+        java.util.Map<String, ProfileDocumentResolver.FieldResult> all =
+                ProfileDocumentResolver.resolveAll(clone, global);
+        check(all.size() == ProfileFieldRegistry.all().size(), "resolveAll must cover every registered field");
+        check(all.get("timeZoneId").source == ProfileDocumentResolver.Source.CLONE,
+                "resolveAll must preserve Clone precedence");
+        check(all.get("localeTag").source == ProfileDocumentResolver.Source.GLOBAL,
+                "resolveAll must preserve per-field Global fallback");
+        check(all.get("locationEnabled").source == ProfileDocumentResolver.Source.SAFE_DEFAULT,
+                "resolveAll must use registry safe defaults");
+        boolean immutable = false;
+        try { all.clear(); } catch (UnsupportedOperationException expected) { immutable = true; }
+        check(immutable, "resolveAll snapshot must be immutable");
 
         check(ProfileFieldRegistry.all().size() >= 40, "registry must cover the researched field inventory");
         System.out.println("Profile document/registry/resolver contract tests: PASS");
