@@ -26,12 +26,16 @@ public class LegacyApi21CompatibilityInstrumentationTest {
     @Test
     public void minimumSdkPackageManagerAndAbiPreflightWorkOnApi21() throws Exception {
         assertEquals("This test must run on Android API 21", 21, Build.VERSION.SDK_INT);
-        Context context = ApplicationProvider.getApplicationContext();
+        // Inspect the separate instrumentation APK. The target Debug APK deliberately
+        // carries an x86_64-only test Probe for the hosted emulator; it is not an Engine
+        // release ABI and must not be mistaken for a production ARM package on API 21.
+        Context context = androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation().getContext();
         assertTrue(context.getPackageManager().getApplicationInfo(
                 context.getPackageName(), 0) != null);
 
-        // Exercises the API-21 PackageManager overload, splitSourceDirs access, APK ZIP
-        // scanning, and the legacy host-bitness fallback (without calling API 23/33 methods).
+        // Exercises the API-21 PackageManager overload, splitSourceDirs access, and APK ZIP
+        // scanning against a pure-Java test harness without requiring an x86 Engine ABI.
         NativeAbiPreflight.Result result = NativeAbiPreflight.inspectInstalledPackage(
                 context, context.getPackageName());
         assertTrue(result.getDiagnosticCode(), result.isAllowed());
