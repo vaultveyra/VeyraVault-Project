@@ -430,6 +430,122 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Reads the expanded Global profile document on the repository worker. */
+    public void loadGlobalProfileDocument(Callback<ProfileDocument> callback) {
+        enqueue(() -> ProfileDocumentStore.readGlobalStrict(appContext).copy(), callback);
+    }
+
+    /** Reads one Clone's expanded profile document without consulting another Clone. */
+    public void loadCloneProfileDocument(String packageName, int userId,
+                                         Callback<ProfileDocument> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
+            deliver(callback, Result.<ProfileDocument>failure(
+                    Failure.INVALID_INPUT, "Clone identity is invalid"));
+            return;
+        }
+        enqueue(() -> ProfileDocumentStore.readCloneStrict(appContext, packageName, userId).copy(), callback);
+    }
+
+    /** Replaces editable Global fields only; storage I/O remains off the UI thread. */
+    public void saveGlobalProfileDocument(ProfileDocument document, Callback<Boolean> callback) {
+        if (!isValidDocument(document)) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Global profile document is invalid"));
+            return;
+        }
+        ProfileDocument snapshot = document.copy();
+        enqueue(() -> {
+            ProfileDocumentStore.readGlobalStrict(appContext);
+            if (!ProfileDocumentStore.saveGlobalDocument(appContext, snapshot))
+                throw new PersistenceFailureException("Global profile document was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    /** Replaces only the requested Clone document; CloneStore and session records are untouched. */
+    public void saveCloneProfileDocument(String packageName, int userId, ProfileDocument document,
+                                         Callback<Boolean> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || !isValidDocument(document)) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile document is invalid"));
+            return;
+        }
+        ProfileDocument snapshot = document.copy();
+        enqueue(() -> {
+            ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
+            if (!ProfileDocumentStore.saveCloneDocument(appContext, packageName, userId, snapshot))
+                throw new PersistenceFailureException("Clone profile document was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void saveGlobalProfileField(String field, Object value, Callback<Boolean> callback) {
+        if (!isValidDocumentField(field, value)) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Global profile field is invalid"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileDocumentStore.saveGlobalField(appContext, field, value))
+                throw new PersistenceFailureException("Global profile field was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void saveCloneProfileField(String packageName, int userId, String field, Object value,
+                                      Callback<Boolean> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || !isValidDocumentField(field, value)) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile field is invalid"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileDocumentStore.saveCloneField(appContext, packageName, userId, field, value))
+                throw new PersistenceFailureException("Clone profile field was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void clearGlobalProfileDocumentField(String field, Callback<Boolean> callback) {
+        ProfileFieldRegistry.Field registered = ProfileFieldRegistry.get(field);
+        if (registered == null || !registered.canBeStoredAsProfileInput()) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Global profile field is unsupported"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileDocumentStore.clearGlobalField(appContext, field))
+                throw new PersistenceFailureException("Global profile field reset was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    public void clearCloneProfileDocumentField(String packageName, int userId, String field,
+                                               Callback<Boolean> callback) {
+        ProfileFieldRegistry.Field registered = ProfileFieldRegistry.get(field);
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || registered == null || !registered.canBeStoredAsProfileInput()) {
+            deliver(callback, Result.<Boolean>failure(Failure.INVALID_INPUT, "Clone profile field is unsupported"));
+            return;
+        }
+        enqueue(() -> {
+            if (!ProfileDocumentStore.clearCloneField(appContext, packageName, userId, field))
+                throw new PersistenceFailureException("Clone profile field reset was not committed");
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    private static boolean isValidDocument(ProfileDocument document) {
+        if (document == null) return false;
+        for (java.util.Map.Entry<String, Object> entry : document.values().entrySet()) {
+            if (!isValidDocumentField(entry.getKey(), entry.getValue())) return false;
+        }
+        return true;
+    }
+
+    private static boolean isValidDocumentField(String key, Object value) {
+        ProfileFieldRegistry.Field field = ProfileFieldRegistry.get(key);
+        return field != null && field.canBeStoredAsProfileInput()
+                && ProfileFieldRegistry.isValidValue(field, value);
+    }
+
     public void migrateLegacyLocationProfiles(Callback<Boolean> callback) {
         enqueue(() -> {
             if (!ProfileStore.migrateLegacyLocationSettings(appContext))
