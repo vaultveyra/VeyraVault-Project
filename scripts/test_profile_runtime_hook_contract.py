@@ -51,7 +51,7 @@ assert "TimeZone.setDefault(TimeZone.getTimeZone(profile.timeZoneId))" in applie
 assert "systemTimeZoneId" in applier
 assert "Intent.ACTION_TIMEZONE_CHANGED" in applier
 assert "lastAppliedSystemTimeZone" in applier
-assert "nextCloneSystemFallbackDoesNotInheritPreviousCloneTimeZone" in (
+assert "nextCloneBindRestoresProcessBaselineWithoutUsingItAsProfileFallback" in (
     Path("app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java")
     .read_text(encoding="utf-8")
 )
