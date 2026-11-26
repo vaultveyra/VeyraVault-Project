@@ -16,12 +16,15 @@ import android.os.Process;
  */
 public final class ProfileRuntimeProvider extends ContentProvider {
     public static final String METHOD_RESOLVE_CLONE_PROFILE = "resolveCloneProfile";
+    public static final String METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT = "resolveCloneProfileDocument";
 
     @Override public boolean onCreate() { return getContext() != null; }
 
     @Override public Bundle call(String method, String arg, Bundle extras) {
         Bundle response = new Bundle();
-        if (!METHOD_RESOLVE_CLONE_PROFILE.equals(method)) {
+        boolean legacyRequest = METHOD_RESOLVE_CLONE_PROFILE.equals(method);
+        boolean documentRequest = METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT.equals(method);
+        if (!legacyRequest && !documentRequest) {
             response.putBoolean("ok", false);
             response.putString("error", "UNSUPPORTED_METHOD");
             return response;
@@ -40,16 +43,47 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         String packageName = extras.getString("packageName");
         int userId = extras.getInt("userId", -1);
         try {
-            ProfileSettings clone = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
-            ProfileSettings global = ProfileStore.readGlobalStrict(context);
-            response.putBoolean("ok", true);
-            response.putBundle("clone", encode(clone));
-            response.putBundle("global", encode(global));
+            if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
+                response.putBoolean("ok", false);
+                response.putString("error", "INVALID_CLONE_IDENTITY");
+                return response;
+            }
+            if (documentRequest) {
+                ProfileDocument clone = ProfileDocumentStore.readCloneStrict(context, packageName, userId);
+                ProfileDocument global = ProfileDocumentStore.readGlobalStrict(context);
+                java.util.Map<String, ProfileDocumentResolver.FieldResult> resolved =
+                        ProfileDocumentResolver.resolveAll(clone, global);
+                Bundle fields = new Bundle();
+                for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
+                    Bundle item = new Bundle();
+                    item.putString("source", field.source.name());
+                    item.putString("status", field.status.name());
+                    putTypedValue(item, field.value);
+                    fields.putBundle(field.key, item);
+                }
+                response.putBoolean("ok", true);
+                response.putBundle("fields", fields);
+                response.putLong("revision", ProfileDocumentStore.readRevisionStrict(context));
+            } else {
+                ProfileSettings clone = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
+                ProfileSettings global = ProfileStore.readGlobalStrict(context);
+                response.putBoolean("ok", true);
+                response.putBundle("clone", encode(clone));
+                response.putBundle("global", encode(global));
+            }
         } catch (Exception error) {
             response.putBoolean("ok", false);
             response.putString("error", error.getClass().getSimpleName());
         }
         return response;
+    }
+
+    private static void putTypedValue(Bundle out, Object value) {
+        if (value instanceof String) out.putString("value", (String) value);
+        else if (value instanceof Boolean) out.putBoolean("value", (Boolean) value);
+        else if (value instanceof Integer) out.putInt("value", (Integer) value);
+        else if (value instanceof Long) out.putLong("value", (Long) value);
+        else if (value instanceof Number) out.putDouble("value", ((Number) value).doubleValue());
     }
 
     private static Bundle encode(ProfileSettings settings) {
