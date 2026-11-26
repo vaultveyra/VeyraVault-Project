@@ -28,6 +28,8 @@ def main():
         ("armeabi-v7a", "armv7a-linux-androideabi21",
          ["-march=armv7-a", "-mfpu=vfpv3-d16", "-mfloat-abi=softfp"]),
         ("arm64-v8a", "aarch64-linux-android21", ["-march=armv8-a"]),
+        # Debug-only test ABI: returns UNKNOWN and is never shipped in Release.
+        ("x86_64", "x86_64-linux-android21", ["-march=x86-64"]),
     ]
     for abi, target, cpu_flags in targets:
         output_dir = output_root / abi
