@@ -182,8 +182,23 @@ jobs:
       - name: Test Android Room instrumentation wiring
         run: python3 scripts/test_room_instrumentation_wiring.py
 
+      - name: Install isolated NDK r23 for baseline CPU probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          "$SDKMANAGER" --install "ndk;23.2.8568313"
+          test -x "$SDK_ROOT/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
+
+      - name: Build independent ARMv7/ARM64 NEON probe
+        run: python3 scripts/build_neon_probe.py
 
       - name: Test Stage 8.17 isolated install transaction recovery harness
         run: python3 scripts/test_stage_8_17_install_transaction_recovery.py
