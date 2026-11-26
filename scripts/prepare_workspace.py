@@ -10,8 +10,6 @@ OUTPUT_DIR = os.path.join(ROOT, "output_artifacts")
 NDK_VERSION = "27.0.12077973"
 ENGINE_COMMIT = "89b59836c66f173756a4ae258cf379a957649820"
 ENGINE_REPOSITORY = "https://github.com/ALEX5402/NewBlackbox.git"
-CPU_FEATURES_COMMIT = "4814778e45acc394b37ca0837441ad32a2305bb1"
-CPU_FEATURES_REPOSITORY = "https://github.com/google/cpu_features.git"
 NDK_LICENSE_HASH = "24333f8a63b6825ea9c5514f83c2829b004d1fee"
 
 
@@ -543,52 +541,6 @@ def detect_app_java_version(app_gradle_path):
     return match.group(1) if match else "VERSION_1_8"
 
 
-def prepare_armv7_neon_probe(workspace):
-    """Add a separate baseline ARMv7 CPU feature probe to the ephemeral Engine workspace."""
-    temporary_root = tempfile.mkdtemp(prefix="veyra_cpu_features_")
-    try:
-        cpu_repository = os.path.join(temporary_root, "cpu_features")
-        run(f'git clone --filter=blob:none --no-checkout "{CPU_FEATURES_REPOSITORY}" "{cpu_repository}"')
-        run(f'git -C "{cpu_repository}" fetch --depth 1 origin {CPU_FEATURES_COMMIT}')
-        run(f'git -C "{cpu_repository}" checkout --detach FETCH_HEAD')
-
-        head = _git_output(cpu_repository, "rev-parse", "HEAD")
-        remote = _git_output(cpu_repository, "remote", "get-url", "origin")
-        status = _git_output(cpu_repository, "status", "--porcelain", "--untracked-files=all")
-        if head != CPU_FEATURES_COMMIT or remote != CPU_FEATURES_REPOSITORY or status:
-            raise RuntimeError("Google cpu_features checkout did not match its immutable source pin")
-
-        native_root = os.path.join(workspace, "Bcore", "src", "main", "cpp")
-        android_mk = os.path.join(native_root, "Android.mk")
-        if not os.path.isdir(native_root) or not os.path.isfile(android_mk):
-            raise RuntimeError("Pinned Engine native build directory is missing")
-
-        vendored = os.path.join(native_root, "veyra_cpu_features")
-        if os.path.exists(vendored):
-            raise RuntimeError("Unexpected pre-existing cpu_features workspace directory")
-        shutil.copytree(os.path.join(cpu_repository, "include"), os.path.join(vendored, "include"))
-        shutil.copytree(os.path.join(cpu_repository, "src"), os.path.join(vendored, "src"))
-        shutil.copy2(os.path.join(cpu_repository, "LICENSE"), os.path.join(vendored, "LICENSE"))
-        shutil.copy2(
-            os.path.join(ROOT, "app", "src", "main", "cpp", "VeyraNeonProbe.cpp"),
-            os.path.join(native_root, "VeyraNeonProbe.cpp"),
-        )
-
-        with open(android_mk, "r", encoding="utf-8") as source_file:
-            makefile = source_file.read()
-        marker = "# VEYRAVAULT_STAGE_8_33_ARMV7_NEON_PROBE"
-        if marker in makefile:
-            raise RuntimeError("Stage 8.33 NEON probe was already injected into the workspace")
-        module = "\n# VEYRAVAULT_STAGE_8_33_ARMV7_NEON_PROBE\n# This helper is separate from libblackbox.so and must never use NEON.\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := veyra_neon_probe\nLOCAL_SRC_FILES := VeyraNeonProbe.cpp\nifeq ($(TARGET_ARCH_ABI),armeabi-v7a)\n# Disable the NDK's default ARMv7 NEON mode for this module only.\nLOCAL_ARM_NEON := false\nLOCAL_CFLAGS += -mfpu=vfpv3-d16\nLOCAL_CPPFLAGS += -mfpu=vfpv3-d16\nLOCAL_SRC_FILES += \\\n    veyra_cpu_features/src/filesystem.c \\\n    veyra_cpu_features/src/stack_line_reader.c \\\n    veyra_cpu_features/src/string_view.c \\\n    veyra_cpu_features/src/hwcaps.c \\\n    veyra_cpu_features/src/hwcaps_linux_or_android.c \\\n    veyra_cpu_features/src/impl_arm_linux_or_android.c\nLOCAL_C_INCLUDES += \\\n    $(LOCAL_PATH)/veyra_cpu_features/include \\\n    $(LOCAL_PATH)/veyra_cpu_features/include/internal\nLOCAL_CFLAGS += -std=c99 -DHAVE_STRONG_GETAUXVAL -DSTACK_LINE_READER_BUFFER_SIZE=1024\nendif\nLOCAL_CPPFLAGS += -std=c++17\ninclude $(BUILD_SHARED_LIBRARY)\n"
-        with open(android_mk, "a", encoding="utf-8") as target_file:
-            target_file.write(module)
-
-        print("[+] Added isolated ARMv7 NEON preflight probe from google/cpu_features@" + CPU_FEATURES_COMMIT)
-        print("[+] The ARMv7 probe uses -mfpu=vfpv3-d16; libblackbox.so is unchanged.")
-    finally:
-        shutil.rmtree(temporary_root, ignore_errors=True)
-
-
 def main():
     if "--post-build" in sys.argv:
         post_build()
@@ -642,7 +594,6 @@ def main():
 
     print(f"[+] Detected Engine Config -> compileSdk: {compile_sdk}, minSdk: {min_sdk}; app Java: {app_java_ver}")
     align_native_application_platform(WORKSPACE, int(min_sdk))
-    prepare_armv7_neon_probe(WORKSPACE)
 
     bcore_manifest = os.path.join(WORKSPACE, "Bcore", "src", "main", "AndroidManifest.xml")
     if os.path.exists(bcore_manifest):
