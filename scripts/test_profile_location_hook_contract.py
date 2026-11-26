@@ -5,7 +5,8 @@ assert "enum LocationStatus { APPLIED, DISABLED, UNSUPPORTED, FAILED }" in sourc
 assert "class SyncSummary" in source
 assert "syncAllClones(Context context)" in source
 assert "CloneStore.readAllStrict(context)" in source
-assert "ProfileStore.resolveStrict(context, entry.packageName, entry.userId" in source
+assert "ProfileRuntimeProvider.resolveMergedProfile(context, entry.packageName" in source
+assert "ProfileStore.resolveStrict(context, entry.packageName, entry.userId" not in source
 assert "CloneStore.readMasterMockGpsEnabledStrict(context)" in source
 assert "if (!masterEnabled)" in source
 assert "Boolean.TRUE.equals(resolved.locationEnabled)" in source
