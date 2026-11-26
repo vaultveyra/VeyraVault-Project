@@ -818,6 +818,60 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void typedRuntimeProfileMergesLegacyValuesPerFieldWithoutMutatingEitherStore() {
+        ProfileSettings legacyClone = new ProfileSettings();
+        legacyClone.localeTag = "de-DE";
+        legacyClone.timeZoneId = "Europe/Berlin";
+        legacyClone.locationEnabled = Boolean.FALSE;
+
+        ProfileDocument typedClone = new ProfileDocument();
+        assertTrue(typedClone.put("timeZoneId", "Europe/Paris"));
+
+        ProfileSettings legacyGlobal = new ProfileSettings();
+        legacyGlobal.localeTag = "fr-FR";
+        legacyGlobal.timeZoneId = "America/Chicago";
+
+        ProfileDocument typedGlobal = new ProfileDocument();
+        assertTrue(typedGlobal.put("timeZoneId", "America/New_York"));
+
+        ProfileDocument mergedClone = ProfileRuntimeProvider.mergeLegacyFields(
+                typedClone, legacyClone);
+        ProfileDocument mergedGlobal = ProfileRuntimeProvider.mergeLegacyFields(
+                typedGlobal, legacyGlobal);
+
+        assertEquals("de-DE", mergedClone.get("localeTag"));
+        assertEquals("Europe/Paris", mergedClone.get("timeZoneId"));
+        assertEquals(Boolean.FALSE, mergedClone.get("locationEnabled"));
+        assertEquals("fr-FR", mergedGlobal.get("localeTag"));
+        assertEquals("America/New_York", mergedGlobal.get("timeZoneId"));
+
+        ProfileDocumentResolver.FieldResult cloneLocale = ProfileDocumentResolver.resolve(
+                "localeTag", mergedClone, mergedGlobal, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult cloneZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", mergedClone, mergedGlobal, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult inheritedZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", new ProfileDocument(), mergedGlobal, ProfileFieldRegistry.createSafeDefaults());
+
+        assertEquals("de-DE", cloneLocale.value);
+        assertEquals(ProfileDocumentResolver.Source.CLONE, cloneLocale.source);
+        assertEquals("Europe/Paris", cloneZone.value);
+        assertEquals(ProfileDocumentResolver.Source.CLONE, cloneZone.source);
+        assertEquals("America/New_York", inheritedZone.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, inheritedZone.source);
+
+        ProfileSettings runtimeClone = ProfileRuntimeProvider.mergeDocumentFields(
+                legacyClone, typedClone);
+        assertEquals("de-DE", runtimeClone.localeTag);
+        assertEquals("Europe/Paris", runtimeClone.timeZoneId);
+        assertEquals(Boolean.FALSE, runtimeClone.locationEnabled);
+
+        // These are in-memory compatibility merges only: persisted legacy and typed inputs stay intact.
+        assertEquals("Europe/Berlin", legacyClone.timeZoneId);
+        assertEquals("Europe/Paris", typedClone.get("timeZoneId"));
+        assertEquals("America/Chicago", legacyGlobal.timeZoneId);
+        assertEquals("America/New_York", typedGlobal.get("timeZoneId"));
+    }
+
     private interface AsyncRepositoryOperation<T> {
         void execute(AsyncCloneRepository.Callback<T> callback);
     }
