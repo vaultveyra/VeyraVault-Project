@@ -664,11 +664,6 @@ android {{
             ndk {{
                 abiFilters "x86_64"
             }}
-            packaging {{
-                jniLibs {{
-                    excludes += ["**/*.so"]
-                }}
-            }}
         }}
     }}
 
