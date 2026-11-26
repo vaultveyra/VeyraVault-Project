@@ -727,9 +727,9 @@ public class AsyncCloneRepositoryInstrumentationTest {
 
     @Test public void typedProfileDocumentSemanticInvalidityFallsBackPerFieldButStructuralCorruptionFailsClosed()
             throws Exception {
-        String semantic = "{\\"schemaVersion\\":1,\\"revision\\":1,\\"updatedAt\\":1,"
-                + "\\"global\\":{\\"localeTag\\":\\"en-US\\",\\"timeZoneId\\":\\"Europe/Paris\\"},"
-                + "\\"clones\\":{\\"com.example.semantic#2\\":{\\"timeZoneId\\":\\"Mars/Olympus\\"}}}";
+        String semantic = "{\"schemaVersion\":1,\"revision\":1,\"updatedAt\":1,"
+                + "\"global\":{\"localeTag\":\"en-US\",\"timeZoneId\":\"Europe/Paris\"},"
+                + "\"clones\":{\"com.example.semantic#2\":{\"timeZoneId\":\"Mars/Olympus\"}}}";
         assertTrue(profileDocumentPreferences.edit().putString("documents_json", semantic).commit());
         ProfileDocument clone = ProfileDocumentStore.readCloneStrict(context, "com.example.semantic", 2);
         ProfileDocument global = ProfileDocumentStore.readGlobalStrict(context);
@@ -739,8 +739,8 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("Europe/Paris", zone.value);
         assertEquals(ProfileDocumentResolver.Source.GLOBAL, zone.source);
 
-        String structural = "{\\"schemaVersion\\":1,\\"revision\\":2,\\"updatedAt\\":2,"
-                + "\\"global\\":{\\"localeTag\\":123},\\"clones\\":{}}";
+        String structural = "{\"schemaVersion\":1,\"revision\":2,\"updatedAt\":2,"
+                + "\"global\":{\"localeTag\":123},\"clones\":{}}";
         assertTrue(profileDocumentPreferences.edit().putString("documents_json", structural).commit());
         boolean rejected = false;
         try {
