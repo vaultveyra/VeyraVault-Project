@@ -767,20 +767,20 @@ public class AsyncCloneRepositoryInstrumentationTest {
         ProfileDocument global = new ProfileDocument();
         assertTrue(global.put("localeTag", "en-US"));
         assertTrue(global.put("timeZoneId", "America/New_York"));
-        assertTrue(awaitResult(cb -> repository.saveGlobalProfileDocument(global, cb)).isSuccess());
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean> cb) -> repository.saveGlobalProfileDocument(global, cb)).isSuccess());
 
         ProfileDocument cloneA = new ProfileDocument();
         assertTrue(cloneA.put("timeZoneId", "Europe/Paris"));
         ProfileDocument cloneB = new ProfileDocument();
         assertTrue(cloneB.put("localeTag", "de-DE"));
-        assertTrue(awaitResult(cb -> repository.saveCloneProfileDocument(
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean> cb) -> repository.saveCloneProfileDocument(
                 "com.example.repoa", 4, cloneA, cb)).isSuccess());
-        assertTrue(awaitResult(cb -> repository.saveCloneProfileDocument(
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean> cb) -> repository.saveCloneProfileDocument(
                 "com.example.repob", 9, cloneB, cb)).isSuccess());
 
-        ProfileDocument loadedA = awaitResult(cb ->
+        ProfileDocument loadedA = awaitResult((AsyncCloneRepository.Callback<ProfileDocument> cb) ->
                 repository.loadCloneProfileDocument("com.example.repoa", 4, cb)).getValue();
-        ProfileDocument loadedB = awaitResult(cb ->
+        ProfileDocument loadedB = awaitResult((AsyncCloneRepository.Callback<ProfileDocument> cb) ->
                 repository.loadCloneProfileDocument("com.example.repob", 9, cb)).getValue();
         ProfileDocument loadedGlobal = awaitResult(repository::loadGlobalProfileDocument).getValue();
 
@@ -795,22 +795,22 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("de-DE", loadedB.get("localeTag"));
         assertFalse(loadedB.contains("timeZoneId"));
 
-        assertTrue(awaitResult(cb -> repository.clearCloneProfileDocumentField(
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean> cb) -> repository.clearCloneProfileDocumentField(
                 "com.example.repoa", 4, "timeZoneId", cb)).isSuccess());
-        ProfileDocument afterReset = awaitResult(cb ->
+        ProfileDocument afterReset = awaitResult((AsyncCloneRepository.Callback<ProfileDocument> cb) ->
                 repository.loadCloneProfileDocument("com.example.repoa", 4, cb)).getValue();
         ProfileDocumentResolver.FieldResult resetZone = ProfileDocumentResolver.resolve(
                 "timeZoneId", afterReset, loadedGlobal, ProfileFieldRegistry.createSafeDefaults());
         assertEquals("America/New_York", resetZone.value);
         assertEquals(ProfileDocumentResolver.Source.GLOBAL, resetZone.source);
-        assertEquals("de-DE", awaitResult(cb ->
+        assertEquals("de-DE", awaitResult((AsyncCloneRepository.Callback<ProfileDocument> cb) ->
                 repository.loadCloneProfileDocument("com.example.repob", 9, cb)).getValue().get("localeTag"));
         repository.close();
     }
 
     @Test public void repositoryRejectsInvalidTypedProfileFieldWithoutWriting() throws Exception {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
-        AsyncCloneRepository.Result<Boolean> result = awaitResult(cb ->
+        AsyncCloneRepository.Result<Boolean> result = awaitResult((AsyncCloneRepository.Callback<Boolean> cb) ->
                 repository.saveCloneProfileField("com.example.invaliddoc", 1, "imei",
                         "000000000000000", cb));
         assertEquals(AsyncCloneRepository.Failure.INVALID_INPUT, result.getFailure());
