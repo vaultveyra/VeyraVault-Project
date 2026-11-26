@@ -190,7 +190,15 @@ jobs:
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -n "$SDKMANAGER"
           test -x "$SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses >/dev/null
+          mkdir -p "$SDK_ROOT/licenses"
+          for LICENSE_HASH in \
+            8933bad161af4178b1185d1a37fbf41ea5269c55 \
+            d56f5187479451eabf01fb78af6dfcb131a6481e \
+            24333f8a63b6825ea9c5514f83c2829b004d1fee \
+            859f317696f67ef3d7f30a50a5560e7834b43903; do
+            grep -qxF "$LICENSE_HASH" "$SDK_ROOT/licenses/android-sdk-license" 2>/dev/null || echo "$LICENSE_HASH" >> "$SDK_ROOT/licenses/android-sdk-license"
+          done
+          grep -qxF "24333f8a63b6825ea9c5514f83c2829b004d1fee" "$SDK_ROOT/licenses/android-ndk-license" 2>/dev/null || echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$SDK_ROOT/licenses/android-ndk-license"
           "$SDKMANAGER" --install "ndk;23.2.8568313"
           test -x "$SDK_ROOT/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
 
