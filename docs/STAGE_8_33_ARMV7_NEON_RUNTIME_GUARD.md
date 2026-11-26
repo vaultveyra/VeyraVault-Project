@@ -14,7 +14,7 @@ The Engine's NativeCore class loads `libblackbox.so` in a static initializer. Th
 - ARMv7 uses an explicit `armv7-a`, `vfpv3-d16`, and `softfp` target with vectorization disabled. ARM64 is built separately for the Android arm64 ABI, where Advanced SIMD is mandatory.
 - The Probe is a minimal JNI C++ source and does not import Google's cpu_features library or link the Engine. ARMv7 reads `AT_HWCAP` through Android libc `getauxval()` and tests `HWCAP_NEON` (bit 12). Missing/empty auxiliary-vector evidence returns UNKNOWN; it is never treated as proof that NEON is absent or present.
 - NDK r24 and later reject `LOCAL_ARM_NEON := false`; therefore this setting is not used. NDK r23 is used only for the independent Probe and does not replace the Engine's NDK.
-- No change is made to the pinned Engine's `libblackbox.so`.
+- No change is made to the pinned Engine's `libblackbox.so`. The Debug variant uses `debugCompileOnly` for Bcore and retains only the x86_64 test Probe; it does not package the Engine runtime.
 
 ## Runtime policy
 
