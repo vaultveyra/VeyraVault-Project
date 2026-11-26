@@ -32,7 +32,13 @@ module_assignment = next(
 )
 module_text = ast.literal_eval(module_assignment.value)
 assert "LOCAL_MODULE := veyra_neon_probe" in module_text
-assert "LOCAL_ARM_NEON := false" in module_text
+assert "LOCAL_ARM_NEON := false" not in module_text
+assert "LOCAL_CFLAGS += -mfpu=vfpv3-d16" in module_text
+assert "LOCAL_CPPFLAGS += -mfpu=vfpv3-d16" in module_text
+armv7_probe_block = module_text.split("ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)", 1)[1].split("endif", 1)[0]
+assert "LOCAL_CFLAGS += -mfpu=vfpv3-d16" in armv7_probe_block
+assert "LOCAL_CPPFLAGS += -mfpu=vfpv3-d16" in armv7_probe_block
+assert module_text.count("-mfpu=vfpv3-d16") == 2
 assert any(line.endswith("\\\n") for line in module_text.splitlines(keepends=True))
 assert "veyra_cpu_features/src/impl_arm_linux_or_android.c" in module_text
 assert "$(LOCAL_PATH)/veyra_cpu_features/include/internal" in module_text
@@ -95,7 +101,7 @@ for expected in (
 assert doc.is_file()
 
 print("PASS: workspace preparation script parses and uses an immutable cpu_features source pin.")
-print("PASS: the isolated ndk-build module is compiled with LOCAL_ARM_NEON := false.")
+print("PASS: the isolated ARMv7 probe uses VFPv3-D16 compiler flags without the NDK-r24-rejected LOCAL_ARM_NEON=false switch.")
 print("PASS: ARMv7 policy permits only positive runtime NEON detection; unknown fails closed.")
 print("PASS: VaultApp checks CPU compatibility before Engine.doAttachBaseContext.")
 print("PASS: Engine reflection and Clone-install preflight are guarded before NativeCore can load.")

@@ -579,12 +579,12 @@ def prepare_armv7_neon_probe(workspace):
         marker = "# VEYRAVAULT_STAGE_8_33_ARMV7_NEON_PROBE"
         if marker in makefile:
             raise RuntimeError("Stage 8.33 NEON probe was already injected into the workspace")
-        module = "\n# VEYRAVAULT_STAGE_8_33_ARMV7_NEON_PROBE\n# This helper is separate from libblackbox.so and must never use NEON.\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := veyra_neon_probe\nLOCAL_SRC_FILES := VeyraNeonProbe.cpp\nLOCAL_ARM_NEON := false\nifeq ($(TARGET_ARCH_ABI),armeabi-v7a)\nLOCAL_SRC_FILES += \\\n    veyra_cpu_features/src/filesystem.c \\\n    veyra_cpu_features/src/stack_line_reader.c \\\n    veyra_cpu_features/src/string_view.c \\\n    veyra_cpu_features/src/hwcaps.c \\\n    veyra_cpu_features/src/hwcaps_linux_or_android.c \\\n    veyra_cpu_features/src/impl_arm_linux_or_android.c\nLOCAL_C_INCLUDES += \\\n    $(LOCAL_PATH)/veyra_cpu_features/include \\\n    $(LOCAL_PATH)/veyra_cpu_features/include/internal\nLOCAL_CFLAGS += -std=c99 -DHAVE_DLFCN_H -DSTACK_LINE_READER_BUFFER_SIZE=1024\nLOCAL_LDLIBS += -ldl\nendif\nLOCAL_CPPFLAGS += -std=c++17\ninclude $(BUILD_SHARED_LIBRARY)\n"
+        module = "\n# VEYRAVAULT_STAGE_8_33_ARMV7_NEON_PROBE\n# This helper is separate from libblackbox.so and must never use NEON.\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := veyra_neon_probe\nLOCAL_SRC_FILES := VeyraNeonProbe.cpp\nifeq ($(TARGET_ARCH_ABI),armeabi-v7a)\n# NDK r24+ rejects LOCAL_ARM_NEON := false. Override the default ARMv7\n# target feature for this isolated probe without changing libblackbox.so.\nLOCAL_CFLAGS += -mfpu=vfpv3-d16\nLOCAL_CPPFLAGS += -mfpu=vfpv3-d16\nLOCAL_SRC_FILES += \\\n    veyra_cpu_features/src/filesystem.c \\\n    veyra_cpu_features/src/stack_line_reader.c \\\n    veyra_cpu_features/src/string_view.c \\\n    veyra_cpu_features/src/hwcaps.c \\\n    veyra_cpu_features/src/hwcaps_linux_or_android.c \\\n    veyra_cpu_features/src/impl_arm_linux_or_android.c\nLOCAL_C_INCLUDES += \\\n    $(LOCAL_PATH)/veyra_cpu_features/include \\\n    $(LOCAL_PATH)/veyra_cpu_features/include/internal\nLOCAL_CFLAGS += -std=c99 -DHAVE_DLFCN_H -DSTACK_LINE_READER_BUFFER_SIZE=1024\nLOCAL_LDLIBS += -ldl\nendif\nLOCAL_CPPFLAGS += -std=c++17\ninclude $(BUILD_SHARED_LIBRARY)\n"
         with open(android_mk, "a", encoding="utf-8") as target_file:
             target_file.write(module)
 
         print("[+] Added isolated ARMv7 NEON preflight probe from google/cpu_features@" + CPU_FEATURES_COMMIT)
-        print("[+] The probe is a separate shared library with LOCAL_ARM_NEON := false; libblackbox.so is unchanged.")
+        print("[+] The ARMv7 probe uses -mfpu=vfpv3-d16; libblackbox.so is unchanged.")
     finally:
         shutil.rmtree(temporary_root, ignore_errors=True)
 
