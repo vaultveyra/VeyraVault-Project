@@ -165,7 +165,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
 
         globalLocationInherit = new CheckBox(this);
         globalLocationInherit.setText(fa ? "استفاده از پیش‌فرض امن سیستم (بدون Override سراسری)" :
-                "Inherit safe System default (no Global override)");
+                "Inherit Safe Isolated Default (no Global override)");
         globalLocationInherit.setOnCheckedChangeListener((button, checked) -> updateGlobalLocationControls());
         root.addView(globalLocationInherit);
 
@@ -195,7 +195,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
 
         resetGlobalLocationButton = new TextView(this);
         resetGlobalLocationButton.setText(fa ? "پاک‌کردن پیش‌فرض‌های موقعیت سراسری و بازگشت به سیستم" :
-                "Clear Global location defaults (inherit System)");
+                "Clear Global location defaults (inherit Safe Isolated Default)");
         resetGlobalLocationButton.setTextColor(UiPalette.accent(getApplicationContext()));
         resetGlobalLocationButton.setPadding(0, 12, 0, 18);
         resetGlobalLocationButton.setOnClickListener(v -> resetGlobalLocation());
@@ -232,7 +232,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         description.setPadding(0, 8, 0, 12);
         description.setText(fa
                 ? "این مقادیر برای کلون‌هایی استفاده می‌شوند که Override اختصاصی ندارند. مقدار اختصاصی هر کلون همیشه اولویت دارد. پاک‌کردن یک فیلد سراسری فقط همان پیش‌فرض را حذف می‌کند و مقدار سیستم جایگزین می‌شود."
-                : "These defaults apply only when a clone has no per-clone override. Clone-specific values always take precedence. Reset clears only the selected Global default and reveals the System value.");
+                : "These defaults apply only when a clone has no per-clone override. Clone-specific values always take precedence. Reset clears only the selected Global default and reveals the Safe Isolated Default value.");
         section.addView(description);
 
         section.addView(buildGlobalProfileField(true));
@@ -293,7 +293,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
 
         Button reset = new Button(this);
         reset.setAllCaps(false);
-        reset.setText(fa ? "بازگشت به سیستم" : "Reset to System");
+        reset.setText(fa ? "بازگشت به سیستم" : "Reset to Safe Default");
         reset.setOnClickListener(v -> resetGlobalProfileField(locale));
         actions.addView(reset, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -343,7 +343,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         String value = (locale ? globalLocaleEt : globalTimeZoneEt).getText().toString().trim();
         if (value.isEmpty()) {
             showSaveFailure(fa ? "برای حذف پیش‌فرض از دکمه بازگشت به سیستم استفاده کنید."
-                    : "Use Reset to System to clear this Global default.");
+                    : "Use Reset to Safe Default to clear this Global default.");
             return;
         }
         if (locale && !ProfileSettings.isLocaleTagValid(value)) {
@@ -411,7 +411,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
             setGlobalProfileControlsEnabled(true);
             Toast.makeText(this, reset
                     ? (fa ? "فقط پیش‌فرض همین فیلد حذف شد؛ مقدار سیستم مؤثر است و Override کلون‌ها حفظ شد."
-                            : "Only this Global field was cleared. System now applies; clone overrides are unchanged.")
+                            : "Only this Global field was cleared. Safe Isolated Default now applies; clone overrides are unchanged.")
                     : (fa ? "پیش‌فرض سراسری ذخیره شد؛ Overrideهای کلون حفظ شدند و در اجرای بعدی اعمال می‌شود."
                             : "Global default saved. Clone overrides are preserved; the default applies on the next clone launch."),
                     Toast.LENGTH_LONG).show();
