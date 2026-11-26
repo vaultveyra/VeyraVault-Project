@@ -109,8 +109,8 @@ public final class VirtualHookManager {
         final ProfileResolver.ResolvedProfile resolved;
         try {
             masterEnabled = CloneStore.readMasterMockGpsEnabledStrict(context);
-            resolved = ProfileStore.resolveStrict(context, entry.packageName, entry.userId,
-                    ProfileRuntimeApplier.systemFallback());
+            resolved = ProfileRuntimeProvider.resolveMergedProfile(context, entry.packageName,
+                    entry.userId, ProfileRuntimeApplier.systemFallback());
         } catch (Exception error) {
             LocationApplyResult disabled = disableEngineLocationHook(entry.packageName, entry.userId,
                     null, null, null);
