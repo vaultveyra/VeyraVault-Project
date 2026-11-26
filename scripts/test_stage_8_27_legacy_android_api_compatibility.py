@@ -61,6 +61,7 @@ instrumentation = instrumentation_path.read_text(encoding="utf-8")
 for marker in (
     'assertEquals("This test must run on Android API 21", 21, Build.VERSION.SDK_INT)',
     "NativeAbiPreflight.inspectInstalledPackage",
+    "InstrumentationRegistry",
     "matchesInstalledPackage",
     "META-INF/services/",
     "AndroidDispatcherFactory",
