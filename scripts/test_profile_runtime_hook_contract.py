@@ -12,6 +12,9 @@ client = (root / "core/ProfileRuntimeClient.java").read_text(encoding="utf-8")
 provider = (root / "core/ProfileRuntimeProvider.java").read_text(encoding="utf-8")
 process = (root / "core/ProcessUtils.java").read_text(encoding="utf-8")
 manifest = Path("app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+instrumentation = Path(
+    "app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java"
+).read_text(encoding="utf-8")
 
 assert "registerCloneProfileLifecycleCallback(this)" in vault
 assert vault.index("ProfileStore.migrateLegacyLocationSettings(this)") < vault.index(
@@ -33,16 +36,15 @@ assert "ProfileStore.migrateLegacyLocationSettings(this)" in vault
 assert "Application.getProcessName()" in process
 assert "getRunningAppProcesses()" in process
 assert "ProfileRuntimeApplier.initializeSystemFallback(this)" in vault
-assert "ProfileRuntimeApplier.restoreSystemDefaults(packageContext)" in callback
 assert "ProfileRuntimeApplier.applySafeDefaults(packageContext)" in callback
+assert "ProfileRuntimeApplier.restoreSystemDefaults(packageContext)" not in callback
+assert callback.index("applySafeDefaults(packageContext)") < callback.index("ProfileRuntimeClient.resolve")
 assert 'SAFE_DEFAULT_LOCALE_TAG = "en-US"' in applier
 assert 'SAFE_DEFAULT_TIME_ZONE_ID = "UTC"' in applier
 assert "fallback.localeTag = SAFE_DEFAULT_LOCALE_TAG" in applier
 assert "fallback.timeZoneId = SAFE_DEFAULT_TIME_ZONE_ID" in applier
-assert "safeFallbackNeverUsesHostLocaleOrTimeZone" in (
-    Path("app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java")
-    .read_text(encoding="utf-8")
-)
+assert "safeFallbackNeverUsesHostLocaleOrTimeZone" in instrumentation
+assert "nextCloneBindStartsFromSafeDefaultsWithoutHostOrPreviousCloneLeakage" in instrumentation
 assert "packageName.equals(appContext.getPackageName())" in callback
 assert "Resources.getSystem().getConfiguration().locale" in applier
 assert "ContentResolver().call" in client
@@ -51,10 +53,6 @@ assert "TimeZone.setDefault(TimeZone.getTimeZone(profile.timeZoneId))" in applie
 assert "systemTimeZoneId" in applier
 assert "Intent.ACTION_TIMEZONE_CHANGED" in applier
 assert "lastAppliedSystemTimeZone" in applier
-assert "nextCloneBindRestoresProcessBaselineWithoutUsingItAsProfileFallback" in (
-    Path("app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java")
-    .read_text(encoding="utf-8")
-)
 assert "Resources resources = packageContext.getResources()" in applier
 assert "resources.updateConfiguration(configuration, resources.getDisplayMetrics())" in applier
 assert "readCloneOverrideStrict(context, packageName, userId)" in store
@@ -65,5 +63,6 @@ assert "Locale.setDefault" not in engine
 assert "TimeZone.setDefault" not in engine
 
 print("Clone lifecycle callback registration contract: PASS")
+print("Safe isolated defaults before profile IPC contract: PASS")
 print("Pre-Application package/user profile resolution contract: PASS")
 print("Process-scoped locale/time-zone application contract: PASS")
