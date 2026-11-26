@@ -32,8 +32,9 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
         CloneRuntimeTrace.record(CloneRuntimeTrace.Event.VIRTUAL_PROCESS_BEFORE_APP_CREATE,
                 packageName, processName, userId, "callback_entered");
         try {
-            // Reset process-wide defaults first so a prior clone cannot leak locale/time-zone.
-            ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
+            // Never expose the host phone or a previously bound Clone while this target process
+            // is being prepared. Start from deterministic isolated values before profile IPC.
+            ProfileRuntimeApplier.applySafeDefaults(packageContext);
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(appContext, packageName, userId);
             ProfileRuntimeApplier.apply(packageContext, resolved);
@@ -44,7 +45,8 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
                     + " localeSource=" + resolved.localeSource
                     + " timeZoneSource=" + resolved.timeZoneSource);
         } catch (Exception error) {
-            // A malformed profile must not crash the target app or be silently rewritten.
+            // A malformed profile must not crash the target app or expose host/previous Clone
+            // values. Keep the deterministic isolated defaults already applied above.
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_FALLBACK,
                     packageName, processName, userId, error.getClass().getSimpleName());
             ProfileRuntimeApplier.applySafeDefaults(packageContext);
