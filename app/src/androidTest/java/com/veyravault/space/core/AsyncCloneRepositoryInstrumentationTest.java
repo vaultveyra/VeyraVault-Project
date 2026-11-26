@@ -761,6 +761,63 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("", profileDocumentPreferences.getString("documents_json", ""));
     }
 
+    @Test public void repositoryPersistsAndResolvesTypedCloneAndGlobalDocumentsAsynchronously()
+            throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        ProfileDocument global = new ProfileDocument();
+        assertTrue(global.put("localeTag", "en-US"));
+        assertTrue(global.put("timeZoneId", "America/New_York"));
+        assertTrue(awaitResult(cb -> repository.saveGlobalProfileDocument(global, cb)).isSuccess());
+
+        ProfileDocument cloneA = new ProfileDocument();
+        assertTrue(cloneA.put("timeZoneId", "Europe/Paris"));
+        ProfileDocument cloneB = new ProfileDocument();
+        assertTrue(cloneB.put("localeTag", "de-DE"));
+        assertTrue(awaitResult(cb -> repository.saveCloneProfileDocument(
+                "com.example.repoa", 4, cloneA, cb)).isSuccess());
+        assertTrue(awaitResult(cb -> repository.saveCloneProfileDocument(
+                "com.example.repob", 9, cloneB, cb)).isSuccess());
+
+        ProfileDocument loadedA = awaitResult(cb ->
+                repository.loadCloneProfileDocument("com.example.repoa", 4, cb)).getValue();
+        ProfileDocument loadedB = awaitResult(cb ->
+                repository.loadCloneProfileDocument("com.example.repob", 9, cb)).getValue();
+        ProfileDocument loadedGlobal = awaitResult(repository::loadGlobalProfileDocument).getValue();
+
+        ProfileDocumentResolver.FieldResult aLocale = ProfileDocumentResolver.resolve(
+                "localeTag", loadedA, loadedGlobal, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult aZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", loadedA, loadedGlobal, ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("en-US", aLocale.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, aLocale.source);
+        assertEquals("Europe/Paris", aZone.value);
+        assertEquals(ProfileDocumentResolver.Source.CLONE, aZone.source);
+        assertEquals("de-DE", loadedB.get("localeTag"));
+        assertFalse(loadedB.contains("timeZoneId"));
+
+        assertTrue(awaitResult(cb -> repository.clearCloneProfileDocumentField(
+                "com.example.repoa", 4, "timeZoneId", cb)).isSuccess());
+        ProfileDocument afterReset = awaitResult(cb ->
+                repository.loadCloneProfileDocument("com.example.repoa", 4, cb)).getValue();
+        ProfileDocumentResolver.FieldResult resetZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", afterReset, loadedGlobal, ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("America/New_York", resetZone.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, resetZone.source);
+        assertEquals("de-DE", awaitResult(cb ->
+                repository.loadCloneProfileDocument("com.example.repob", 9, cb)).getValue().get("localeTag"));
+        repository.close();
+    }
+
+    @Test public void repositoryRejectsInvalidTypedProfileFieldWithoutWriting() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        AsyncCloneRepository.Result<Boolean> result = awaitResult(cb ->
+                repository.saveCloneProfileField("com.example.invaliddoc", 1, "imei",
+                        "000000000000000", cb));
+        assertEquals(AsyncCloneRepository.Failure.INVALID_INPUT, result.getFailure());
+        assertEquals("", profileDocumentPreferences.getString("documents_json", ""));
+        repository.close();
+    }
+
     private interface AsyncRepositoryOperation<T> {
         void execute(AsyncCloneRepository.Callback<T> callback);
     }
