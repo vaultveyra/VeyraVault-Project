@@ -17,6 +17,11 @@ import java.util.TimeZone;
  * every subsequent package/user bind, preventing one clone from leaking defaults into another.
  */
 public final class ProfileRuntimeApplier {
+    // Deterministic isolated defaults: never expose the host phone's locale/time zone
+    // to a virtual app when neither its Clone profile nor Global profile defines a value.
+    private static final String SAFE_DEFAULT_LOCALE_TAG = "en-US";
+    private static final String SAFE_DEFAULT_TIME_ZONE_ID = "UTC";
+
     private static volatile String systemLocaleTag;
     private static volatile String systemTimeZoneId;
     private static volatile boolean lastAppliedSystemLocale = true;
@@ -75,15 +80,36 @@ public final class ProfileRuntimeApplier {
         return locale.toLanguageTag();
     }
 
-    /** System fallback is stable across virtual package/user launches in this host process. */
+    /**
+     * Returns deterministic isolated defaults, not values read from the host phone.
+     * The host baseline is retained only internally so a reused virtual process can be
+     * reset between package/user binds; it is never selected as a target app profile.
+     */
     public static synchronized ProfileSettings systemFallback() {
-        initializeSystemFallback(null);
         ProfileSettings fallback = new ProfileSettings();
-        fallback.localeTag = systemLocaleTag;
-        fallback.timeZoneId = systemTimeZoneId;
+        fallback.localeTag = SAFE_DEFAULT_LOCALE_TAG;
+        fallback.timeZoneId = SAFE_DEFAULT_TIME_ZONE_ID;
         // Safe location fallback: never enable location without an explicit clone/global choice.
         fallback.locationEnabled = Boolean.FALSE;
         return fallback;
+    }
+
+    /**
+     * Fail-closed target-process fallback used when profile IPC or validation fails.
+     * Do not restore host-derived defaults into a target app after a profile error.
+     */
+    public static synchronized void applySafeDefaults(Context packageContext) {
+        Locale locale = Locale.forLanguageTag(SAFE_DEFAULT_LOCALE_TAG);
+        Locale.setDefault(locale);
+        TimeZone.setDefault(TimeZone.getTimeZone(SAFE_DEFAULT_TIME_ZONE_ID));
+        lastAppliedSystemLocale = false;
+        lastAppliedSystemTimeZone = false;
+        if (packageContext == null) return;
+        Resources resources = packageContext.getResources();
+        Configuration configuration = new Configuration(resources.getConfiguration());
+        configuration.setLocale(locale);
+        configuration.setLayoutDirection(locale);
+        resources.updateConfiguration(configuration, resources.getDisplayMetrics());
     }
 
     /** Restore process-global defaults before reading/applying the next virtual app profile. */
@@ -122,13 +148,15 @@ public final class ProfileRuntimeApplier {
                 configuration.setLocale(locale);
                 configuration.setLayoutDirection(locale);
                 resources.updateConfiguration(configuration, resources.getDisplayMetrics());
-                lastAppliedSystemLocale = profile.localeSource == ProfileResolver.Source.SYSTEM;
+                // Even SYSTEM means the deterministic isolated default, never the host locale.
+                lastAppliedSystemLocale = false;
             }
         }
 
         if (profile.timeZoneId != null && ProfileSettings.isTimeZoneIdValid(profile.timeZoneId)) {
             TimeZone.setDefault(TimeZone.getTimeZone(profile.timeZoneId));
-            lastAppliedSystemTimeZone = profile.timeZoneSource == ProfileResolver.Source.SYSTEM;
+            // Never follow host time-zone broadcasts after binding a virtual app profile.
+            lastAppliedSystemTimeZone = false;
         }
     }
 }

@@ -75,14 +75,14 @@ public class ProfileRuntimeApplierInstrumentationTest {
             else prefs.edit().putString("profiles_json", before).commit();
         }
     }
-    @Test public void nextCloneSystemFallbackDoesNotInheritPreviousCloneTimeZone() {
+    @Test public void nextCloneBindRestoresProcessBaselineWithoutUsingItAsProfileFallback() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
         TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
         Configuration originalConfiguration =
                 new Configuration(context.getResources().getConfiguration());
+        String hostBaselineZone = TimeZone.getDefault().getID();
         ProfileRuntimeApplier.initializeSystemFallback(context);
-        String systemZone = ProfileRuntimeApplier.systemFallback().timeZoneId;
         try {
             ProfileSettings cloneA = new ProfileSettings();
             cloneA.timeZoneId = "Europe/Paris";
@@ -92,10 +92,42 @@ public class ProfileRuntimeApplierInstrumentationTest {
             ProfileRuntimeApplier.apply(context, first);
             assertEquals("Europe/Paris", TimeZone.getDefault().getID());
 
-            // Simulate the next virtual package/user bind in the same reused :pN process.
+            // The internal baseline clears Clone A before the next bind. The target profile
+            // fallback remains deterministic and is applied before target Application creation.
             ProfileRuntimeApplier.restoreSystemDefaults(context);
-            assertEquals(systemZone, ProfileRuntimeApplier.systemFallback().timeZoneId);
-            assertEquals(systemZone, TimeZone.getDefault().getID());
+            assertEquals(hostBaselineZone, TimeZone.getDefault().getID());
+            assertEquals("UTC", ProfileRuntimeApplier.systemFallback().timeZoneId);
+        } finally {
+            Locale.setDefault(originalLocale);
+            TimeZone.setDefault(originalZone);
+            context.getResources().updateConfiguration(
+                    originalConfiguration, context.getResources().getDisplayMetrics());
+        }
+    }
+
+    @Test public void safeFallbackNeverUsesHostLocaleOrTimeZone() {
+        Context context = ApplicationProvider.getApplicationContext();
+        Locale originalLocale = Locale.getDefault();
+        TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
+        Configuration originalConfiguration =
+                new Configuration(context.getResources().getConfiguration());
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ja-JP"));
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+
+            ProfileResolver.ResolvedProfile resolved = ProfileResolver.resolve(
+                    new ProfileSettings(), new ProfileSettings(),
+                    ProfileRuntimeApplier.systemFallback());
+            assertEquals("en-US", resolved.localeTag);
+            assertEquals("UTC", resolved.timeZoneId);
+            ProfileRuntimeApplier.apply(context, resolved);
+            assertEquals("en", Locale.getDefault().getLanguage());
+            assertEquals("UTC", TimeZone.getDefault().getID());
+            assertEquals("en", context.getResources().getConfiguration().locale.getLanguage());
+
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            assertEquals("en", Locale.getDefault().getLanguage());
+            assertEquals("UTC", TimeZone.getDefault().getID());
         } finally {
             Locale.setDefault(originalLocale);
             TimeZone.setDefault(originalZone);

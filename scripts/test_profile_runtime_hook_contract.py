@@ -34,6 +34,15 @@ assert "Application.getProcessName()" in process
 assert "getRunningAppProcesses()" in process
 assert "ProfileRuntimeApplier.initializeSystemFallback(this)" in vault
 assert "ProfileRuntimeApplier.restoreSystemDefaults(packageContext)" in callback
+assert "ProfileRuntimeApplier.applySafeDefaults(packageContext)" in callback
+assert 'SAFE_DEFAULT_LOCALE_TAG = "en-US"' in applier
+assert 'SAFE_DEFAULT_TIME_ZONE_ID = "UTC"' in applier
+assert "fallback.localeTag = SAFE_DEFAULT_LOCALE_TAG" in applier
+assert "fallback.timeZoneId = SAFE_DEFAULT_TIME_ZONE_ID" in applier
+assert "safeFallbackNeverUsesHostLocaleOrTimeZone" in (
+    Path("app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java")
+    .read_text(encoding="utf-8")
+)
 assert "packageName.equals(appContext.getPackageName())" in callback
 assert "Resources.getSystem().getConfiguration().locale" in applier
 assert "ContentResolver().call" in client

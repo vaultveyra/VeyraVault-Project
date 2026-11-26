@@ -47,8 +47,8 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             // A malformed profile must not crash the target app or be silently rewritten.
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_FALLBACK,
                     packageName, processName, userId, error.getClass().getSimpleName());
-            ProfileRuntimeApplier.restoreSystemDefaults(packageContext);
-            Log.w(TAG, "Clone profile could not be resolved; system process defaults retained for "
+            ProfileRuntimeApplier.applySafeDefaults(packageContext);
+            Log.w(TAG, "Clone profile could not be resolved; deterministic isolated defaults applied for "
                     + packageName + "#" + userId + " (" + error.getClass().getSimpleName() + ")");
         }
     }
