@@ -42,7 +42,9 @@ assert module_text.count("-mfpu=vfpv3-d16") == 2
 assert any(line.endswith("\\\n") for line in module_text.splitlines(keepends=True))
 assert "veyra_cpu_features/src/impl_arm_linux_or_android.c" in module_text
 assert "$(LOCAL_PATH)/veyra_cpu_features/include/internal" in module_text
-assert "-DHAVE_DLFCN_H" in module_text
+assert "-DHAVE_STRONG_GETAUXVAL" in module_text
+assert "-DHAVE_DLFCN_H" not in module_text
+assert "LOCAL_LDLIBS += -ldl" not in module_text
 assert "-DSTACK_LINE_READER_BUFFER_SIZE=1024" in module_text
 assert "LOCAL_MODULE := blackbox" not in module_text
 
