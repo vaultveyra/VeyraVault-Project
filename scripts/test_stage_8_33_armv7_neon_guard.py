@@ -28,6 +28,7 @@ assert '"-mfpu=vfpv3-d16"' in build and '"-mfloat-abi=softfp"' in build
 assert '"-fno-vectorize"' in build and '"-fno-slp-vectorize"' in build
 assert '("armeabi-v7a", "armv7a-linux-androideabi21"' in build
 assert '("arm64-v8a", "aarch64-linux-android21"' in build
+assert '("x86_64", "x86_64-linux-android21"' in build
 assert "jniLibs" in build and "LOCAL_ARM_NEON" not in build
 
 assert "getauxval(AT_HWCAP)" in cpp
