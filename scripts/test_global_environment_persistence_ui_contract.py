@@ -21,8 +21,8 @@ assert "summary.unsupported" in source and "summary.failed" in source
 assert "profileLoaded && locationProfileLoaded && masterGpsLoaded && !loadFailed" in source
 assert "Both global coordinates are required when global location is enabled." in source
 assert "parseOptionalCoordinate" in source
-assert "Clear Global location defaults (inherit System)" in source
-assert "Inherit safe System default (no Global override)" in source
+assert "Clear Global location defaults (inherit Safe Isolated Default)" in source
+assert "Inherit Safe Isolated Default (no Global override)" in source
 assert "globalProfile.locationEnabled == null" in source
 assert "globalLocationInherit.isChecked()" in source
 assert "Boolean.TRUE.equals(locationEnabled)" in source
@@ -59,7 +59,7 @@ for marker in (
     "ProfileSettings.isTimeZoneIdValid(value)",
     "next clone launch",
     "Clone-specific values always take precedence",
-    "Reset to System",
+    "Reset to Safe Default",
 ):
     assert marker in source, f"Missing Global Locale/Time Zone UI behavior: {marker}"
 
