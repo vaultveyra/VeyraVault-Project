@@ -1,5 +1,9 @@
 package com.veyravault.space.core;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /** Field-by-field Clone -> Global -> explicit Safe Isolated Default resolver. */
 public final class ProfileDocumentResolver {
     public enum Source { CLONE, GLOBAL, SAFE_DEFAULT, UNSET }
@@ -17,6 +21,25 @@ public final class ProfileDocumentResolver {
     }
 
     private ProfileDocumentResolver() { }
+
+    /** Resolves every registered field using the registry-owned Safe Isolated Defaults. */
+    public static Map<String, FieldResult> resolveAll(ProfileDocument clone,
+                                                       ProfileDocument global) {
+        return resolveAll(clone, global, ProfileFieldRegistry.createSafeDefaults());
+    }
+
+    /** Resolves every registered field and returns an immutable, stable-order snapshot. */
+    public static Map<String, FieldResult> resolveAll(ProfileDocument clone,
+                                                       ProfileDocument global,
+                                                       ProfileDocument safeDefaults) {
+        ProfileDocument defaults = safeDefaults == null
+                ? ProfileFieldRegistry.createSafeDefaults() : safeDefaults;
+        Map<String, FieldResult> results = new LinkedHashMap<>();
+        for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
+            results.put(field.key, resolve(field.key, clone, global, defaults));
+        }
+        return Collections.unmodifiableMap(results);
+    }
 
     public static FieldResult resolve(String key, ProfileDocument clone,
                                       ProfileDocument global, ProfileDocument safeDefaults) {
