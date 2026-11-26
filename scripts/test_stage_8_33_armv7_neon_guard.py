@@ -52,6 +52,8 @@ assert "Build independent ARMv7/ARM64 NEON probe" in workflow
 assert "build_neon_probe.py" in workflow
 assert 'yes | "$SDKMANAGER" --licenses' not in workflow
 assert "android-ndk-license" in workflow
+assert "grep -qxF" in workflow
+assert "24333f8a63b6825ea9c5514f83c2829b004d1fee" in workflow
 assert "Test Stage 8.33 ARMv7 NEON preflight guard" in workflow
 
 for expected in (
