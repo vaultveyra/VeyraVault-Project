@@ -60,9 +60,6 @@ public class ProfileRuntimeApplierInstrumentationTest {
                     + "\"clones\":{\"com.example.runtime#3\":{\"localeTag\":\"fr-FR\"}}}";
             assertEquals(true, prefs.edit().putString("profiles_json", payload).commit());
 
-            ProfileSettings system = new ProfileSettings();
-            system.localeTag = "en-US";
-            system.timeZoneId = "UTC";
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(context, "com.example.runtime", 3);
 
@@ -75,15 +72,17 @@ public class ProfileRuntimeApplierInstrumentationTest {
             else prefs.edit().putString("profiles_json", before).commit();
         }
     }
-    @Test public void nextCloneBindRestoresProcessBaselineWithoutUsingItAsProfileFallback() {
+
+    @Test public void nextCloneBindStartsFromSafeDefaultsWithoutHostOrPreviousCloneLeakage() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
         TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
         Configuration originalConfiguration =
                 new Configuration(context.getResources().getConfiguration());
-        String hostBaselineZone = TimeZone.getDefault().getID();
-        ProfileRuntimeApplier.initializeSystemFallback(context);
         try {
+            Locale.setDefault(Locale.forLanguageTag("ja-JP"));
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+
             ProfileSettings cloneA = new ProfileSettings();
             cloneA.timeZoneId = "Europe/Paris";
             ProfileResolver.ResolvedProfile first =
@@ -92,11 +91,24 @@ public class ProfileRuntimeApplierInstrumentationTest {
             ProfileRuntimeApplier.apply(context, first);
             assertEquals("Europe/Paris", TimeZone.getDefault().getID());
 
-            // The internal baseline clears Clone A before the next bind. The target profile
-            // fallback remains deterministic and is applied before target Application creation.
-            ProfileRuntimeApplier.restoreSystemDefaults(context);
-            assertEquals(hostBaselineZone, TimeZone.getDefault().getID());
-            assertEquals("UTC", ProfileRuntimeApplier.systemFallback().timeZoneId);
+            // The next target bind must clear Clone A directly to safe values, never host values.
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            assertEquals("en", Locale.getDefault().getLanguage());
+            assertEquals("UTC", TimeZone.getDefault().getID());
+
+            ProfileSettings cloneB = new ProfileSettings();
+            ProfileSettings global = new ProfileSettings();
+            global.timeZoneId = "Europe/Berlin";
+            ProfileResolver.ResolvedProfile second =
+                    ProfileResolver.resolve(cloneB, global, ProfileRuntimeApplier.systemFallback());
+            ProfileRuntimeApplier.apply(context, second);
+            assertEquals(ProfileResolver.Source.GLOBAL, second.timeZoneSource);
+            assertEquals("Europe/Berlin", TimeZone.getDefault().getID());
+
+            // A Clone with no override and no Global value receives only the deterministic default.
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            assertEquals("en", Locale.getDefault().getLanguage());
+            assertEquals("UTC", TimeZone.getDefault().getID());
         } finally {
             Locale.setDefault(originalLocale);
             TimeZone.setDefault(originalZone);
@@ -135,5 +147,4 @@ public class ProfileRuntimeApplierInstrumentationTest {
                     originalConfiguration, context.getResources().getDisplayMetrics());
         }
     }
-
 }
