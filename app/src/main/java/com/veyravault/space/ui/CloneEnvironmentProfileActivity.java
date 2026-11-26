@@ -84,7 +84,7 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
         TextView intro = new TextView(this);
         intro.setText(fa
                 ? "زبان و منطقه زمانی فقط برای همین بسته و شناسه مجازی تنظیم می‌شوند. اولویت هر فیلد: کلون ← سراسری ← سیستم. تغییرات پس از اجرای بعدی کلون اعمال می‌شوند؛ این صفحه نشست فعال را متوقف نمی‌کند."
-                : "Locale and time zone are scoped to this virtual package and user. Each field resolves Clone → Global → System. Saved changes apply on the next clone launch; this screen does not stop an active session.");
+                : "Locale and time zone are scoped to this virtual package and user. Each field resolves Clone → Global → Safe Isolated Default. Saved changes apply on the next clone launch; this screen does not stop an active session.");
         intro.setTextSize(13f);
         intro.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         intro.setPadding(0, dp(10), 0, dp(18));
@@ -279,8 +279,8 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
             updateEffectiveValues();
             setControlsEnabled(true);
             Toast.makeText(this, reset
-                    ? (fa ? "Override این فیلد حذف شد؛ مقدار Global/System مؤثر است."
-                          : "Field override cleared; Global/System now applies.")
+                    ? (fa ? "Override این فیلد حذف شد؛ مقدار Global یا Safe Isolated Default مؤثر است."
+                          : "Field override cleared; Global or Safe Isolated Default now applies.")
                     : (fa ? "ذخیره شد؛ در اجرای بعدی کلون اعمال می‌شود."
                           : "Saved; this setting applies on the clone's next launch."),
                     Toast.LENGTH_LONG).show();
