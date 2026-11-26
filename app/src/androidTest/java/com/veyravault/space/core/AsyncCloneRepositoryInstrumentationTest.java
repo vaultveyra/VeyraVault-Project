@@ -25,13 +25,17 @@ public class AsyncCloneRepositoryInstrumentationTest {
     private Context context;
     private SharedPreferences preferences;
     private SharedPreferences profilePreferences;
+    private SharedPreferences profileDocumentPreferences;
 
     @Before public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         preferences = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE);
         profilePreferences = context.getSharedPreferences("veyravault_profiles_v1", Context.MODE_PRIVATE);
+        profileDocumentPreferences = context.getSharedPreferences("veyravault_profile_documents_v1", Context.MODE_PRIVATE);
         preferences.edit().clear().commit();
         profilePreferences.edit().clear().commit();
+        profileDocumentPreferences.edit().clear().commit();
+        profileDocumentPreferences.edit().clear().commit();
     }
 
     @After public void tearDown() {
@@ -662,6 +666,100 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+
+    @Test public void typedProfileDocumentsPersistIndependentlyAndResolvePerField() throws Exception {
+        ProfileDocument global = new ProfileDocument();
+        assertTrue(global.put("localeTag", "fr-FR"));
+        assertTrue(global.put("timeZoneId", "America/New_York"));
+        assertTrue(ProfileDocumentStore.saveGlobalDocument(context, global));
+
+        ProfileDocument cloneA = new ProfileDocument();
+        assertTrue(cloneA.put("timeZoneId", "Europe/Paris"));
+        assertTrue(ProfileDocumentStore.saveCloneDocument(context, "com.example.documenta", 3, cloneA));
+
+        ProfileDocument cloneB = new ProfileDocument();
+        assertTrue(cloneB.put("localeTag", "de-DE"));
+        assertTrue(ProfileDocumentStore.saveCloneDocument(context, "com.example.documentb", 8, cloneB));
+
+        ProfileDocument globalRead = ProfileDocumentStore.readGlobalStrict(context);
+        ProfileDocument cloneARead = ProfileDocumentStore.readCloneStrict(context, "com.example.documenta", 3);
+        ProfileDocument cloneBRead = ProfileDocumentStore.readCloneStrict(context, "com.example.documentb", 8);
+        ProfileDocumentResolver.FieldResult aLocale = ProfileDocumentResolver.resolve(
+                "localeTag", cloneARead, globalRead, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult aZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", cloneARead, globalRead, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult bLocale = ProfileDocumentResolver.resolve(
+                "localeTag", cloneBRead, globalRead, ProfileFieldRegistry.createSafeDefaults());
+        ProfileDocumentResolver.FieldResult bZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", cloneBRead, globalRead, ProfileFieldRegistry.createSafeDefaults());
+
+        assertEquals("fr-FR", aLocale.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, aLocale.source);
+        assertEquals("Europe/Paris", aZone.value);
+        assertEquals(ProfileDocumentResolver.Source.CLONE, aZone.source);
+        assertEquals("de-DE", bLocale.value);
+        assertEquals(ProfileDocumentResolver.Source.CLONE, bLocale.source);
+        assertEquals("America/New_York", bZone.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, bZone.source);
+
+        ProfileDocument updatedGlobal = new ProfileDocument();
+        assertTrue(updatedGlobal.put("localeTag", "es-ES"));
+        assertTrue(updatedGlobal.put("timeZoneId", "America/Chicago"));
+        assertTrue(ProfileDocumentStore.saveGlobalDocument(context, updatedGlobal));
+        ProfileDocument afterGlobalEditA = ProfileDocumentStore.readCloneStrict(
+                context, "com.example.documenta", 3);
+        assertEquals("Europe/Paris", afterGlobalEditA.get("timeZoneId"));
+        assertFalse(afterGlobalEditA.contains("localeTag"));
+
+        assertTrue(ProfileDocumentStore.clearCloneField(
+                context, "com.example.documenta", 3, "timeZoneId"));
+        ProfileDocument afterResetA = ProfileDocumentStore.readCloneStrict(
+                context, "com.example.documenta", 3);
+        ProfileDocument latestGlobal = ProfileDocumentStore.readGlobalStrict(context);
+        ProfileDocumentResolver.FieldResult resetZone = ProfileDocumentResolver.resolve(
+                "timeZoneId", afterResetA, latestGlobal, ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("America/Chicago", resetZone.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, resetZone.source);
+        assertEquals("de-DE", ProfileDocumentStore.readCloneStrict(
+                context, "com.example.documentb", 8).get("localeTag"));
+        assertTrue(ProfileDocumentStore.readRevisionStrict(context) >= 5L);
+    }
+
+    @Test public void typedProfileDocumentSemanticInvalidityFallsBackPerFieldButStructuralCorruptionFailsClosed()
+            throws Exception {
+        String semantic = "{\\"schemaVersion\\":1,\\"revision\\":1,\\"updatedAt\\":1,"
+                + "\\"global\\":{\\"localeTag\\":\\"en-US\\",\\"timeZoneId\\":\\"Europe/Paris\\"},"
+                + "\\"clones\\":{\\"com.example.semantic#2\\":{\\"timeZoneId\\":\\"Mars/Olympus\\"}}}";
+        assertTrue(profileDocumentPreferences.edit().putString("documents_json", semantic).commit());
+        ProfileDocument clone = ProfileDocumentStore.readCloneStrict(context, "com.example.semantic", 2);
+        ProfileDocument global = ProfileDocumentStore.readGlobalStrict(context);
+        assertFalse(clone.contains("timeZoneId"));
+        ProfileDocumentResolver.FieldResult zone = ProfileDocumentResolver.resolve(
+                "timeZoneId", clone, global, ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("Europe/Paris", zone.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, zone.source);
+
+        String structural = "{\\"schemaVersion\\":1,\\"revision\\":2,\\"updatedAt\\":2,"
+                + "\\"global\\":{\\"localeTag\\":123},\\"clones\\":{}}";
+        assertTrue(profileDocumentPreferences.edit().putString("documents_json", structural).commit());
+        boolean rejected = false;
+        try {
+            ProfileDocumentStore.readGlobalStrict(context);
+        } catch (Exception expected) {
+            rejected = true;
+        }
+        assertTrue("Wrong stored field type must fail closed", rejected);
+        assertFalse(ProfileDocumentStore.saveGlobalField(context, "localeTag", "it-IT"));
+        assertEquals(structural, profileDocumentPreferences.getString("documents_json", null));
+    }
+
+    @Test public void typedProfileDocumentRejectsRestrictedAndObservedOnlyFields() {
+        assertFalse(ProfileDocumentStore.saveGlobalField(context, "imei", "000000000000000"));
+        assertFalse(ProfileDocumentStore.saveGlobalField(context, "publicIpAddress", "203.0.113.4"));
+        assertFalse(ProfileDocumentStore.saveCloneField(
+                context, "com.example.restricted", 1, "phoneNumber", "+15550000000"));
+        assertEquals("", profileDocumentPreferences.getString("documents_json", ""));
+    }
 
     private interface AsyncRepositoryOperation<T> {
         void execute(AsyncCloneRepository.Callback<T> callback);
