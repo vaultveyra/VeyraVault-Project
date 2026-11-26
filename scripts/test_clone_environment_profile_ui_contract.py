@@ -17,7 +17,7 @@ assert "ProfileRuntimeApplier.systemFallback()" in activity
 assert "effective.localeSource" in activity and "effective.timeZoneSource" in activity
 assert "ProfileSettings.isLocaleTagValid(value)" in activity
 assert "ProfileSettings.isTimeZoneIdValid(value)" in activity
-assert "Clone → Global → System" in activity
+assert "Clone → Global → Safe Isolated Default" in activity
 assert "next clone launch" in activity
 assert "Engine.stopClone" not in activity
 assert "Engine.clearCloneData" not in activity
