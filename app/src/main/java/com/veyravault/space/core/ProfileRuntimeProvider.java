@@ -48,11 +48,21 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                 response.putString("error", "INVALID_CLONE_IDENTITY");
                 return response;
             }
+            // Read both stores strictly. The five-field ProfileStore remains a live
+            // compatibility source until every settings screen has moved to documents.
+            ProfileSettings legacyClone = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
+            ProfileSettings legacyGlobal = ProfileStore.readGlobalStrict(context);
+            ProfileDocument documentClone = ProfileDocumentStore.readCloneStrict(context, packageName, userId);
+            ProfileDocument documentGlobal = ProfileDocumentStore.readGlobalStrict(context);
+
+            // Explicit document values win field-by-field; missing document fields inherit
+            // the previously saved legacy value. No migration write or destructive rewrite occurs.
+            ProfileDocument mergedClone = mergeLegacyFields(documentClone, legacyClone);
+            ProfileDocument mergedGlobal = mergeLegacyFields(documentGlobal, legacyGlobal);
+
             if (documentRequest) {
-                ProfileDocument clone = ProfileDocumentStore.readCloneStrict(context, packageName, userId);
-                ProfileDocument global = ProfileDocumentStore.readGlobalStrict(context);
                 java.util.Map<String, ProfileDocumentResolver.FieldResult> resolved =
-                        ProfileDocumentResolver.resolveAll(clone, global);
+                        ProfileDocumentResolver.resolveAll(mergedClone, mergedGlobal);
                 Bundle fields = new Bundle();
                 for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
                     Bundle item = new Bundle();
@@ -65,8 +75,10 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                 response.putBundle("fields", fields);
                 response.putLong("revision", ProfileDocumentStore.readRevisionStrict(context));
             } else {
-                ProfileSettings clone = ProfileStore.readCloneOverrideStrict(context, packageName, userId);
-                ProfileSettings global = ProfileStore.readGlobalStrict(context);
+                // Existing ProfileRuntimeClient and lifecycle callback now receive the
+                // merged supported fields without changing their established IPC contract.
+                ProfileSettings clone = mergeDocumentFields(legacyClone, documentClone);
+                ProfileSettings global = mergeDocumentFields(legacyGlobal, documentGlobal);
                 response.putBoolean("ok", true);
                 response.putBundle("clone", encode(clone));
                 response.putBundle("global", encode(global));
@@ -76,6 +88,41 @@ public final class ProfileRuntimeProvider extends ContentProvider {
             response.putString("error", error.getClass().getSimpleName());
         }
         return response;
+    }
+
+    /** Add legacy supported values only where the typed document has no field override. */
+    static ProfileDocument mergeLegacyFields(ProfileDocument document, ProfileSettings legacy) {
+        ProfileDocument merged = document == null ? new ProfileDocument() : document.copy();
+        if (legacy == null) return merged;
+        putIfMissing(merged, "localeTag", legacy.localeTag);
+        putIfMissing(merged, "timeZoneId", legacy.timeZoneId);
+        putIfMissing(merged, "locationEnabled", legacy.locationEnabled);
+        putIfMissing(merged, "latitude", legacy.latitude);
+        putIfMissing(merged, "longitude", legacy.longitude);
+        return merged;
+    }
+
+    private static void putIfMissing(ProfileDocument target, String key, Object value) {
+        if (value != null && !target.contains(key) && target.put(key, value)) {
+            // Value was validated and copied into the merged in-memory snapshot.
+        }
+    }
+
+    /** Overlay typed document values onto a legacy runtime payload without changing storage. */
+    static ProfileSettings mergeDocumentFields(ProfileSettings legacy, ProfileDocument document) {
+        ProfileSettings merged = legacy == null ? new ProfileSettings() : legacy.copy();
+        if (document == null) return merged;
+        Object value = document.get("localeTag");
+        if (value instanceof String) merged.localeTag = (String) value;
+        value = document.get("timeZoneId");
+        if (value instanceof String) merged.timeZoneId = (String) value;
+        value = document.get("locationEnabled");
+        if (value instanceof Boolean) merged.locationEnabled = (Boolean) value;
+        value = document.get("latitude");
+        if (value instanceof Number) merged.latitude = ((Number) value).doubleValue();
+        value = document.get("longitude");
+        if (value instanceof Number) merged.longitude = ((Number) value).doubleValue();
+        return merged;
     }
 
     private static void putTypedValue(Bundle out, Object value) {
