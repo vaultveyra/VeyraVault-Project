@@ -24,6 +24,14 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
                 && !packageName.equals(appContext.getPackageName()) && userId >= 0;
     }
 
+    /** BlackBox runs virtual apps in a host-owned worker process such as host:p0, not host main. */
+    static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName) {
+        if (currentProcessName == null || hostPackageName == null
+                || hostPackageName.trim().isEmpty()) return false;
+        return currentProcessName.startsWith(hostPackageName + ":")
+                && currentProcessName.length() > hostPackageName.length() + 1;
+    }
+
     @Override
     public void beforeCreateApplication(String packageName, String processName,
                                         Context packageContext, int userId) {
@@ -31,9 +39,33 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
 
         CloneRuntimeTrace.record(CloneRuntimeTrace.Event.VIRTUAL_PROCESS_BEFORE_APP_CREATE,
                 packageName, processName, userId, "callback_entered");
+
+        // Locale.setDefault and TimeZone.setDefault are process-global. Never execute them
+        // in VeyraVault's main host process; only a pinned BlackBox host:pN worker may bind
+        // a virtual package/user and receive these process-scoped settings.
+        String hostProcessName = null;
         try {
-            // Never expose the host phone or a previously bound Clone while this target process
-            // is being prepared. Start from deterministic isolated values before profile IPC.
+            hostProcessName = ProcessUtils.currentProcessName(appContext);
+        } catch (RuntimeException ignored) { }
+        if (!isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_PROCESS_BOUNDARY_REJECTED,
+                    packageName, processName, userId,
+                    hostProcessName == null ? "host_process_unknown" : "not_blackbox_worker");
+            Log.w(TAG, "Clone profile application rejected outside a BlackBox host worker for "
+                    + packageName + "#" + userId);
+            return;
+        }
+        if (!packageName.equals(packageContext.getPackageName())) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_PROCESS_BOUNDARY_REJECTED,
+                    packageName, processName, userId, "target_context_mismatch");
+            Log.w(TAG, "Clone profile application rejected because target Context identity mismatched for "
+                    + packageName + "#" + userId);
+            return;
+        }
+
+        try {
+            // Never expose a previously bound Clone while this target process is being prepared.
+            // The host main process has already been excluded by the worker-process gate above.
             ProfileRuntimeApplier.applySafeDefaults(packageContext);
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(appContext, packageName, userId);
