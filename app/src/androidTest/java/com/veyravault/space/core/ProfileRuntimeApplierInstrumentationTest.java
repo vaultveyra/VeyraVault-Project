@@ -14,6 +14,8 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class ProfileRuntimeApplierInstrumentationTest {
@@ -34,13 +36,54 @@ public class ProfileRuntimeApplierInstrumentationTest {
 
             ProfileResolver.ResolvedProfile resolved =
                     ProfileResolver.resolve(clone, global, system);
-            ProfileRuntimeApplier.apply(context, resolved);
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            ProfileRuntimeApplier.RuntimeApplyResult verification =
+                    ProfileRuntimeApplier.applyAndVerify(context, context.getPackageName(), resolved);
 
             assertEquals(ProfileResolver.Source.CLONE, resolved.localeSource);
             assertEquals(ProfileResolver.Source.CLONE, resolved.timeZoneSource);
-            assertEquals("fr", Locale.getDefault().getLanguage());
-            assertEquals("Europe/Paris", TimeZone.getDefault().getID());
-            assertEquals("fr", context.getResources().getConfiguration().locale.getLanguage());
+            assertTrue(verification.isFullyVerified());
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED, verification.localeStatus);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED, verification.timeZoneStatus);
+            assertEquals(context.getPackageName(), verification.targetPackageName);
+            assertEquals("fr-FR", verification.expectedLocaleTag);
+            assertEquals("fr-FR", verification.observedDefaultLocaleTag);
+            assertEquals("fr-FR", verification.observedResourceLocaleTag);
+            assertEquals("Europe/Paris", verification.observedTimeZoneId);
+        } finally {
+            Locale.setDefault(originalLocale);
+            TimeZone.setDefault(originalZone);
+            context.getResources().updateConfiguration(
+                    originalConfiguration, context.getResources().getDisplayMetrics());
+        }
+    }
+
+    @Test public void applyAndVerifyRejectsWrongTargetContextWithoutApplyingProfile() {
+        Context context = ApplicationProvider.getApplicationContext();
+        Locale originalLocale = Locale.getDefault();
+        TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
+        Configuration originalConfiguration =
+                new Configuration(context.getResources().getConfiguration());
+        try {
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            Locale safeLocale = Locale.getDefault();
+            TimeZone safeZone = (TimeZone) TimeZone.getDefault().clone();
+
+            ProfileSettings clone = new ProfileSettings();
+            clone.localeTag = "fr-FR";
+            clone.timeZoneId = "Europe/Paris";
+            ProfileResolver.ResolvedProfile resolved = ProfileResolver.resolve(
+                    clone, new ProfileSettings(), ProfileRuntimeApplier.systemFallback());
+
+            ProfileRuntimeApplier.RuntimeApplyResult result =
+                    ProfileRuntimeApplier.applyAndVerify(context, "com.example.not.the.target", resolved);
+
+            assertFalse(result.targetIdentityMatches);
+            assertFalse(result.isFullyVerified());
+            assertEquals(ProfileFieldRegistry.ApplyStatus.FAILED, result.localeStatus);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.FAILED, result.timeZoneStatus);
+            assertEquals(safeLocale, Locale.getDefault());
+            assertEquals(safeZone.getID(), TimeZone.getDefault().getID());
         } finally {
             Locale.setDefault(originalLocale);
             TimeZone.setDefault(originalZone);
