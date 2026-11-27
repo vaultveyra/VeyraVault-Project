@@ -47,7 +47,11 @@ public final class ProfileDocument {
     public void markInheritGlobal(String key) { markState(key, FieldState.INHERIT_GLOBAL); }
     public void markSafeDefault(String key) { markState(key, FieldState.SAFE_DEFAULT); }
     private void markState(String key, FieldState state) {
-        if (ProfileFieldRegistry.get(key) == null) throw new IllegalArgumentException("Unknown profile field: " + key);
+        ProfileFieldRegistry.Field field = ProfileFieldRegistry.get(key);
+        if (field == null) throw new IllegalArgumentException("Unknown profile field: " + key);
+        if (!field.canBeStoredAsProfileInput()) {
+            throw new IllegalArgumentException("Profile field cannot be stored as profile input: " + key);
+        }
         values.remove(key); invalidFields.remove(key); fieldStates.put(key, state);
     }
     void markInvalid(String key) {
