@@ -17,28 +17,128 @@ public final class ProfileFieldRegistry {
     public enum ApplyStatus { APPLIED, STORED_ONLY, UNSUPPORTED, NOT_TESTED, FAILED, NOT_APPLICABLE }
 
     public static final class Field {
+        /** Stable machine identifier; once published it must never be renamed. */
+        public final String id;
         public final String key;
+        public final String label;
         public final ValueType type;
         public final Capability capability;
         public final Object safeDefault;
         public final String scope;
         public final String note;
+        /** Explicit capability metadata; "NOT_VERIFIED" is not a support claim. */
+        public final String adapterId;
+        public final String apiSupport;
+        public final String privacyClass;
+        public final boolean editable;
+        public final String readbackMethod;
+        public final String unsupportedReason;
 
         private Field(String key, ValueType type, Capability capability,
                       Object safeDefault, String scope, String note) {
+            this.id = key;
             this.key = key;
+            this.label = humanize(key);
             this.type = type;
             this.capability = capability;
             this.safeDefault = safeDefault;
             this.scope = scope;
             this.note = note;
+            this.editable = isEditableCapability(capability, scope);
+            this.adapterId = adapterFor(capability, key);
+            this.apiSupport = apiSupportFor(capability, key);
+            this.privacyClass = privacyFor(capability, key);
+            this.readbackMethod = readbackFor(capability, key);
+            this.unsupportedReason = unsupportedFor(capability, key, note);
         }
 
         public boolean canBeStoredAsProfileInput() {
+            return editable;
+        }
+
+        private static String humanize(String key) {
+            if (key == null || key.isEmpty()) return "";
+            StringBuilder label = new StringBuilder();
+            for (int i = 0; i < key.length(); i++) {
+                char ch = key.charAt(i);
+                if (Character.isUpperCase(ch)) label.append(' ');
+                label.append(ch);
+            }
+            label.setCharAt(0, Character.toUpperCase(label.charAt(0)));
+            return label.toString();
+        }
+
+        private static boolean isEditableCapability(Capability capability, String scope) {
             return capability != Capability.PLATFORM_RESTRICTED
                     && capability != Capability.SERVICE_OWNED
                     && capability != Capability.OBSERVED_ONLY
-                    && !"observed-only".equals(scope) && !"read-only".equals(scope);
+                    && !"observed-only".equals(scope)
+                    && !"read-only".equals(scope)
+                    && !"service-owned".equals(scope);
+        }
+
+        private static String adapterFor(Capability capability, String key) {
+            switch (capability) {
+                case PROCESS_SCOPED:
+                    return "profile-runtime-process";
+                case ENGINE_SCOPED:
+                    return "blackbox-engine";
+                case NETWORK_PROVIDER_REQUIRED:
+                    return "per-clone-network-provider";
+                default:
+                    return "none";
+            }
+        }
+
+        private static String apiSupportFor(Capability capability, String key) {
+            switch (capability) {
+                case PROCESS_SCOPED:
+                    return "API-gated; verify on each supported Android API";
+                case ENGINE_SCOPED:
+                    return "Pinned Engine API; per-field readback required";
+                case NETWORK_PROVIDER_REQUIRED:
+                    return "Requires a real network provider and external leak tests";
+                default:
+                    return "NOT_VERIFIED";
+            }
+        }
+
+        private static String privacyFor(Capability capability, String key) {
+            if (capability == Capability.PLATFORM_RESTRICTED
+                    || capability == Capability.SERVICE_OWNED) return "restricted-sensitive";
+            if (capability == Capability.OBSERVED_ONLY) return "observed-telemetry";
+            if ("appInstallInstanceId".equals(key)) return "pseudonymous-internal";
+            return "profile-preference";
+        }
+
+        private static String readbackFor(Capability capability, String key) {
+            if ("localeTag".equals(key)) return "Locale.getDefault + Resources.Configuration";
+            if ("timeZoneId".equals(key)) return "TimeZone.getDefault";
+            if (capability == Capability.ENGINE_SCOPED) return "Engine package/user scoped API readback";
+            if (capability == Capability.NETWORK_PROVIDER_REQUIRED) return "External egress, DNS, IPv4/IPv6 leak verification";
+            if (capability == Capability.OBSERVED_ONLY) return "Live observation source; adapter not wired";
+            return "No runtime readback adapter";
+        }
+
+        private static String unsupportedFor(Capability capability, String key, String note) {
+            switch (capability) {
+                case PROCESS_SCOPED:
+                case ENGINE_SCOPED:
+                    return "Readback evidence required before APPLIED";
+                case NETWORK_PROVIDER_REQUIRED:
+                    return "Real per-Clone network provider is required";
+                case OBSERVED_ONLY:
+                    return "Read-only telemetry; no profile write is permitted";
+                case PLATFORM_RESTRICTED:
+                    return "Platform-controlled or restricted; never fabricate";
+                case SERVICE_OWNED:
+                    return "Third-party/platform service owns this value";
+                case LOCAL_PREFERENCE_ONLY:
+                    return "Preference metadata only; no runtime adapter";
+                case NOT_IMPLEMENTED:
+                default:
+                    return note == null ? "Adapter not implemented" : note;
+            }
         }
     }
 
