@@ -6,6 +6,7 @@ root = Path(__file__).resolve().parents[1]
 trace = (root / "app/src/main/java/com/veyravault/space/core/CloneRuntimeTrace.java").read_text(encoding="utf-8")
 engine = (root / "app/src/main/java/com/veyravault/space/core/Engine.java").read_text(encoding="utf-8")
 callback = (root / "app/src/main/java/com/veyravault/space/core/CloneProfileLifecycleCallback.java").read_text(encoding="utf-8")
+process_utils = (root / "app/src/main/java/com/veyravault/space/core/ProcessUtils.java").read_text(encoding="utf-8")
 compatibility = (root / "app/src/main/java/com/veyravault/space/core/CompatibilityManager.java").read_text(encoding="utf-8")
 doc = (root / "docs/STAGE_8_10_APP_COMPATIBILITY_DIAGNOSTICS.md").read_text(encoding="utf-8")
 workflow = (root / ".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
@@ -103,7 +104,8 @@ assert "CloneRuntimeTrace.Event.PROFILE_READBACK_VERIFIED" in before_create
 assert "CloneRuntimeTrace.Event.PROFILE_READBACK_FAILED" in before_create
 assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in trace
 assert "ProcessUtils.currentProcessName(appContext)" in before_create
-assert "isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in before_create
+assert "ProcessUtils.isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in before_create
+assert "public static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName)" in process_utils
 assert before_create.index("isBlackBoxWorkerProcess") < before_create.index("applySafeDefaults(packageContext)")
 assert "target_context_mismatch" in before_create
 assert '"readback_verified"' in before_create
