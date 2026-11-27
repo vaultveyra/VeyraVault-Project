@@ -180,7 +180,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             if (!field.category.equals(lastCategory)) {
                 lastCategory = field.category;
                 TextView category = new TextView(this);
-                category.setText(field.category);
+                category.setText(displayCategory(field.category));
                 category.setTextSize(17f);
                 category.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                 category.setTextColor(UiPalette.textPrimary(this));
@@ -194,21 +194,25 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void addSummary(Map<String, ProfileDocumentResolver.FieldResult> resolved) {
-        int stored = 0, unsupported = 0, notTested = 0, notApplicable = 0;
+        int applied = 0, stored = 0, unsupported = 0, notTested = 0, failed = 0, notApplicable = 0;
         for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
             switch (field.status) {
+                case APPLIED: applied++; break;
                 case STORED_ONLY: stored++; break;
                 case UNSUPPORTED: unsupported++; break;
                 case NOT_APPLICABLE: notApplicable++; break;
                 case NOT_TESTED: notTested++; break;
+                case FAILED: failed++; break;
                 default: break;
             }
         }
         TextView summary = new TextView(this);
         summary.setText("Fields: " + resolved.size()
+                + "  ·  Applied: " + applied
                 + "  ·  Stored only: " + stored
                 + "  ·  Unsupported: " + unsupported
                 + "  ·  Not tested: " + notTested
+                + "  ·  Failed: " + failed
                 + "  ·  Not applicable: " + notApplicable);
         summary.setTextSize(12f);
         summary.setTextColor(UiPalette.textPrimary(this));
@@ -447,6 +451,18 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             showLoading();
             toast(message);
         }
+    }
+
+    private String displayCategory(String category) {
+        if (!fa) return category;
+        if ("Locale & Formatting".equals(category)) return "زبان و قالب‌بندی";
+        if ("Location".equals(category)) return "موقعیت مکانی";
+        if ("Device & OS".equals(category)) return "دستگاه و سیستم‌عامل";
+        if ("Network".equals(category)) return "شبکه";
+        if ("Identifiers & Services".equals(category)) return "شناسه‌ها و سرویس‌ها";
+        if ("Browser & WebView".equals(category)) return "مرورگر و WebView";
+        if ("App Data & Privacy".equals(category)) return "داده و حریم خصوصی برنامه";
+        return category;
     }
 
     private String valueText(Object value) {
