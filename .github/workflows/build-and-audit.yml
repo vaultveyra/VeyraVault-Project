@@ -321,8 +321,18 @@ jobs:
           working-directory: build_workspace
           script: |
             set -euo pipefail
-            SDK_LEVEL="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
-            test "$SDK_LEVEL" = "27"
+            # Pin ADB to the emulator created by this step; do not rely on implicit device selection.
+            adb -s emulator-5554 wait-for-device
+            SDK_LEVEL="$(adb -s emulator-5554 shell getprop ro.build.version.sdk | tr -d '[:space:]')"
+            echo Detected-Android-SDK-level-on-emulator-5554="$SDK_LEVEL"
+            if [[ "$SDK_LEVEL" != "27" ]]; then
+              echo "::error::Expected Android API 27 on emulator-5554; detected: $SDK_LEVEL"
+              adb devices -l || true
+              adb -s emulator-5554 shell getprop ro.build.version.release || true
+              exit 1
+            fi
+            # Run the full instrumentation suite on the user's Android 8.1 target API.
+            # The API-21-only contract test runs in its dedicated minimum-API step above.
             # Run the full instrumentation suite on the user's Android 8.1 target API.
             # The API-21-only contract test runs in its dedicated minimum-API step above.
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest

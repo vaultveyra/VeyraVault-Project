@@ -19,7 +19,7 @@ The app declares minSdkVersion 21 (Android 5.0). Stage 8.27 makes minimum-API va
 - CI retains the API-34 Android instrumentation run for the broader Room and app instrumentation suite.
 - The API-34 run uses AndroidJUnitRunner's `notClass` filter to exclude LegacyApi21CompatibilityInstrumentationTest; that class has an explicit SDK-21 assertion and must not run on API 34.
 - A separate API-21 x86_64 emulator run uses the runner's `class` filter to execute LegacyApi21CompatibilityInstrumentationTest directly on the declared minimum API.
-- A separate Android 8.1 / API-27 x86_64 emulator run executes the full Android instrumentation suite (excluding only the API-21-specific test class). The workflow checks `ro.build.version.sdk == 27` before starting Gradle, so a misprovisioned emulator cannot silently count as target-device coverage.
+- A separate Android 8.1 / API-27 x86_64 emulator run executes the full Android instrumentation suite (excluding only the API-21-specific test class). The workflow pins ADB to `emulator-5554`, verifies `ro.build.version.sdk == 27`, logs the detected SDK value, and prints device/release diagnostics on mismatch before starting Gradle.
 - The API-27 full suite includes the typed ProfileDocumentStore, asynchronous Clone repository, runtime applier, location migration, appearance, security, and Room instrumentation suites.
 - The API-21 test exercises the legacy PackageManager overload, ApplicationInfo splitSourceDirs, APK ZIP preflight, package fingerprint revalidation and the pre-API-23 host-bitness path.
 - It also exercises the Calendar-based date formatter and checks that both Kotlin Coroutines ServiceLoader resources remain readable and their provider classes load.

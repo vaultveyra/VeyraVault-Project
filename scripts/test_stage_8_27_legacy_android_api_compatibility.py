@@ -93,8 +93,14 @@ assert "-Pandroid.testInstrumentationRunnerArguments.class=" + api21_class in ap
     "The API-21 emulator must explicitly execute the minimum-API instrumentation class."
 )
 assert "api-level: 27" in api27 and "arch: x86_64" in api27
-assert 'SDK_LEVEL="$(adb shell getprop ro.build.version.sdk | tr -d \'\\r\')"' in api27
-assert 'test "$SDK_LEVEL" = "27"' in api27, "The API-27 job must verify the emulator's actual runtime API."
+assert "adb -s emulator-5554 wait-for-device" in api27
+assert "adb -s emulator-5554 shell getprop ro.build.version.sdk" in api27
+assert "tr -d '[:space:]'" in api27
+assert "Detected-Android-SDK-level-on-emulator-5554" in api27
+assert 'if [[ "$SDK_LEVEL" != "27" ]]; then' in api27
+assert "adb -s emulator-5554 shell getprop ro.build.version.release" in api27, (
+    "API-27 mismatch diagnostics must print the Android release value."
+)
 api27_commands = [line.strip() for line in api27.splitlines() if line.strip().startswith("./gradlew :app:connectedDebugAndroidTest")]
 assert api27_commands == ["./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=" + api21_class], (
     "API-27 must execute the full suite while excluding the API-21-only class."
