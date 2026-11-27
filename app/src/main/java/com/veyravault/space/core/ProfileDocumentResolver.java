@@ -47,15 +47,41 @@ public final class ProfileDocumentResolver {
         if (field == null) return new FieldResult(key, null, Source.UNSET,
                 ProfileFieldRegistry.ApplyStatus.UNSUPPORTED);
 
-        Object value = valid(field, clone) ? clone.get(key) : null;
-        Source source = value == null ? Source.UNSET : Source.CLONE;
-        if (value == null && valid(field, global)) {
-            value = global.get(key);
-            if (value != null) source = Source.GLOBAL;
-        }
-        if (value == null && valid(field, safeDefaults)) {
-            value = safeDefaults.get(key);
-            source = Source.SAFE_DEFAULT;
+        ProfileDocument defaults = safeDefaults == null
+                ? ProfileFieldRegistry.createSafeDefaults() : safeDefaults;
+        Object value = null;
+        Source source = Source.UNSET;
+
+        // An explicit Clone Safe Default is a deliberate override of Global.
+        // INHERIT_GLOBAL skips only the Clone layer; invalid/missing values also
+        // fall through per field without affecting unrelated profile fields.
+        boolean cloneForcesSafe = hasState(clone, key, ProfileDocument.FieldState.SAFE_DEFAULT);
+        boolean cloneInherits = hasState(clone, key, ProfileDocument.FieldState.INHERIT_GLOBAL);
+        if (cloneForcesSafe) {
+            if (validValue(field, defaults)) {
+                value = defaults.get(key);
+                source = Source.SAFE_DEFAULT;
+            }
+        } else {
+            if (!cloneInherits && validValue(field, clone)) {
+                value = clone.get(key);
+                source = Source.CLONE;
+            }
+            if (value == null) {
+                if (hasState(global, key, ProfileDocument.FieldState.SAFE_DEFAULT)) {
+                    // A Global Safe Default deliberately blocks registry-independent values.
+                    if (validValue(field, defaults)) {
+                        value = defaults.get(key);
+                        source = Source.SAFE_DEFAULT;
+                    }
+                } else if (validValue(field, global)) {
+                    value = global.get(key);
+                    source = Source.GLOBAL;
+                } else if (validValue(field, defaults)) {
+                    value = defaults.get(key);
+                    source = Source.SAFE_DEFAULT;
+                }
+            }
         }
 
         ProfileFieldRegistry.ApplyStatus status;
@@ -79,8 +105,14 @@ public final class ProfileDocumentResolver {
         return new FieldResult(key, value, source, status);
     }
 
-    private static boolean valid(ProfileFieldRegistry.Field field, ProfileDocument document) {
-        return document != null && !document.hasState(field.key) && !document.isInvalid(field.key) && document.contains(field.key)
+    private static boolean hasState(ProfileDocument document, String key,
+                                    ProfileDocument.FieldState state) {
+        return document != null && document.state(key) == state;
+    }
+
+    private static boolean validValue(ProfileFieldRegistry.Field field, ProfileDocument document) {
+        return document != null && !document.hasState(field.key) && !document.isInvalid(field.key)
+                && document.contains(field.key)
                 && ProfileFieldRegistry.isValidValue(field, document.get(field.key));
     }
 
