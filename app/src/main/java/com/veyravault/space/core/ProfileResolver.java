@@ -42,27 +42,27 @@ public final class ProfileResolver {
                     ProfileSettings.isLongitudeValid(safeDefault.longitude));
             longitude = lng.value; longitudeSource = lng.source;
         }
+
+        private ResolvedProfile(String localeTag, Source localeSource,
+                                String timeZoneId, Source timeZoneSource,
+                                Boolean locationEnabled, Source locationEnabledSource,
+                                Double latitude, Source latitudeSource,
+                                Double longitude, Source longitudeSource) {
+            this.localeTag = localeTag;
+            this.localeSource = safeSource(localeSource);
+            this.timeZoneId = timeZoneId;
+            this.timeZoneSource = safeSource(timeZoneSource);
+            this.locationEnabled = locationEnabled;
+            this.locationEnabledSource = safeSource(locationEnabledSource);
+            this.latitude = latitude;
+            this.latitudeSource = safeSource(latitudeSource);
+            this.longitude = longitude;
+            this.longitudeSource = safeSource(longitudeSource);
+        }
     }
     private static final class Value<T> {
         final T value; final Source source;
         Value(T value, Source source) { this.value = value; this.source = source; }
-    }
-
-    private ResolvedProfile(String localeTag, Source localeSource,
-                            String timeZoneId, Source timeZoneSource,
-                            Boolean locationEnabled, Source locationEnabledSource,
-                            Double latitude, Source latitudeSource,
-                            Double longitude, Source longitudeSource) {
-        this.localeTag = localeTag;
-        this.localeSource = safeSource(localeSource);
-        this.timeZoneId = timeZoneId;
-        this.timeZoneSource = safeSource(timeZoneSource);
-        this.locationEnabled = locationEnabled;
-        this.locationEnabledSource = safeSource(locationEnabledSource);
-        this.latitude = latitude;
-        this.latitudeSource = safeSource(latitudeSource);
-        this.longitude = longitude;
-        this.longitudeSource = safeSource(longitudeSource);
     }
 
     private static Source safeSource(Source source) {
