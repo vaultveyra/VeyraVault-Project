@@ -10,6 +10,7 @@ lifecycle = (ROOT / "app/src/main/java/com/veyravault/space/core/CloneProfileLif
 runtime_applier = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeApplier.java").read_text(encoding="utf-8")
 runtime_trace = (ROOT / "app/src/main/java/com/veyravault/space/core/CloneRuntimeTrace.java").read_text(encoding="utf-8")
 runtime_tests = (ROOT / "app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java").read_text(encoding="utf-8")
+process_utils = (ROOT / "app/src/main/java/com/veyravault/space/core/ProcessUtils.java").read_text(encoding="utf-8")
 virtual_hooks = (ROOT / "app/src/main/java/com/veyravault/space/core/VirtualHookManager.java").read_text(encoding="utf-8")
 audit = (ROOT / "docs/STAGE_8_9_ENGINE_DEVICE_CAPABILITY_AUDIT.md").read_text(encoding="utf-8")
 workflow = (ROOT / ".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
@@ -50,7 +51,8 @@ assert "PROFILE_READBACK_VERIFIED" in runtime_trace
 assert "PROFILE_READBACK_FAILED" in runtime_trace
 assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in runtime_trace
 assert "ProcessUtils.currentProcessName(appContext)" in lifecycle
-assert "isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
+assert "ProcessUtils.isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
+assert "public static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName)" in process_utils
 assert lifecycle.index("isBlackBoxWorkerProcess") < lifecycle.index("applySafeDefaults(packageContext)")
 assert "blackBoxWorkerGateRejectsMainHostAndForeignProcesses" in runtime_tests
 
