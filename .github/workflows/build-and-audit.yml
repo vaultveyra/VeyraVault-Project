@@ -63,6 +63,9 @@ jobs:
       - name: Test typed profile document registry and resolver engine
         run: python3 scripts/test_profile_document_engine.py
 
+      - name: Test registry-driven Global and Clone profile editor
+        run: python3 scripts/test_profile_document_editor_contract.py
+
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
 
