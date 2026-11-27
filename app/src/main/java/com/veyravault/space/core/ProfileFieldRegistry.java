@@ -115,7 +115,8 @@ public final class ProfileFieldRegistry {
                     || "wifiMac".equals(key) || "wifiBssid".equals(key)
                     || "phoneNumber".equals(key) || "accountId".equals(key)
                     || "playIntegrityVerdict".equals(key) || "safetyNetAttestation".equals(key)
-                    || "simOperatorIdentity".equals(key) || "purchaseState".equals(key)) return "Identifiers & Services";
+                    || "simOperatorIdentity".equals(key) || "purchaseState".equals(key)
+                    || "gsfId".equals(key) || "pushToken".equals(key)) return "Identifiers & Services";
             if ("webViewUserAgentProfile".equals(key) || key.startsWith("webView")
                     || "serviceWorkerIsolation".equals(key) || "javascriptLocaleTimeZone".equals(key)
                     || "screenSurfaceProfile".equals(key) || "fontSurfaceProfile".equals(key)
@@ -317,6 +318,8 @@ public final class ProfileFieldRegistry {
         add(fields, "safetyNetAttestation", ValueType.STRING, Capability.SERVICE_OWNED, null, "observed-only", "Attestation result is platform/service-owned and must remain truthful.");
         add(fields, "simOperatorIdentity", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Carrier/SIM operator identity is service-owned and cannot be asserted as a profile override.");
         add(fields, "purchaseState", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Purchase entitlement is store/service-owned and must remain truthful.");
+        add(fields, "gsfId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Google Services Framework ID is platform/service-owned; never fabricate, configure or expose as a Clone override.");
+        add(fields, "pushToken", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Push token is provider-owned and sensitive; never fabricate or configure. Registration isolation requires provider-specific tests.");
 
         add(fields, "privateFilesIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone private-directory isolation tests.");
         add(fields, "databaseIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone database isolation tests.");
@@ -325,6 +328,7 @@ public final class ProfileFieldRegistry {
         add(fields, "contactsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires explicit provider/permission isolation tests.");
         add(fields, "calendarDataIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires explicit provider/permission isolation tests.");
         add(fields, "accountsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires account-provider isolation; cannot imply independent Android accounts.");
+        add(fields, "sessionDataIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified per-Clone session-state isolation across process death and relaunch; stored setting does not clear or reset existing sessions.");
         add(fields, "clipboardPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped clipboard adapter.");
         add(fields, "notificationPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires notification and listener isolation tests.");
         add(fields, "cameraPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped camera permission adapter.");
