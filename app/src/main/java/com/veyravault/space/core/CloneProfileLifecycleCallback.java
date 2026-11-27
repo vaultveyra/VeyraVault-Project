@@ -19,6 +19,24 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
         this.appContext = application == null ? context : application;
     }
 
+    private static String statusSummary(ProfileRuntimeClient.ResolvedDocument document) {
+        int applied = 0, stored = 0, unsupported = 0, notTested = 0, failed = 0, notApplicable = 0;
+        for (ProfileRuntimeClient.ResolvedField field : document.fields().values()) {
+            switch (field.status) {
+                case APPLIED: applied++; break;
+                case STORED_ONLY: stored++; break;
+                case UNSUPPORTED: unsupported++; break;
+                case NOT_TESTED: notTested++; break;
+                case FAILED: failed++; break;
+                case NOT_APPLICABLE: notApplicable++; break;
+                default: notTested++; break;
+            }
+        }
+        return "revision_" + document.revision + "_fields_" + document.fields().size()
+                + "_applied_" + applied + "_stored_" + stored + "_unsupported_" + unsupported
+                + "_not_tested_" + notTested + "_failed_" + failed + "_not_applicable_" + notApplicable;
+    }
+
     private boolean isTargetProcess(String packageName, int userId) {
         return appContext != null && packageName != null && !packageName.trim().isEmpty()
                 && !packageName.equals(appContext.getPackageName()) && userId >= 0;
@@ -59,8 +77,11 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             // Never expose a previously bound Clone while this target process is being prepared.
             // The host main process has already been excluded by the worker-process gate above.
             ProfileRuntimeApplier.applySafeDefaults(packageContext);
-            ProfileResolver.ResolvedProfile resolved =
-                    ProfileRuntimeClient.resolve(appContext, packageName, userId);
+            ProfileRuntimeClient.ResolvedDocument document =
+                    ProfileRuntimeClient.resolveDocument(appContext, packageName, userId);
+            ProfileResolver.ResolvedProfile resolved = document.toRuntimeProfile();
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_DOCUMENT_RESOLVED,
+                    packageName, processName, userId, statusSummary(document));
             ProfileRuntimeApplier.RuntimeApplyResult verification =
                     ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved);
             String verificationOutcome = "locale_" + verification.localeStatus.name()
