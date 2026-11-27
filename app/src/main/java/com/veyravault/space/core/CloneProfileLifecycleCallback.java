@@ -37,13 +37,27 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             ProfileRuntimeApplier.applySafeDefaults(packageContext);
             ProfileResolver.ResolvedProfile resolved =
                     ProfileRuntimeClient.resolve(appContext, packageName, userId);
-            ProfileRuntimeApplier.apply(packageContext, resolved);
+            ProfileRuntimeApplier.RuntimeApplyResult verification =
+                    ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved);
+            String verificationOutcome = "locale_" + verification.localeStatus.name()
+                    + "_timezone_" + verification.timeZoneStatus.name()
+                    + "_context_" + (verification.targetIdentityMatches ? "MATCH" : "MISMATCH");
+            CloneRuntimeTrace.record(verification.isFullyVerified()
+                            ? CloneRuntimeTrace.Event.PROFILE_READBACK_VERIFIED
+                            : CloneRuntimeTrace.Event.PROFILE_READBACK_FAILED,
+                    packageName, processName, userId, verificationOutcome);
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED,
-                    packageName, processName, userId, "apply_returned");
-            Log.i(TAG, "Clone locale/time-zone profile apply operation returned before Application creation: "
-                    + packageName + "#" + userId
-                    + " localeSource=" + resolved.localeSource
-                    + " timeZoneSource=" + resolved.timeZoneSource);
+                    packageName, processName, userId,
+                    verification.isFullyVerified() ? "readback_verified" : "readback_incomplete");
+            if (verification.isFullyVerified()) {
+                Log.i(TAG, "Clone locale/time-zone readback verified before Application creation: "
+                        + packageName + "#" + userId
+                        + " localeSource=" + resolved.localeSource
+                        + " timeZoneSource=" + resolved.timeZoneSource);
+            } else {
+                Log.w(TAG, "Clone locale/time-zone readback did not verify for "
+                        + packageName + "#" + userId + " (" + verificationOutcome + ")");
+            }
         } catch (Exception error) {
             // A malformed profile must not crash the target app or expose host/previous Clone
             // values. Keep the deterministic isolated defaults already applied above.
