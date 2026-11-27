@@ -96,8 +96,21 @@ public class ProfileRuntimeApplierInstrumentationTest {
             assertTrue(ProfileDocumentStore.saveCloneDocument(
                     context, packageName, userId, cloneSafe));
 
-            ProfileResolver.ResolvedProfile safe = ProfileRuntimeClient.resolve(
-                    context, packageName, userId);
+            ProfileRuntimeClient.ResolvedDocument safeDocument =
+                    ProfileRuntimeClient.resolveDocument(context, packageName, userId);
+            assertEquals(ProfileFieldRegistry.all().size(), safeDocument.fields().size());
+            assertEquals("UTC", safeDocument.field("timeZoneId").value);
+            assertEquals(ProfileDocumentResolver.Source.SAFE_DEFAULT,
+                    safeDocument.field("timeZoneId").source);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_TESTED,
+                    safeDocument.field("timeZoneId").status);
+            assertFalse(safeDocument.field("publicIpAddress").editable);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_APPLICABLE,
+                    safeDocument.field("publicIpAddress").status);
+            assertEquals(ProfileFieldRegistry.Capability.PLATFORM_RESTRICTED,
+                    safeDocument.field("imei").capability);
+            assertFalse(safeDocument.field("imei").editable);
+            ProfileResolver.ResolvedProfile safe = safeDocument.toRuntimeProfile();
             assertEquals("UTC", safe.timeZoneId);
             assertEquals(ProfileResolver.Source.SAFE_DEFAULT, safe.timeZoneSource);
 
