@@ -37,7 +37,7 @@ assert "verification.isFullyVerified()" in instrumentation
 assert "ProfileStore.resolveStrict" not in callback
 assert "ContentResolver().call" in client
 assert "METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT" in client
-assert "resolveDocument(Context context, String packageName, int userId)" in client
+assert "ResolvedDocument resolveDocument(" in client
 assert "class ResolvedDocument" in client
 assert "Collections.unmodifiableMap" in client
 assert "PROFILE_PROVIDER_FAILURE:FIELD_COUNT_MISMATCH" in client
