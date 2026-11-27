@@ -233,6 +233,9 @@ public final class ProfileFieldRegistry {
         add(fields, "appSetId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Google Play services-owned identifier; never fabricate or configure.");
         add(fields, "firebaseInstallationId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Firebase service-owned installation identifier.");
         add(fields, "iccid", ValueType.STRING, Capability.PLATFORM_RESTRICTED, null, "read-only", "Restricted SIM identifier; never configurable.");
+        add(fields, "androidIdSsaid", ValueType.STRING, Capability.PLATFORM_RESTRICTED, null, "read-only", "Android app-scoped SSAID is OS-controlled; never fabricate or configure.");
+        add(fields, "safetyNetAttestation", ValueType.STRING, Capability.SERVICE_OWNED, null, "observed-only", "Attestation result is platform/service-owned and must remain truthful.");
+        add(fields, "simOperatorIdentity", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Carrier/SIM operator identity is service-owned and cannot be asserted as a profile override.");
         add(fields, "purchaseState", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Purchase entitlement is store/service-owned and must remain truthful.");
 
         add(fields, "privateFilesIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone private-directory isolation tests.");
@@ -244,6 +247,7 @@ public final class ProfileFieldRegistry {
         add(fields, "accountsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires account-provider isolation; cannot imply independent Android accounts.");
         add(fields, "clipboardPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped clipboard adapter.");
         add(fields, "notificationPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires notification and listener isolation tests.");
+        add(fields, "cameraPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped camera permission adapter.");
         add(fields, "microphonePolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped microphone permission adapter.");
         add(fields, "backgroundExecutionPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires lifecycle and background execution isolation tests.");
         add(fields, "packageVisibilityPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires package visibility enforcement and tests.");
