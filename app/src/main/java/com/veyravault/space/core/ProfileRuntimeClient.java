@@ -259,6 +259,8 @@ public final class ProfileRuntimeClient {
                 || !field.privacyClass.equals(item.getString("privacyClass"))
                 || field.editable != item.getBoolean("editable", !field.editable)
                 || !field.label.equals(item.getString("label"))
+                || !field.category.equals(item.getString("category"))
+                || !field.validationRule.equals(item.getString("validationRule"))
                 || !field.readbackMethod.equals(item.getString("readbackMethod"))
                 || !field.unsupportedReason.equals(item.getString("unsupportedReason"))) {
             throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:METADATA_MISMATCH:" + field.key);
