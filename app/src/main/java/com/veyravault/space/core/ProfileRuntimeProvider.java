@@ -105,9 +105,12 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         ProfileSettings legacyGlobal = ProfileStore.readGlobalStrict(context);
         ProfileDocument typedClone = ProfileDocumentStore.readCloneStrict(context, packageName, userId);
         ProfileDocument typedGlobal = ProfileDocumentStore.readGlobalStrict(context);
-        ProfileSettings clone = mergeDocumentFields(legacyClone, typedClone);
-        ProfileSettings global = mergeDocumentFields(legacyGlobal, typedGlobal);
-        return ProfileResolver.resolve(clone, global, safeDefault);
+        ProfileDocument mergedClone = mergeLegacyFields(typedClone, legacyClone);
+        ProfileDocument mergedGlobal = mergeLegacyFields(typedGlobal, legacyGlobal);
+        // The typed resolver preserves explicit Clone SAFE_DEFAULT and INHERIT_GLOBAL
+        // states. Flattening those states into nullable legacy fields would incorrectly
+        // allow a Global value to override an explicit Clone Safe Default.
+        return ProfileResolver.resolveDocuments(mergedClone, mergedGlobal);
     }
 
     /** Add legacy supported values only where the typed document has no field override. */
