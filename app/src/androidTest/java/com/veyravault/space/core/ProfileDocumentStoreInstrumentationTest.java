@@ -277,7 +277,7 @@ public class ProfileDocumentStoreInstrumentationTest {
                 {"lengthUnit", "in"},
                 {"weekStart", "Sunday"}
         };
-        ExecutorService executor = Executors.newFixedThreadPool(6);
+        ExecutorService executor = Executors.newFixedThreadPool(fields.length);
         final CountDownLatch ready = new CountDownLatch(fields.length);
         final CountDownLatch start = new CountDownLatch(1);
         List<Future<Boolean>> writes = new ArrayList<>();
