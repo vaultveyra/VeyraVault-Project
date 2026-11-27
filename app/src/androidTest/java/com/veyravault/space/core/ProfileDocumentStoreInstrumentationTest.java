@@ -177,6 +177,40 @@ public class ProfileDocumentStoreInstrumentationTest {
     }
 
     @Test
+    public void cloneSafeDefaultStatePersistsAndOverridesGlobal() throws Exception {
+        String clone = "com.veyravault.fixture.clone-safe-default";
+        assertTrue(ProfileDocumentStore.saveGlobalField(
+                testContext, "timeZoneId", "America/New_York"));
+
+        ProfileDocument safeOverride = new ProfileDocument();
+        safeOverride.markSafeDefault("timeZoneId");
+        assertTrue("Clone Safe Default state must persist",
+                ProfileDocumentStore.saveCloneDocument(testContext, clone, 12, safeOverride));
+
+        ProfileDocument loadedSafe = ProfileDocumentStore.readCloneStrict(testContext, clone, 12);
+        assertEquals(ProfileDocument.FieldState.SAFE_DEFAULT,
+                loadedSafe.state("timeZoneId"));
+        ProfileDocumentResolver.FieldResult safe = ProfileDocumentResolver.resolve(
+                "timeZoneId", loadedSafe, ProfileDocumentStore.readGlobalStrict(testContext),
+                ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("UTC", safe.value);
+        assertEquals(ProfileDocumentResolver.Source.SAFE_DEFAULT, safe.source);
+
+        ProfileDocument inheritGlobal = new ProfileDocument();
+        inheritGlobal.markInheritGlobal("timeZoneId");
+        assertTrue("Clone Inherit Global state must remain persistable",
+                ProfileDocumentStore.saveCloneDocument(testContext, clone, 12, inheritGlobal));
+        ProfileDocument loadedInherited = ProfileDocumentStore.readCloneStrict(testContext, clone, 12);
+        assertEquals(ProfileDocument.FieldState.INHERIT_GLOBAL,
+                loadedInherited.state("timeZoneId"));
+        ProfileDocumentResolver.FieldResult inherited = ProfileDocumentResolver.resolve(
+                "timeZoneId", loadedInherited, ProfileDocumentStore.readGlobalStrict(testContext),
+                ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("America/New_York", inherited.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, inherited.source);
+    }
+
+    @Test
     public void semanticInvalidityFallsBackForOnlyThatField() throws Exception {
         String clone = "com.veyravault.fixture.invalid";
         JSONObject global = new JSONObject();
