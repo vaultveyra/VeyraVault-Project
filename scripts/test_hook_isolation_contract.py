@@ -41,8 +41,10 @@ assert "catch (Throwable ignored)" not in hooks
 # Process-global locale/time-zone changes are permitted only in a BlackBox host:pN worker,
 # never in the VeyraVault main host process.
 lifecycle = Path("app/src/main/java/com/veyravault/space/core/CloneProfileLifecycleCallback.java").read_text(encoding="utf-8")
+process_utils = Path("app/src/main/java/com/veyravault/space/core/ProcessUtils.java").read_text(encoding="utf-8")
 assert "ProcessUtils.currentProcessName(appContext)" in lifecycle
-assert "isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
+assert "ProcessUtils.isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
+assert "isBlackBoxWorkerProcess" in process_utils
 assert lifecycle.index("isBlackBoxWorkerProcess") < lifecycle.index("ProfileRuntimeApplier.applySafeDefaults(packageContext)")
 assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in lifecycle
 
