@@ -129,6 +129,58 @@ public class ProfileRuntimeApplierInstrumentationTest {
         }
     }
 
+    @Test public void fullSnapshotPromotesOnlyFieldsWithSuccessfulRuntimeReadback() throws Exception {
+        Context context = ApplicationProvider.getApplicationContext();
+        SharedPreferences documents = context.getSharedPreferences(
+                "veyravault_profile_documents_v1", Context.MODE_PRIVATE);
+        SharedPreferences legacy = context.getSharedPreferences(
+                "veyravault_profiles_v1", Context.MODE_PRIVATE);
+        java.util.Map<String, ?> documentsBefore = documents.getAll();
+        java.util.Map<String, ?> legacyBefore = legacy.getAll();
+        Locale originalLocale = Locale.getDefault();
+        TimeZone originalZone = (TimeZone) TimeZone.getDefault().clone();
+        Configuration originalConfiguration =
+                new Configuration(context.getResources().getConfiguration());
+        int userId = 9187;
+        try {
+            assertTrue(ProfileDocumentStore.saveCloneField(
+                    context, context.getPackageName(), userId, "localeTag", "fr-FR"));
+            assertTrue(ProfileDocumentStore.saveCloneField(
+                    context, context.getPackageName(), userId, "timeZoneId", "Europe/Paris"));
+
+            ProfileRuntimeClient.ResolvedDocument resolved =
+                    ProfileRuntimeClient.resolveDocument(context, context.getPackageName(), userId);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_TESTED,
+                    resolved.field("localeTag").status);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_TESTED,
+                    resolved.field("timeZoneId").status);
+
+            ProfileRuntimeApplier.applySafeDefaults(context);
+            ProfileRuntimeApplier.RuntimeApplyResult readback =
+                    ProfileRuntimeApplier.applyAndVerify(
+                            context, context.getPackageName(), resolved.toRuntimeProfile());
+            assertTrue(readback.isFullyVerified());
+
+            ProfileRuntimeClient.ResolvedDocument verified =
+                    resolved.withRuntimeVerification(readback);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+                    verified.field("localeTag").status);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+                    verified.field("timeZoneId").status);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_APPLICABLE,
+                    verified.field("publicIpAddress").status);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_TESTED,
+                    verified.field("locationEnabled").status);
+        } finally {
+            Locale.setDefault(originalLocale);
+            TimeZone.setDefault(originalZone);
+            context.getResources().updateConfiguration(
+                    originalConfiguration, context.getResources().getDisplayMetrics());
+            restorePreferences(documents, documentsBefore);
+            restorePreferences(legacy, legacyBefore);
+        }
+    }
+
     @Test public void applyAndVerifyRejectsWrongTargetContextWithoutApplyingProfile() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
