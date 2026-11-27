@@ -31,6 +31,7 @@ public final class CloneRuntimeTrace {
         PROFILE_APPLY_RETURNED,
         PROFILE_READBACK_VERIFIED,
         PROFILE_READBACK_FAILED,
+        PROFILE_PROCESS_BOUNDARY_REJECTED,
         PROFILE_FALLBACK
     }
 
