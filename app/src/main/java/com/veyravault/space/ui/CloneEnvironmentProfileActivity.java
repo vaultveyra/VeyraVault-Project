@@ -1,6 +1,7 @@
 package com.veyravault.space.ui;
 
-import android.app.AlertDialog;\nimport android.content.Intent;
+import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
