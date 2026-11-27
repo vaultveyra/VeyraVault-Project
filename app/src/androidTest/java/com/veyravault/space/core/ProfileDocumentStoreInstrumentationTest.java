@@ -90,7 +90,12 @@ public class ProfileDocumentStoreInstrumentationTest {
                     editor.putStringSet(key, strings);
                 }
             }
-            assertTrue("Test-only preferences must be restored", editor.commit());
+            // apply() restores this instrumentation-only namespace in memory immediately
+            // and schedules the disk write. The next setUp() uses commit() before tests,
+            // which waits for pending SharedPreferences writes.
+            editor.apply();
+            assertEquals("Test-only preferences must be restored in memory",
+                    originalPreferences, testPrefs.getAll());
         }
     }
 
