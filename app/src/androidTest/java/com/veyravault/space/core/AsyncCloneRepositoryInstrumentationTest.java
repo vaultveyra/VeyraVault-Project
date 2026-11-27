@@ -901,16 +901,16 @@ public class AsyncCloneRepositoryInstrumentationTest {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         ProfileSettings global = new ProfileSettings();
         global.localeTag = "en-GB";
-        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.saveGlobalProfile(global, cb)).isSuccess());
+        assertTrue(awaitResult((AsyncRepositoryOperation<Boolean>) cb -> repository.saveGlobalProfile(global, cb)).isSuccess());
         ProfileSettings clone = new ProfileSettings();
         clone.localeTag = "ja-JP";
-        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.saveCloneProfile("com.example.ui-bridge", 14, clone, cb)).isSuccess());
+        assertTrue(awaitResult((AsyncRepositoryOperation<Boolean>) cb -> repository.saveCloneProfile("com.example.ui-bridge", 14, clone, cb)).isSuccess());
         assertEquals("ja-JP", ProfileDocumentStore.readCloneStrict(context, "com.example.ui-bridge", 14).get("localeTag"));
         assertEquals("en-GB", ProfileDocumentStore.readGlobalStrict(context).get("localeTag"));
-        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.clearCloneProfileField("com.example.ui-bridge", 14, "localeTag", cb)).isSuccess());
+        assertTrue(awaitResult((AsyncRepositoryOperation<Boolean>) cb -> repository.clearCloneProfileField("com.example.ui-bridge", 14, "localeTag", cb)).isSuccess());
         assertEquals(ProfileDocument.FieldState.INHERIT_GLOBAL, ProfileDocumentStore.readCloneStrict(context, "com.example.ui-bridge", 14).state("localeTag"));
-        assertNull(awaitResult((AsyncCloneRepository.Callback<ProfileSettings>) cb -> repository.loadCloneProfile("com.example.ui-bridge", 14, cb)).getValue().localeTag);
-        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.clearGlobalProfileField("localeTag", cb)).isSuccess());
+        assertNull(awaitResult((AsyncRepositoryOperation<ProfileSettings>) cb -> repository.loadCloneProfile("com.example.ui-bridge", 14, cb)).getValue().localeTag);
+        assertTrue(awaitResult((AsyncRepositoryOperation<Boolean>) cb -> repository.clearGlobalProfileField("localeTag", cb)).isSuccess());
         assertEquals(ProfileDocument.FieldState.SAFE_DEFAULT, ProfileDocumentStore.readGlobalStrict(context).state("localeTag"));
         repository.close();
     }
