@@ -45,6 +45,9 @@ assert "verifyMetadata(item, definition)" in client
 assert "document.toRuntimeProfile()" in callback
 assert "PROFILE_DOCUMENT_RESOLVED" in callback
 assert "PROFILE_DOCUMENT_RESOLVED" in (root / "core/CloneRuntimeTrace.java").read_text(encoding="utf-8")
+assert "withRuntimeVerification(verification)" in callback
+assert callback.index("applyAndVerify(packageContext, packageName, resolved)") < callback.index("withRuntimeVerification(verification)")
+assert "fullSnapshotPromotesOnlyFieldsWithSuccessfulRuntimeReadback" in instrumentation
 assert "ProfileResolver.resolveDocuments" in provider
 assert "ProfileDocumentResolver.resolveAll" in provider
 assert "ProfileStore.readCloneOverrideStrict" in provider
