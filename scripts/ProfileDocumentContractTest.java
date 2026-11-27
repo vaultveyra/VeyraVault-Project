@@ -44,8 +44,8 @@ public final class ProfileDocumentContractTest {
 
         ProfileDocumentResolver.FieldResult ip =
                 ProfileDocumentResolver.resolve("publicIpAddress", clone, global, safe);
-        check(ip.status == ProfileFieldRegistry.ApplyStatus.UNSUPPORTED,
-                "IP observation requires a real network provider");
+        check(ip.status == ProfileFieldRegistry.ApplyStatus.NOT_APPLICABLE,
+                "observed IP is telemetry, not an editable profile input");
 
         check(!clone.put("imei", "123456789"), "restricted identifiers cannot be profile inputs");
         check(!clone.put("phoneNumber", "+15551234567"), "service-owned identity cannot be configured");
@@ -142,7 +142,23 @@ public final class ProfileDocumentContractTest {
         try { all.clear(); } catch (UnsupportedOperationException expected) { immutable = true; }
         check(immutable, "resolveAll snapshot must be immutable");
 
-        check(ProfileFieldRegistry.all().size() >= 40, "registry must cover the researched field inventory");
+        check(ProfileFieldRegistry.all().size() >= 90, "registry must cover the complete researched field inventory");
+        check(ProfileFieldRegistry.get("altitude") != null
+                        && ProfileFieldRegistry.get("locationProviderState") != null,
+                "location metadata inventory must be complete");
+        check(ProfileFieldRegistry.get("ipv6LeakStatus") != null
+                        && ProfileFieldRegistry.get("throughputMbps") != null,
+                "network observation inventory must be complete");
+        check(ProfileFieldRegistry.get("privateFilesIsolation") != null
+                        && ProfileFieldRegistry.get("pushRegistrationPolicy") != null,
+                "app-data isolation inventory must be complete");
+        check(ProfileFieldRegistry.get("webViewLocalStorageIsolation") != null
+                        && ProfileFieldRegistry.get("tlsNetworkStackProfile") != null,
+                "browser/WebView inventory must be complete");
+        check(!clone.put("ipv6LeakStatus", "PASS"),
+                "observed network leak status cannot be manually asserted");
+        check(!clone.put("batteryState", "100%"),
+                "observed device telemetry cannot be manually asserted");
         System.out.println("Profile document/registry/resolver contract tests: PASS");
     }
 }
