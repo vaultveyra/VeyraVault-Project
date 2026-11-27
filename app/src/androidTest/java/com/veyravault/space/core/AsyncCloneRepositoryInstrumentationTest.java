@@ -754,6 +754,49 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals(structural, profileDocumentPreferences.getString("documents_json", null));
     }
 
+    @Test public void invalidTypedFieldsSuppressSameLevelLegacyFallback() throws Exception {
+        String cloneInvalid = "{\"schemaVersion\":1,\"revision\":1,\"updatedAt\":1,"
+                + "\"global\":{\"timeZoneId\":\"Europe/Paris\"},"
+                + "\"clones\":{\"com.example.invalidclone#6\":{\"timeZoneId\":\"Mars/Olympus\"}}}";
+        assertTrue(profileDocumentPreferences.edit().putString("documents_json", cloneInvalid).commit());
+
+        ProfileSettings legacyClone = new ProfileSettings();
+        legacyClone.timeZoneId = "America/Chicago";
+        ProfileSettings legacyGlobal = new ProfileSettings();
+        legacyGlobal.timeZoneId = "Asia/Tokyo";
+        ProfileDocument typedClone = ProfileDocumentStore.readCloneStrict(
+                context, "com.example.invalidclone", 6);
+        ProfileDocument typedGlobal = ProfileDocumentStore.readGlobalStrict(context);
+        assertTrue(typedClone.isInvalid("timeZoneId"));
+        ProfileDocument mergedClone = ProfileRuntimeProvider.mergeLegacyFields(typedClone, legacyClone);
+        ProfileDocument mergedGlobal = ProfileRuntimeProvider.mergeLegacyFields(typedGlobal, legacyGlobal);
+        assertFalse("Invalid typed Clone value must suppress same-level Legacy", mergedClone.contains("timeZoneId"));
+        assertEquals("Europe/Paris", ProfileDocumentResolver.resolve(
+                "timeZoneId", mergedClone, mergedGlobal, ProfileFieldRegistry.createSafeDefaults()).value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, ProfileDocumentResolver.resolve(
+                "timeZoneId", mergedClone, mergedGlobal, ProfileFieldRegistry.createSafeDefaults()).source);
+
+        String globalInvalid = "{\"schemaVersion\":1,\"revision\":2,\"updatedAt\":2,"
+                + "\"global\":{\"timeZoneId\":\"Mars/Olympus\"},\"clones\":{}}";
+        assertTrue(profileDocumentPreferences.edit().putString("documents_json", globalInvalid).commit());
+        ProfileDocument invalidGlobal = ProfileDocumentStore.readGlobalStrict(context);
+        assertTrue(invalidGlobal.isInvalid("timeZoneId"));
+        ProfileDocument mergedInvalidGlobal = ProfileRuntimeProvider.mergeLegacyFields(
+                invalidGlobal, legacyGlobal);
+        assertFalse("Invalid typed Global value must suppress same-level Legacy",
+                mergedInvalidGlobal.contains("timeZoneId"));
+        ProfileDocumentResolver.FieldResult safe = ProfileDocumentResolver.resolve(
+                "timeZoneId", new ProfileDocument(), mergedInvalidGlobal,
+                ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("UTC", safe.value);
+        assertEquals(ProfileDocumentResolver.Source.SAFE_DEFAULT, safe.source);
+
+        // A truly absent typed field retains the backwards-compatible Legacy fallback.
+        ProfileDocument absent = ProfileRuntimeProvider.mergeLegacyFields(
+                new ProfileDocument(), legacyClone);
+        assertEquals("America/Chicago", absent.get("timeZoneId"));
+    }
+
     @Test public void typedProfileDocumentRejectsRestrictedAndObservedOnlyFields() {
         assertFalse(ProfileDocumentStore.saveGlobalField(context, "imei", "000000000000000"));
         assertFalse(ProfileDocumentStore.saveGlobalField(context, "publicIpAddress", "203.0.113.4"));
