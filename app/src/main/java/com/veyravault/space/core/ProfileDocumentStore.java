@@ -96,8 +96,19 @@ public final class ProfileDocumentStore {
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
             Object value = object.opt(field.key);
             if (value == null || value == JSONObject.NULL) continue;
-            if (!field.canBeStoredAsProfileInput() || !matchesJsonType(field, value)) {
-                throw new IllegalStateException("Profile field has an invalid stored type or capability: " + field.key);
+            if (!matchesJsonType(field, value)) {
+                throw new IllegalStateException("Profile field has an invalid stored type: " + field.key);
+            }
+            if (!field.canBeStoredAsProfileInput()) {
+                // Older editor builds exposed this VeyraVault-owned internal ID as a
+                // generic string. Preserve the stored bytes during additive updates,
+                // but mark the value invalid so it can never become an effective profile
+                // input. Other restricted fields remain structural errors.
+                if ("appInstallInstanceId".equals(field.key) && value instanceof String) {
+                    document.markInvalid(field.key);
+                    continue;
+                }
+                throw new IllegalStateException("Profile field is not an editable profile input: " + field.key);
             }
             // Semantic invalidity is field-scoped: omit only this field so the resolver
             // can continue to Global or Safe Isolated Default for that field.
