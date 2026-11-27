@@ -4,6 +4,7 @@ root = Path("app/src/main")
 editor = (root / "java/com/veyravault/space/ui/ProfileDocumentEditorActivity.java").read_text(encoding="utf-8")
 clone_entry = (root / "java/com/veyravault/space/ui/CloneEnvironmentProfileActivity.java").read_text(encoding="utf-8")
 settings = (root / "java/com/veyravault/space/ui/SettingsHubActivity.java").read_text(encoding="utf-8")
+spaces = (root / "java/com/veyravault/space/ui/MainActivity.java").read_text(encoding="utf-8")
 manifest = (root / "AndroidManifest.xml").read_text(encoding="utf-8")
 repository = (root / "java/com/veyravault/space/core/AsyncCloneRepository.java").read_text(encoding="utf-8")
 registry = (root / "java/com/veyravault/space/core/ProfileFieldRegistry.java").read_text(encoding="utf-8")
@@ -30,6 +31,9 @@ assert "both valid latitude and longitude" in editor
 assert "ProfileDocumentStore" not in editor
 assert "ProfileStore" not in editor
 assert "ProfileDocumentEditorActivity.class" in settings
+assert "ProfileDocumentEditorActivity.class" in spaces
+assert "repository.loadGlobalProfileDocument" in spaces
+assert "ProfileDocumentResolver.resolveAll" in spaces
 assert "ProfileDocumentEditorActivity.class" in clone_entry
 assert 'android:name=".ui.ProfileDocumentEditorActivity" android:exported="false"' in manifest
 assert "setCloneProfileFieldSafeDefault" in repository
