@@ -574,6 +574,37 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Selects the registry Safe Default for one Clone field without touching other profile data. */
+    public void setCloneProfileFieldSafeDefault(String packageName, int userId, String field,
+                                                Callback<Boolean> callback) {
+        ProfileFieldRegistry.Field registered = ProfileFieldRegistry.get(field);
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0
+                || registered == null || !registered.canBeStoredAsProfileInput()
+                || registered.safeDefault == null) {
+            deliver(callback, Result.<Boolean>failure(
+                    Failure.INVALID_INPUT, "Clone Safe Default request is invalid"));
+            return;
+        }
+        enqueue(() -> {
+            ProfileDocument document = ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
+            document.markSafeDefault(field);
+            if (!ProfileDocumentStore.saveCloneDocument(appContext, packageName, userId, document))
+                throw new PersistenceFailureException("Clone Safe Default state was not committed");
+            if (isLegacyRuntimeProfileField(field)
+                    && !ProfileStore.clearCloneOverrideField(appContext, packageName, userId, field)) {
+                throw new PersistenceFailureException(
+                        "Typed Clone Safe Default is saved, but legacy override cleanup failed");
+            }
+            return Boolean.TRUE;
+        }, callback);
+    }
+
+    private static boolean isLegacyRuntimeProfileField(String field) {
+        return "localeTag".equals(field) || "timeZoneId".equals(field)
+                || "locationEnabled".equals(field) || "latitude".equals(field)
+                || "longitude".equals(field);
+    }
+
     private static boolean isValidDocument(ProfileDocument document) {
         if (document == null) return false;
         for (java.util.Map.Entry<String, Object> entry : document.values().entrySet()) {
