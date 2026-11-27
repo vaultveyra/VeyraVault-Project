@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
 public class ProfileRuntimeApplierInstrumentationTest {
     @Test public void blackBoxWorkerGateRejectsMainHostAndForeignProcesses() {
         String host = "com.veyravault.space";
-        assertTrue(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+        assertTrue(ProcessUtils.isBlackBoxWorkerProcess(
                 "com.veyravault.space:p0", host));
         assertTrue(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
                 "com.veyravault.space:p12", host));
