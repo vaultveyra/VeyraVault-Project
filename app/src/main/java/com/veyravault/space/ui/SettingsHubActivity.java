@@ -47,8 +47,13 @@ public class SettingsHubActivity extends BaseActivity {
                 fa ? "انتخاب از میان گزینه‌های واقعی بسته‌بندی‌شده در برنامه"
                    : "Choose from the launcher options actually bundled in this app",
                 AppIconNameActivity.class);
-        addRow(root, fa ? "محیط و پروفایل سراسری" : "Global Environment",
-                fa ? "مدیریت تنظیمات عمومی محیط" : "Manage global environment preferences",
+        addRow(root, fa ? "پروفایل کامل محیط (تمام فیلدها)" : "Complete Environment Profile (All Fields)",
+                fa ? "مدیریت فیلدهای سراسری و وضعیت واقعی هر قابلیت" :
+                        "Edit the full registry and review each field's capability and status",
+                ProfileDocumentEditorActivity.class);
+        addRow(root, fa ? "محیط و کنترل موقعیت سراسری" : "Global Environment & Location Controls",
+                fa ? "مدیریت کلید اصلی موقعیت و تنظیمات قدیمی سازگار" :
+                        "Manage the Master Location switch and legacy-compatible controls",
                 GlobalEnvironmentActivity.class);
         addRow(root, fa ? "امنیت و قفل برنامه" : "Security & App Lock",
                 fa ? "مدیریت قفل و گزینه‌های امنیتی" : "Manage app lock and security options",
