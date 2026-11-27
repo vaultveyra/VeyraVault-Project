@@ -1,4 +1,4 @@
-# Stage 8.27 — Minimum Android API and legacy signing verification
+# Stage 8.27 — Minimum Android API, Android 8.1 target, and legacy signing verification
 > Follow-up: The Release packaging/signature warning found during this stage is addressed by Stage 8.28. See `STAGE_8_28_ROOM_RUNTIME_RELEASE_ISOLATION.md`.
 
 
@@ -14,11 +14,13 @@ The app declares minSdkVersion 21 (Android 5.0). Stage 8.27 makes minimum-API va
 - The workspace generator now reads the app level only from the tracked app/build.gradle; Bcore's own Java 21 configuration remains unchanged.
 - The Release build still uses compile SDK 35, min SDK 21 and target SDK 28. This separation does not imply that every newer Java library API is available on API 21.
 
-## API-21 runtime coverage
+## API-21 minimum-API and API-27 target-device runtime coverage
 
 - CI retains the API-34 Android instrumentation run for the broader Room and app instrumentation suite.
 - The API-34 run uses AndroidJUnitRunner's `notClass` filter to exclude LegacyApi21CompatibilityInstrumentationTest; that class has an explicit SDK-21 assertion and must not run on API 34.
 - A separate API-21 x86_64 emulator run uses the runner's `class` filter to execute LegacyApi21CompatibilityInstrumentationTest directly on the declared minimum API.
+- A separate Android 8.1 / API-27 x86_64 emulator run executes the full Android instrumentation suite (excluding only the API-21-specific test class). The workflow checks `ro.build.version.sdk == 27` before starting Gradle, so a misprovisioned emulator cannot silently count as target-device coverage.
+- The API-27 full suite includes the typed ProfileDocumentStore, asynchronous Clone repository, runtime applier, location migration, appearance, security, and Room instrumentation suites.
 - The API-21 test exercises the legacy PackageManager overload, ApplicationInfo splitSourceDirs, APK ZIP preflight, package fingerprint revalidation and the pre-API-23 host-bitness path.
 - It also exercises the Calendar-based date formatter and checks that both Kotlin Coroutines ServiceLoader resources remain readable and their provider classes load.
 - NativeAbiPreflight keeps Process.is64Bit behind the API-23 guard and PackageManager.ApplicationInfoFlags behind the API-33 guard.
@@ -33,7 +35,7 @@ The app declares minSdkVersion 21 (Android 5.0). Stage 8.27 makes minimum-API va
 
 ## Validation limits
 
-- API-21 x86_64 emulator coverage is a minimum-OS smoke test; it does not certify ARMv7 hardware, Huawei firmware, vendor-specific storage, or Engine native virtualization on a physical device.
-- The API-34 emulator suite and ARM native release packaging remain separate validation tracks.
+- API-21 x86_64 emulator coverage is a minimum-OS smoke test; API-27 x86_64 executes the broader suite on the Android 8.1 target OS, and API-34 remains the modern-OS suite. None of these certify ARMv7 hardware, Huawei firmware, vendor-specific storage, or Engine native virtualization on a physical device.
+- ARM native release packaging and physical-device validation remain separate validation tracks.
 - No Clone, account, session, credential, or user app data is touched by these tests.
 - main remains unchanged; PR #4 remains Open and Draft.

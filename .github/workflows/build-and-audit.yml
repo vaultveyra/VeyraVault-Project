@@ -304,6 +304,29 @@ jobs:
             set -euo pipefail
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.class=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
 
+      - name: Run Android 8.1 API 27 target-device compatibility instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 27
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          emulator-boot-timeout: 1200
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          script: |
+            set -euo pipefail
+            SDK_LEVEL="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+            test "$SDK_LEVEL" = "27"
+            # Run the full instrumentation suite on the user's Android 8.1 target API.
+            # The API-21-only contract test runs in its dedicated minimum-API step above.
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
+
       - name: Test source audit contract
         run: python3 scripts/test_source_audit_contract.py
 
