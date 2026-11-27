@@ -958,6 +958,50 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals(Double.valueOf(48.75d), ProfileDocumentStore.readGlobalStrict(context).get("longitude"));
     }
 
+    @Test public void invalidTypedFieldsFallThroughAtActualLocationRuntimeResolver() throws Exception {
+        String packageName = "com.example.invalidtypedlocation";
+        int userId = 11;
+
+        ProfileSettings legacyClone = new ProfileSettings();
+        legacyClone.timeZoneId = "America/Chicago";
+        assertTrue(ProfileStore.saveCloneOverride(context, packageName, userId, legacyClone));
+
+        ProfileSettings legacyGlobal = new ProfileSettings();
+        legacyGlobal.timeZoneId = "Asia/Tokyo";
+        assertTrue(ProfileStore.saveGlobal(context, legacyGlobal));
+
+        String typedCloneInvalidGlobalValid = "{\"schemaVersion\":1,\"revision\":1,\"updatedAt\":1,"
+                + "\"global\":{\"timeZoneId\":\"Europe/Paris\"},"
+                + "\"clones\":{\"" + packageName + "#" + userId
+                + "\":{\"timeZoneId\":\"Mars/Olympus\"}}}";
+        assertTrue(profileDocumentPreferences.edit()
+                .putString("documents_json", typedCloneInvalidGlobalValid).commit());
+
+        ProfileResolver.ResolvedProfile inherited = ProfileRuntimeProvider.resolveMergedProfile(
+                context, packageName, userId, ProfileRuntimeApplier.systemFallback());
+        assertEquals("Europe/Paris", inherited.timeZoneId);
+        assertEquals(ProfileResolver.Source.GLOBAL, inherited.timeZoneSource);
+
+        String typedCloneAndGlobalInvalid = "{\"schemaVersion\":1,\"revision\":2,\"updatedAt\":2,"
+                + "\"global\":{\"timeZoneId\":\"Mars/Olympus\"},"
+                + "\"clones\":{\"" + packageName + "#" + userId
+                + "\":{\"timeZoneId\":\"Mars/Olympus\"}}}";
+        assertTrue(profileDocumentPreferences.edit()
+                .putString("documents_json", typedCloneAndGlobalInvalid).commit());
+
+        ProfileResolver.ResolvedProfile safe = ProfileRuntimeProvider.resolveMergedProfile(
+                context, packageName, userId, ProfileRuntimeApplier.systemFallback());
+        assertEquals("UTC", safe.timeZoneId);
+        assertEquals(ProfileResolver.Source.SAFE_DEFAULT, safe.timeZoneSource);
+
+        // Runtime resolution is read-only; neither legacy nor typed storage is rewritten.
+        assertEquals("America/Chicago",
+                ProfileStore.readCloneOverrideStrict(context, packageName, userId).timeZoneId);
+        assertEquals("Asia/Tokyo", ProfileStore.readGlobalStrict(context).timeZoneId);
+        assertEquals(typedCloneAndGlobalInvalid,
+                profileDocumentPreferences.getString("documents_json", null));
+    }
+
     private interface AsyncRepositoryOperation<T> {
         void execute(AsyncCloneRepository.Callback<T> callback);
     }
