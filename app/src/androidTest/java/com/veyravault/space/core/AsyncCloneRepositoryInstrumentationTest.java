@@ -1,6 +1,7 @@
 package com.veyravault.space.core;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 import android.os.Looper;
 
@@ -23,18 +24,21 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class AsyncCloneRepositoryInstrumentationTest {
     private Context context;
+    private Context rawContext;
     private SharedPreferences preferences;
     private SharedPreferences profilePreferences;
     private SharedPreferences profileDocumentPreferences;
 
     @Before public void setUp() {
-        context = ApplicationProvider.getApplicationContext();
+        rawContext = ApplicationProvider.getApplicationContext();
+        // All repository/store preferences are redirected into test-only namespaces.
+        // Instrumentation must never clear or overwrite a user's real Clone/session data.
+        context = new IsolatedPreferencesContext(rawContext);
         preferences = context.getSharedPreferences("veyravault_clones_v2", Context.MODE_PRIVATE);
         profilePreferences = context.getSharedPreferences("veyravault_profiles_v1", Context.MODE_PRIVATE);
         profileDocumentPreferences = context.getSharedPreferences("veyravault_profile_documents_v1", Context.MODE_PRIVATE);
         preferences.edit().clear().commit();
         profilePreferences.edit().clear().commit();
-        profileDocumentPreferences.edit().clear().commit();
         profileDocumentPreferences.edit().clear().commit();
     }
 
@@ -1063,6 +1067,29 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("Asia/Tokyo", ProfileStore.readGlobalStrict(context).timeZoneId);
         assertEquals(typedCloneAndGlobalInvalid,
                 profileDocumentPreferences.getString("documents_json", null));
+    }
+
+    @Test public void instrumentationPreferencesAreIsolatedFromProductionNamespaces() {
+        String probe = "veyra_test_isolation_probe_20261127";
+        assertTrue(preferences.edit().putString(probe, "isolated").commit());
+        assertEquals("isolated", preferences.getString(probe, null));
+        assertNull(rawContext.getSharedPreferences(
+                "veyravault_clones_v2", Context.MODE_PRIVATE).getString(probe, null));
+        preferences.edit().remove(probe).commit();
+    }
+
+    private static final class IsolatedPreferencesContext extends ContextWrapper {
+        IsolatedPreferencesContext(Context base) {
+            super(base);
+        }
+
+        @Override public Context getApplicationContext() {
+            return this;
+        }
+
+        @Override public SharedPreferences getSharedPreferences(String name, int mode) {
+            return super.getSharedPreferences("veyra_instrumentation_" + name, mode);
+        }
     }
 
     private interface AsyncRepositoryOperation<T> {
