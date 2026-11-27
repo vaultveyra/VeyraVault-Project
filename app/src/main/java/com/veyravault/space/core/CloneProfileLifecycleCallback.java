@@ -80,10 +80,11 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
             ProfileRuntimeClient.ResolvedDocument document =
                     ProfileRuntimeClient.resolveDocument(appContext, packageName, userId);
             ProfileResolver.ResolvedProfile resolved = document.toRuntimeProfile();
-            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_DOCUMENT_RESOLVED,
-                    packageName, processName, userId, statusSummary(document));
             ProfileRuntimeApplier.RuntimeApplyResult verification =
                     ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved);
+            document = document.withRuntimeVerification(verification);
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_DOCUMENT_RESOLVED,
+                    packageName, processName, userId, statusSummary(document));
             String verificationOutcome = "locale_" + verification.localeStatus.name()
                     + "_timezone_" + verification.timeZoneStatus.name()
                     + "_context_" + (verification.targetIdentityMatches ? "MATCH" : "MISMATCH");
