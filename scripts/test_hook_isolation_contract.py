@@ -38,6 +38,14 @@ assert '"getLongitude"' in location_method
 assert "failClosedAfterEnableFailure" in location_method
 assert "catch (Throwable ignored)" not in hooks
 
+# Process-global locale/time-zone changes are permitted only in a BlackBox host:pN worker,
+# never in the VeyraVault main host process.
+lifecycle = Path("app/src/main/java/com/veyravault/space/core/CloneProfileLifecycleCallback.java").read_text(encoding="utf-8")
+assert "ProcessUtils.currentProcessName(appContext)" in lifecycle
+assert "isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
+assert lifecycle.index("isBlackBoxWorkerProcess") < lifecycle.index("ProfileRuntimeApplier.applySafeDefaults(packageContext)")
+assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in lifecycle
+
 # Startup synchronization must not attempt to apply unsupported device-profile APIs.
 sync_method = store.split("syncAllHooks(Context c)", 1)[1]
 assert "VirtualHookManager.syncAllClones(c)" in sync_method
@@ -55,3 +63,4 @@ assert "Saved profile:" in main_ui
 print("Host-global hook isolation contract: PASS")
 print("Package/user-scoped engine location contract: PASS")
 print("Device/SIM profile metadata disclosure contract: PASS")
+print("Process-global Locale/Time Zone changes are gated to BlackBox host:pN workers: PASS")
