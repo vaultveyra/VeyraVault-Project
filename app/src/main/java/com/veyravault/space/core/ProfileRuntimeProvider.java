@@ -114,16 +114,17 @@ public final class ProfileRuntimeProvider extends ContentProvider {
     static ProfileDocument mergeLegacyFields(ProfileDocument document, ProfileSettings legacy) {
         ProfileDocument merged = document == null ? new ProfileDocument() : document.copy();
         if (legacy == null) return merged;
-        putIfMissing(merged, "localeTag", legacy.localeTag);
-        putIfMissing(merged, "timeZoneId", legacy.timeZoneId);
-        putIfMissing(merged, "locationEnabled", legacy.locationEnabled);
-        putIfMissing(merged, "latitude", legacy.latitude);
-        putIfMissing(merged, "longitude", legacy.longitude);
+        putLegacyIfAbsentAndValid(merged, "localeTag", legacy.localeTag);
+        putLegacyIfAbsentAndValid(merged, "timeZoneId", legacy.timeZoneId);
+        putLegacyIfAbsentAndValid(merged, "locationEnabled", legacy.locationEnabled);
+        putLegacyIfAbsentAndValid(merged, "latitude", legacy.latitude);
+        putLegacyIfAbsentAndValid(merged, "longitude", legacy.longitude);
         return merged;
     }
 
-    private static void putIfMissing(ProfileDocument target, String key, Object value) {
-        if (value != null && !target.contains(key) && target.put(key, value)) {
+    private static void putLegacyIfAbsentAndValid(ProfileDocument target, String key, Object value) {
+        // Invalid typed presence intentionally suppresses same-level Legacy fallback.
+        if (value != null && !target.contains(key) && !target.isInvalid(key) && target.put(key, value)) {
             // Value was validated and copied into the merged in-memory snapshot.
         }
     }
@@ -132,16 +133,31 @@ public final class ProfileRuntimeProvider extends ContentProvider {
     static ProfileSettings mergeDocumentFields(ProfileSettings legacy, ProfileDocument document) {
         ProfileSettings merged = legacy == null ? new ProfileSettings() : legacy.copy();
         if (document == null) return merged;
-        Object value = document.get("localeTag");
-        if (value instanceof String) merged.localeTag = (String) value;
-        value = document.get("timeZoneId");
-        if (value instanceof String) merged.timeZoneId = (String) value;
-        value = document.get("locationEnabled");
-        if (value instanceof Boolean) merged.locationEnabled = (Boolean) value;
-        value = document.get("latitude");
-        if (value instanceof Number) merged.latitude = ((Number) value).doubleValue();
-        value = document.get("longitude");
-        if (value instanceof Number) merged.longitude = ((Number) value).doubleValue();
+        if (document.isInvalid("localeTag")) merged.localeTag = null;
+        else {
+            Object value = document.get("localeTag");
+            if (value instanceof String) merged.localeTag = (String) value;
+        }
+        if (document.isInvalid("timeZoneId")) merged.timeZoneId = null;
+        else {
+            Object value = document.get("timeZoneId");
+            if (value instanceof String) merged.timeZoneId = (String) value;
+        }
+        if (document.isInvalid("locationEnabled")) merged.locationEnabled = null;
+        else {
+            Object value = document.get("locationEnabled");
+            if (value instanceof Boolean) merged.locationEnabled = (Boolean) value;
+        }
+        if (document.isInvalid("latitude")) merged.latitude = null;
+        else {
+            Object value = document.get("latitude");
+            if (value instanceof Number) merged.latitude = ((Number) value).doubleValue();
+        }
+        if (document.isInvalid("longitude")) merged.longitude = null;
+        else {
+            Object value = document.get("longitude");
+            if (value instanceof Number) merged.longitude = ((Number) value).doubleValue();
+        }
         return merged;
     }
 
