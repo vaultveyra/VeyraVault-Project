@@ -24,14 +24,6 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
                 && !packageName.equals(appContext.getPackageName()) && userId >= 0;
     }
 
-    /** BlackBox runs virtual apps in a host-owned worker process such as host:p0, not host main. */
-    static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName) {
-        if (currentProcessName == null || hostPackageName == null
-                || hostPackageName.trim().isEmpty()) return false;
-        return currentProcessName.startsWith(hostPackageName + ":")
-                && currentProcessName.length() > hostPackageName.length() + 1;
-    }
-
     @Override
     public void beforeCreateApplication(String packageName, String processName,
                                         Context packageContext, int userId) {
@@ -47,7 +39,7 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
         try {
             hostProcessName = ProcessUtils.currentProcessName(appContext);
         } catch (RuntimeException ignored) { }
-        if (!isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())) {
+        if (!ProcessUtils.isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())) {
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_PROCESS_BOUNDARY_REJECTED,
                     packageName, processName, userId,
                     hostProcessName == null ? "host_process_unknown" : "not_blackbox_worker");
