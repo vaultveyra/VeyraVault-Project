@@ -12,9 +12,9 @@ public final class ProfileFieldRegistry {
     public enum ValueType { STRING, BOOLEAN, INTEGER, DECIMAL }
     public enum Capability {
         PROCESS_SCOPED, ENGINE_SCOPED, LOCAL_PREFERENCE_ONLY,
-        NETWORK_PROVIDER_REQUIRED, PLATFORM_RESTRICTED, SERVICE_OWNED, NOT_IMPLEMENTED
+        NETWORK_PROVIDER_REQUIRED, PLATFORM_RESTRICTED, SERVICE_OWNED, NOT_IMPLEMENTED, OBSERVED_ONLY
     }
-    public enum ApplyStatus { APPLIED, STORED_ONLY, UNSUPPORTED, NOT_TESTED, FAILED }
+    public enum ApplyStatus { APPLIED, STORED_ONLY, UNSUPPORTED, NOT_TESTED, FAILED, NOT_APPLICABLE }
 
     public static final class Field {
         public final String key;
@@ -37,6 +37,7 @@ public final class ProfileFieldRegistry {
         public boolean canBeStoredAsProfileInput() {
             return capability != Capability.PLATFORM_RESTRICTED
                     && capability != Capability.SERVICE_OWNED
+                    && capability != Capability.OBSERVED_ONLY
                     && !"observed-only".equals(scope) && !"read-only".equals(scope);
         }
     }
@@ -81,7 +82,7 @@ public final class ProfileFieldRegistry {
         add(fields, "networkRouteProfileId", ValueType.STRING, Capability.NETWORK_PROVIDER_REQUIRED, null, "clone/global", "Requires a real per-Clone traffic-routing provider.");
         add(fields, "dnsMode", ValueType.STRING, Capability.NETWORK_PROVIDER_REQUIRED, null, "clone/global", "Requires a real network adapter and leak tests.");
         add(fields, "dnsServers", ValueType.STRING, Capability.NETWORK_PROVIDER_REQUIRED, null, "clone/global", "Requires a real network adapter and leak tests.");
-        add(fields, "publicIpAddress", ValueType.STRING, Capability.NETWORK_PROVIDER_REQUIRED, null, "observed-only", "Observed egress result, never a manually asserted profile value.");
+        add(fields, "publicIpAddress", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Observed egress result, never a manually asserted profile value.");
 
         add(fields, "buildFingerprint", ValueType.STRING, Capability.PLATFORM_RESTRICTED, null, "read-only", "Host OS/build identity is not an editable profile input.");
         add(fields, "cpuAbiProfile", ValueType.STRING, Capability.PLATFORM_RESTRICTED, null, "read-only", "Native ABI must match the actual host process and packaged libraries.");
@@ -95,6 +96,68 @@ public final class ProfileFieldRegistry {
         add(fields, "phoneNumber", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "SIM/account/provider-owned data, not a VeyraVault profile field.");
         add(fields, "accountId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Third-party service account identity is not controlled by this profile.");
         add(fields, "playIntegrityVerdict", ValueType.STRING, Capability.SERVICE_OWNED, null, "observed-only", "Security verdict is platform/service-owned and must remain truthful.");
+
+        // Additional inventory required by the authoritative Clone/Global engine spec.
+        // These entries make capability boundaries explicit; definitions do not imply adapters.
+        add(fields, "calendarFormat", ValueType.STRING, Capability.LOCAL_PREFERENCE_ONLY, null, "clone/global", "Calendar formatting preference only; no verified Android adapter.");
+        add(fields, "numberFormat", ValueType.STRING, Capability.LOCAL_PREFERENCE_ONLY, null, "clone/global", "Number formatting preference only; no verified Android adapter.");
+
+        add(fields, "altitude", ValueType.DECIMAL, Capability.NOT_IMPLEMENTED, null, "clone/global", "Authorized test-location metadata only; no verified altitude adapter.");
+        add(fields, "locationAccuracy", ValueType.DECIMAL, Capability.NOT_IMPLEMENTED, null, "clone/global", "Authorized test-location metadata only; no verified accuracy adapter.");
+        add(fields, "locationBearing", ValueType.DECIMAL, Capability.NOT_IMPLEMENTED, null, "clone/global", "Authorized test-location metadata only; no verified bearing adapter.");
+        add(fields, "locationSpeed", ValueType.DECIMAL, Capability.NOT_IMPLEMENTED, null, "clone/global", "Authorized test-location metadata only; no verified speed adapter.");
+        add(fields, "locationTimestamp", ValueType.INTEGER, Capability.NOT_IMPLEMENTED, null, "clone/global", "Authorized test-location metadata only; timestamp is not a live location readback.");
+        add(fields, "locationPermissionState", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Effective permission state must be observed from the platform; not user-asserted.");
+        add(fields, "locationProviderState", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Provider availability must be measured from the actual runtime.");
+
+        add(fields, "screenMetrics", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Actual display metrics are observed compatibility data; no virtual display adapter.");
+        add(fields, "screenDensity", ValueType.DECIMAL, Capability.OBSERVED_ONLY, null, "observed-only", "Actual display density is observed compatibility data.");
+        add(fields, "hardwareFeatures", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Actual hardware feature availability must not be fabricated.");
+        add(fields, "batteryState", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Battery telemetry is measured, not a profile override.");
+        add(fields, "memoryState", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Memory telemetry is measured, not a profile override.");
+        add(fields, "storageState", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Storage telemetry is measured, not a profile override.");
+        add(fields, "sensorAvailability", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Sensor availability is observed; no synthetic safety-critical readings.");
+
+        add(fields, "ipv4RoutingStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "IPv4 route status requires live route observation.");
+        add(fields, "ipv6RoutingStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "IPv6 route status requires live route observation.");
+        add(fields, "networkTransport", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Network transport/type is measured from the active route.");
+        add(fields, "vpnRouteStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "VPN route status requires verified route observation.");
+        add(fields, "proxyStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "Proxy state is observed from the actual network path.");
+        add(fields, "dnsLeakStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "DNS leak result requires an external leak test.");
+        add(fields, "ipv4LeakStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "IPv4 leak result requires external egress verification.");
+        add(fields, "ipv6LeakStatus", ValueType.STRING, Capability.OBSERVED_ONLY, null, "observed-only", "IPv6 leak result requires external egress verification.");
+        add(fields, "latencyMs", ValueType.DECIMAL, Capability.OBSERVED_ONLY, null, "observed-only", "Latency is a measured observation, never a configured value.");
+        add(fields, "pingMs", ValueType.DECIMAL, Capability.OBSERVED_ONLY, null, "observed-only", "Ping is a measured observation, never a configured value.");
+        add(fields, "throughputMbps", ValueType.DECIMAL, Capability.OBSERVED_ONLY, null, "observed-only", "Throughput is a measured observation, never a configured value.");
+
+        add(fields, "appSetId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Google Play services-owned identifier; never fabricate or configure.");
+        add(fields, "firebaseInstallationId", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Firebase service-owned installation identifier.");
+        add(fields, "iccid", ValueType.STRING, Capability.PLATFORM_RESTRICTED, null, "read-only", "Restricted SIM identifier; never configurable.");
+        add(fields, "purchaseState", ValueType.STRING, Capability.SERVICE_OWNED, null, "service-owned", "Purchase entitlement is store/service-owned and must remain truthful.");
+
+        add(fields, "privateFilesIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone private-directory isolation tests.");
+        add(fields, "databaseIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone database isolation tests.");
+        add(fields, "sharedPreferencesIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone preferences isolation tests.");
+        add(fields, "downloadsMediaDocumentsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires URI/media/document isolation tests.");
+        add(fields, "contactsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires explicit provider/permission isolation tests.");
+        add(fields, "calendarDataIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires explicit provider/permission isolation tests.");
+        add(fields, "accountsIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires account-provider isolation; cannot imply independent Android accounts.");
+        add(fields, "clipboardPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped clipboard adapter.");
+        add(fields, "notificationPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires notification and listener isolation tests.");
+        add(fields, "microphonePolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped microphone permission adapter.");
+        add(fields, "backgroundExecutionPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires lifecycle and background execution isolation tests.");
+        add(fields, "packageVisibilityPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires package visibility enforcement and tests.");
+        add(fields, "pushRegistrationPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Push tokens and service registrations remain provider-owned until isolated.");
+
+        add(fields, "webViewLocalStorageIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone WebView local-storage isolation tests.");
+        add(fields, "webViewCacheIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone WebView cache isolation tests.");
+        add(fields, "serviceWorkerIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires per-Clone Service Worker isolation tests.");
+        add(fields, "javascriptLocaleTimeZone", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires WebView JavaScript API readback; User-Agent alone is insufficient.");
+        add(fields, "screenSurfaceProfile", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified screen-surface adapter; no fingerprint evasion.");
+        add(fields, "fontSurfaceProfile", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified font-surface adapter; no fingerprint evasion.");
+        add(fields, "canvasSurfaceProfile", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified canvas-surface adapter; no fingerprint evasion.");
+        add(fields, "webGlSurfaceProfile", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified WebGL-surface adapter; no fingerprint evasion.");
+        add(fields, "tlsNetworkStackProfile", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "TLS/network stack is not a cosmetic profile; requires supported engine routing and security review.");
 
         FIELDS = Collections.unmodifiableMap(fields);
     }
