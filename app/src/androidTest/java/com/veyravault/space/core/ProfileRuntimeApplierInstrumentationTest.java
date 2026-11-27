@@ -75,6 +75,47 @@ public class ProfileRuntimeApplierInstrumentationTest {
         }
     }
 
+    @Test public void typedProviderRuntimeResolutionHonorsCloneSafeDefaultAndInheritGlobal() throws Exception {
+        Context context = ApplicationProvider.getApplicationContext();
+        SharedPreferences documents = context.getSharedPreferences(
+                "veyravault_profile_documents_v1", Context.MODE_PRIVATE);
+        SharedPreferences legacy = context.getSharedPreferences(
+                "veyravault_profiles_v1", Context.MODE_PRIVATE);
+        java.util.Map<String, ?> documentsBefore = documents.getAll();
+        java.util.Map<String, ?> legacyBefore = legacy.getAll();
+        String packageName = "com.veyravault.runtime.safe-default.fixture";
+        int userId = 9917;
+        try {
+            documents.edit().clear().commit();
+            legacy.edit().clear().commit();
+            assertTrue(ProfileDocumentStore.saveGlobalField(
+                    context, "timeZoneId", "America/New_York"));
+
+            ProfileDocument cloneSafe = new ProfileDocument();
+            cloneSafe.markSafeDefault("timeZoneId");
+            assertTrue(ProfileDocumentStore.saveCloneDocument(
+                    context, packageName, userId, cloneSafe));
+
+            ProfileResolver.ResolvedProfile safe = ProfileRuntimeClient.resolve(
+                    context, packageName, userId);
+            assertEquals("UTC", safe.timeZoneId);
+            assertEquals(ProfileResolver.Source.SAFE_DEFAULT, safe.timeZoneSource);
+
+            ProfileDocument cloneInherit = new ProfileDocument();
+            cloneInherit.markInheritGlobal("timeZoneId");
+            assertTrue(ProfileDocumentStore.saveCloneDocument(
+                    context, packageName, userId, cloneInherit));
+
+            ProfileResolver.ResolvedProfile inherited = ProfileRuntimeClient.resolve(
+                    context, packageName, userId);
+            assertEquals("America/New_York", inherited.timeZoneId);
+            assertEquals(ProfileResolver.Source.GLOBAL, inherited.timeZoneSource);
+        } finally {
+            restorePreferences(documents, documentsBefore);
+            restorePreferences(legacy, legacyBefore);
+        }
+    }
+
     @Test public void applyAndVerifyRejectsWrongTargetContextWithoutApplyingProfile() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
@@ -107,6 +148,26 @@ public class ProfileRuntimeApplierInstrumentationTest {
             context.getResources().updateConfiguration(
                     originalConfiguration, context.getResources().getDisplayMetrics());
         }
+    }
+
+    private static void restorePreferences(SharedPreferences preferences,
+                                            java.util.Map<String, ?> snapshot) {
+        SharedPreferences.Editor editor = preferences.edit().clear();
+        for (java.util.Map.Entry<String, ?> entry : snapshot.entrySet()) {
+            Object value = entry.getValue();
+            String key = entry.getKey();
+            if (value instanceof String) editor.putString(key, (String) value);
+            else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+            else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+            else if (value instanceof Long) editor.putLong(key, (Long) value);
+            else if (value instanceof Float) editor.putFloat(key, (Float) value);
+            else if (value instanceof java.util.Set) {
+                @SuppressWarnings("unchecked")
+                java.util.Set<String> strings = new java.util.HashSet<>((java.util.Set<String>) value);
+                editor.putStringSet(key, strings);
+            }
+        }
+        assertTrue("Instrumentation preferences must be restored", editor.commit());
     }
 
     @Test public void strictResolverReadsCloneAndGlobalFieldsIndependently() throws Exception {
