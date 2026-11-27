@@ -797,6 +797,18 @@ public class AsyncCloneRepositoryInstrumentationTest {
         assertEquals("America/Chicago", absent.get("timeZoneId"));
     }
 
+    @Test public void profileDocumentRejectsStringSchemaVersionWithoutCoercion() throws Exception {
+        String malformed = "{\"schemaVersion\":\"1\",\"revision\":1,\"updatedAt\":1,"
+                + "\"global\":{},\"clones\":{}}";
+        assertTrue(profileDocumentPreferences.edit().putString("documents_json", malformed).commit());
+        try {
+            ProfileDocumentStore.readGlobalStrict(context);
+            fail("String schemaVersion must not be coerced into a numeric schema");
+        } catch (IllegalStateException expected) {
+            assertEquals(malformed, profileDocumentPreferences.getString("documents_json", null));
+        }
+    }
+
     @Test public void typedProfileDocumentRejectsRestrictedAndObservedOnlyFields() {
         assertFalse(ProfileDocumentStore.saveGlobalField(context, "imei", "000000000000000"));
         assertFalse(ProfileDocumentStore.saveGlobalField(context, "publicIpAddress", "203.0.113.4"));
