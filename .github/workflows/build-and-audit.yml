@@ -322,11 +322,22 @@ jobs:
           script: |
             set -euo pipefail
             # Pin ADB to the emulator created by this step; do not rely on implicit device selection.
+            set -eu
             adb -s emulator-5554 wait-for-device
-            SDK_LEVEL="$(adb -s emulator-5554 shell getprop ro.build.version.sdk | tr -d '[:space:]')"
+            SDK_LEVEL=""
+            BOOT_COMPLETED=""
+            # wait-for-device means ADB transport is connected, not that Android finished booting.
+            for ATTEMPT in $(seq 1 90); do
+              SDK_LEVEL="$(adb -s emulator-5554 shell getprop ro.build.version.sdk 2>/dev/null | tr -d '[:space:]' || true)"
+              BOOT_COMPLETED="$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '[:space:]' || true)"
+              if [ "$SDK_LEVEL" = "27" ] && [ "$BOOT_COMPLETED" = "1" ]; then
+                break
+              fi
+              sleep 2
+            done
             echo Detected-Android-SDK-level-on-emulator-5554="$SDK_LEVEL"
-            if [[ "$SDK_LEVEL" != "27" ]]; then
-              echo "::error::Expected Android API 27 on emulator-5554; detected: $SDK_LEVEL"
+            if [ "$SDK_LEVEL" != "27" ] || [ "$BOOT_COMPLETED" != "1" ]; then
+              echo "::error::Expected a fully booted Android API 27 emulator; detected SDK=$SDK_LEVEL boot_completed=$BOOT_COMPLETED"
               adb devices -l || true
               adb -s emulator-5554 shell getprop ro.build.version.release || true
               exit 1
