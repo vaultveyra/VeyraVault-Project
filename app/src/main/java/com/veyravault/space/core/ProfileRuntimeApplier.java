@@ -30,6 +30,124 @@ public final class ProfileRuntimeApplier {
 
     private ProfileRuntimeApplier() { }
 
+    /** Readback evidence gathered in the same virtual package process that applied the profile. */
+    public static final class RuntimeApplyResult {
+        public final String targetPackageName;
+        public final boolean targetIdentityMatches;
+        public final String expectedLocaleTag;
+        public final String observedDefaultLocaleTag;
+        public final String observedResourceLocaleTag;
+        public final String expectedTimeZoneId;
+        public final String observedTimeZoneId;
+        public final ProfileFieldRegistry.ApplyStatus localeStatus;
+        public final ProfileFieldRegistry.ApplyStatus timeZoneStatus;
+
+        private RuntimeApplyResult(String targetPackageName, boolean targetIdentityMatches,
+                                   String expectedLocaleTag, String observedDefaultLocaleTag,
+                                   String observedResourceLocaleTag, String expectedTimeZoneId,
+                                   String observedTimeZoneId,
+                                   ProfileFieldRegistry.ApplyStatus localeStatus,
+                                   ProfileFieldRegistry.ApplyStatus timeZoneStatus) {
+            this.targetPackageName = targetPackageName;
+            this.targetIdentityMatches = targetIdentityMatches;
+            this.expectedLocaleTag = expectedLocaleTag;
+            this.observedDefaultLocaleTag = observedDefaultLocaleTag;
+            this.observedResourceLocaleTag = observedResourceLocaleTag;
+            this.expectedTimeZoneId = expectedTimeZoneId;
+            this.observedTimeZoneId = observedTimeZoneId;
+            this.localeStatus = localeStatus;
+            this.timeZoneStatus = timeZoneStatus;
+        }
+
+        public boolean isFullyVerified() {
+            return targetIdentityMatches
+                    && localeStatus == ProfileFieldRegistry.ApplyStatus.APPLIED
+                    && timeZoneStatus == ProfileFieldRegistry.ApplyStatus.APPLIED;
+        }
+    }
+
+    private static String localeTag(Locale locale) {
+        if (locale == null || locale.getLanguage() == null || locale.getLanguage().isEmpty()) return null;
+        return locale.toLanguageTag();
+    }
+
+    private static String readResourceLocaleTag(Context packageContext) {
+        if (packageContext == null) return null;
+        Configuration configuration = packageContext.getResources().getConfiguration();
+        return configuration == null ? null : localeTag(configuration.locale);
+    }
+
+    /**
+     * Applies and verifies supported process-scoped fields inside the supplied target package
+     * Context. A field is APPLIED only when its value is read back and matches the request.
+     * Callers must establish safe isolated defaults before resolving/calling this method.
+     */
+    public static RuntimeApplyResult applyAndVerify(Context packageContext,
+                                                    String expectedPackageName,
+                                                    ProfileResolver.ResolvedProfile profile) {
+        String actualPackageName = null;
+        try {
+            if (packageContext != null) actualPackageName = packageContext.getPackageName();
+        } catch (RuntimeException ignored) { }
+        boolean identityMatches = packageContext != null
+                && expectedPackageName != null && !expectedPackageName.trim().isEmpty()
+                && expectedPackageName.equals(actualPackageName);
+
+        String expectedLocale = profile != null && ProfileSettings.isLocaleTagValid(profile.localeTag)
+                ? localeTag(Locale.forLanguageTag(profile.localeTag)) : null;
+        String expectedZone = profile != null && ProfileSettings.isTimeZoneIdValid(profile.timeZoneId)
+                ? profile.timeZoneId : null;
+
+        if (!identityMatches) {
+            return new RuntimeApplyResult(actualPackageName, false, expectedLocale,
+                    safeDefaultLocaleTag(), safeResourceLocaleTag(packageContext), expectedZone,
+                    safeDefaultTimeZoneId(), statusFor(false, expectedLocale),
+                    statusFor(false, expectedZone));
+        }
+
+        try {
+            apply(packageContext, profile);
+        } catch (RuntimeException ignored) {
+            // The readback below is authoritative per field; a partial apply must not be
+            // mistaken for success merely because the method was entered.
+        }
+
+        String observedDefaultLocale = safeDefaultLocaleTag();
+        String observedResourceLocale = safeResourceLocaleTag(packageContext);
+        String observedZone = safeDefaultTimeZoneId();
+        boolean localeMatches = expectedLocale != null
+                && expectedLocale.equals(observedDefaultLocale)
+                && expectedLocale.equals(observedResourceLocale);
+        boolean zoneMatches = expectedZone != null && expectedZone.equals(observedZone);
+
+        return new RuntimeApplyResult(actualPackageName, true, expectedLocale,
+                observedDefaultLocale, observedResourceLocale, expectedZone, observedZone,
+                statusFor(localeMatches, expectedLocale), statusFor(zoneMatches, expectedZone));
+    }
+
+    private static ProfileFieldRegistry.ApplyStatus statusFor(boolean matches, String expected) {
+        if (expected == null) return ProfileFieldRegistry.ApplyStatus.NOT_TESTED;
+        return matches ? ProfileFieldRegistry.ApplyStatus.APPLIED
+                : ProfileFieldRegistry.ApplyStatus.FAILED;
+    }
+
+    private static String safeDefaultLocaleTag() {
+        try { return localeTag(Locale.getDefault()); }
+        catch (RuntimeException ignored) { return null; }
+    }
+
+    private static String safeResourceLocaleTag(Context packageContext) {
+        try { return readResourceLocaleTag(packageContext); }
+        catch (RuntimeException ignored) { return null; }
+    }
+
+    private static String safeDefaultTimeZoneId() {
+        try {
+            TimeZone zone = TimeZone.getDefault();
+            return zone == null ? null : zone.getID();
+        } catch (RuntimeException ignored) { return null; }
+    }
+
     public static synchronized void initializeSystemFallback(Context context) {
         if (systemLocaleTag == null) systemLocaleTag = readSystemLocaleTag();
         if (systemTimeZoneId == null) {
