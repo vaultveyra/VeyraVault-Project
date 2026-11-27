@@ -66,8 +66,22 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                 Bundle fields = new Bundle();
                 for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
                     Bundle item = new Bundle();
+                    ProfileFieldRegistry.Field definition = ProfileFieldRegistry.get(field.key);
+                    if (definition == null) {
+                        throw new IllegalStateException("PROFILE_REGISTRY_FIELD_MISSING:" + field.key);
+                    }
                     item.putString("source", field.source.name());
                     item.putString("status", field.status.name());
+                    item.putString("capability", definition.capability.name());
+                    item.putString("type", definition.type.name());
+                    item.putString("scope", definition.scope);
+                    item.putString("label", definition.label);
+                    item.putString("adapterId", definition.adapterId);
+                    item.putString("apiSupport", definition.apiSupport);
+                    item.putString("privacyClass", definition.privacyClass);
+                    item.putBoolean("editable", definition.editable);
+                    item.putString("readbackMethod", definition.readbackMethod);
+                    item.putString("unsupportedReason", definition.unsupportedReason);
                     putTypedValue(item, field.value);
                     fields.putBundle(field.key, item);
                 }
