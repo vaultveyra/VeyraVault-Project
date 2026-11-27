@@ -25,6 +25,8 @@ assert "repository.clearGlobalProfileDocumentField" in editor
 assert "repository.clearCloneProfileDocumentField" in editor
 assert "repository.setCloneProfileFieldSafeDefault" in editor
 assert "ProfileFieldRegistry.isValidValue(field, value)" in editor
+assert "validLocationConfiguration(candidateClone, candidateGlobal)" in editor
+assert "both valid latitude and longitude" in editor
 assert "ProfileDocumentStore" not in editor
 assert "ProfileStore" not in editor
 assert "ProfileDocumentEditorActivity.class" in settings
