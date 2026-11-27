@@ -148,6 +148,7 @@ public final class ProfileRuntimeClient {
             ProfileFieldRegistry.ApplyStatus status = enumValue(
                     item.getString("status"), ProfileFieldRegistry.ApplyStatus.class, definition.key, "STATUS");
             verifyMetadata(item, definition);
+            validateStatus(definition, value, source, status);
             decoded.put(definition.key, new ResolvedField(
                     definition.key, value, source, status, definition));
         }
@@ -162,6 +163,46 @@ public final class ProfileRuntimeClient {
     public static ProfileResolver.ResolvedProfile resolve(
             Context context, String packageName, int userId) throws Exception {
         return resolveDocument(context, packageName, userId).toRuntimeProfile();
+    }
+
+    private static void validateStatus(ProfileFieldRegistry.Field field, Object value,
+                                        ProfileDocumentResolver.Source source,
+                                        ProfileFieldRegistry.ApplyStatus status) {
+        if (value != null && source == ProfileDocumentResolver.Source.UNSET) {
+            throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:VALUE_WITHOUT_SOURCE:" + field.key);
+        }
+        switch (field.capability) {
+            case OBSERVED_ONLY:
+                if (status != ProfileFieldRegistry.ApplyStatus.NOT_APPLICABLE || value != null
+                        || source != ProfileDocumentResolver.Source.UNSET) {
+                    throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:OBSERVED_ONLY_POLICY:" + field.key);
+                }
+                break;
+            case PLATFORM_RESTRICTED:
+            case SERVICE_OWNED:
+            case NETWORK_PROVIDER_REQUIRED:
+                if (status != ProfileFieldRegistry.ApplyStatus.UNSUPPORTED) {
+                    throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:UNSUPPORTED_POLICY:" + field.key);
+                }
+                break;
+            case LOCAL_PREFERENCE_ONLY:
+            case NOT_IMPLEMENTED:
+                if (status != (value == null ? ProfileFieldRegistry.ApplyStatus.NOT_TESTED
+                        : ProfileFieldRegistry.ApplyStatus.STORED_ONLY)) {
+                    throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:STORAGE_STATUS:" + field.key);
+                }
+                break;
+            case PROCESS_SCOPED:
+            case ENGINE_SCOPED:
+                if (status != ProfileFieldRegistry.ApplyStatus.NOT_TESTED
+                        && status != ProfileFieldRegistry.ApplyStatus.APPLIED
+                        && status != ProfileFieldRegistry.ApplyStatus.FAILED) {
+                    throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:RUNTIME_STATUS:" + field.key);
+                }
+                break;
+            default:
+                throw new IllegalStateException("PROFILE_PROVIDER_FAILURE:UNKNOWN_CAPABILITY:" + field.key);
+        }
     }
 
     private static void verifyMetadata(Bundle item, ProfileFieldRegistry.Field field) {
