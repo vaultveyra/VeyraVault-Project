@@ -94,8 +94,14 @@ public final class ProfileDocumentStore {
             }
             // Semantic invalidity is field-scoped: omit only this field so the resolver
             // can continue to Global or Safe Isolated Default for that field.
-            if (ProfileFieldRegistry.isValidValue(field, value) && !document.put(field.key, value)) {
-                throw new IllegalStateException("Valid profile field could not be decoded: " + field.key);
+            if (ProfileFieldRegistry.isValidValue(field, value)) {
+                if (!document.put(field.key, value)) {
+                    throw new IllegalStateException("Valid profile field could not be decoded: " + field.key);
+                }
+            } else {
+                // Preserve presence without accepting the invalid value. The runtime
+                // compatibility merge must not resurrect a stale same-level Legacy value.
+                document.markInvalid(field.key);
             }
         }
         return document;
