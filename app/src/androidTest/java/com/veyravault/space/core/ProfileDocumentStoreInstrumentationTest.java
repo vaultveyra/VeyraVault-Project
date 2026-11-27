@@ -68,8 +68,12 @@ public class ProfileDocumentStoreInstrumentationTest {
 
         testPrefs = testContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         originalPreferences = testPrefs.getAll();
-        assertTrue("Test-only preferences must be isolated before each test",
-                testPrefs.edit().clear().commit());
+        // Clear the test-only namespace in memory before each test. apply() updates
+        // the in-process map immediately; actual ProfileDocumentStore writes below
+        // still use commit() and assert durable persistence.
+        testPrefs.edit().clear().apply();
+        assertTrue("Test-only preferences must be empty before each test",
+                testPrefs.getAll().isEmpty());
     }
 
     @After
