@@ -17,6 +17,7 @@ import android.os.Process;
 public final class ProfileRuntimeProvider extends ContentProvider {
     public static final String METHOD_RESOLVE_CLONE_PROFILE = "resolveCloneProfile";
     public static final String METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT = "resolveCloneProfileDocument";
+    public static final String METHOD_RECORD_CLONE_PROFILE_STATUS = "recordCloneProfileStatus";
 
     @Override public boolean onCreate() { return getContext() != null; }
 
@@ -24,7 +25,8 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         Bundle response = new Bundle();
         boolean legacyRequest = METHOD_RESOLVE_CLONE_PROFILE.equals(method);
         boolean documentRequest = METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT.equals(method);
-        if (!legacyRequest && !documentRequest) {
+        boolean statusRequest = METHOD_RECORD_CLONE_PROFILE_STATUS.equals(method);
+        if (!legacyRequest && !documentRequest && !statusRequest) {
             response.putBoolean("ok", false);
             response.putString("error", "UNSUPPORTED_METHOD");
             return response;
@@ -46,6 +48,32 @@ public final class ProfileRuntimeProvider extends ContentProvider {
             if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
                 response.putBoolean("ok", false);
                 response.putString("error", "INVALID_CLONE_IDENTITY");
+                return response;
+            }
+            if (statusRequest) {
+                if (!isRegisteredClone(context, packageName, userId)) {
+                    response.putBoolean("ok", false);
+                    response.putString("error", "CLONE_NOT_REGISTERED");
+                    return response;
+                }
+                Bundle statusBundle = extras.getBundle("statuses");
+                if (statusBundle == null) {
+                    response.putBoolean("ok", false);
+                    response.putString("error", "MISSING_STATUS_BUNDLE");
+                    return response;
+                }
+                java.util.Map<String, ProfileFieldRegistry.ApplyStatus> statuses =
+                        new java.util.LinkedHashMap<>();
+                for (String key : statusBundle.keySet()) {
+                    String raw = statusBundle.getString(key);
+                    if (raw == null) throw new IllegalArgumentException("INVALID_STATUS:" + key);
+                    statuses.put(key, ProfileFieldRegistry.ApplyStatus.valueOf(raw));
+                }
+                boolean saved = ProfileRuntimeStatusStore.record(context, packageName, userId,
+                        extras.getLong("revision", -1L), extras.getString("processName"), statuses);
+                response.putBoolean("ok", saved);
+                if (!saved) response.putString("error", "STALE_OR_INVALID_STATUS");
+                else response.putLong("revision", ProfileDocumentStore.readRevisionStrict(context));
                 return response;
             }
             // Read both stores strictly. The five-field ProfileStore remains a live
@@ -127,6 +155,14 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         // states. Flattening those states into nullable legacy fields would incorrectly
         // allow a Global value to override an explicit Clone Safe Default.
         return ProfileResolver.resolveDocuments(mergedClone, mergedGlobal);
+    }
+
+    private static boolean isRegisteredClone(Context context, String packageName, int userId)
+            throws Exception {
+        for (CloneStore.CloneEntry entry : CloneStore.readAllStrict(context)) {
+            if (entry != null && packageName.equals(entry.packageName) && userId == entry.userId) return true;
+        }
+        return false;
     }
 
     /** Add legacy supported values only where the typed document has no field override. */
