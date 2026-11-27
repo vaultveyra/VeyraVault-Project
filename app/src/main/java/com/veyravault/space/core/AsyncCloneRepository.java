@@ -319,7 +319,12 @@ public final class AsyncCloneRepository implements AutoCloseable {
     }
 
     public void loadGlobalProfile(Callback<ProfileSettings> callback) {
-        enqueue(() -> ProfileStore.readGlobalStrict(appContext).copy(), callback);
+        enqueue(() -> {
+            ProfileSettings legacy = ProfileStore.readGlobalStrict(appContext);
+            ProfileDocument typed = ProfileDocumentStore.readGlobalStrict(appContext);
+            return ProfileRuntimeProvider.mergeDocumentFields(legacy,
+                    ProfileRuntimeProvider.mergeLegacyFields(typed, legacy));
+        }, callback);
     }
 
     public void saveGlobalProfile(ProfileSettings settings, Callback<Boolean> callback) {
@@ -329,9 +334,20 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final ProfileSettings snapshot = settings.copy();
         enqueue(() -> {
-            ProfileStore.readGlobalStrict(appContext);
-            if (!ProfileStore.saveGlobal(appContext, snapshot))
-                throw new PersistenceFailureException("Global profile was not committed");
+            ProfileSettings legacy = ProfileStore.readGlobalStrict(appContext);
+            ProfileDocument typed = ProfileDocumentStore.readGlobalStrict(appContext);
+            if (snapshot.localeTag != null && !typed.put("localeTag", snapshot.localeTag)) throw new IllegalArgumentException("Global locale is invalid");
+            if (snapshot.timeZoneId != null && !typed.put("timeZoneId", snapshot.timeZoneId)) throw new IllegalArgumentException("Global time zone is invalid");
+            if (snapshot.locationEnabled != null && !typed.put("locationEnabled", snapshot.locationEnabled)) throw new IllegalArgumentException("Global location gate is invalid");
+            if (snapshot.latitude != null && !typed.put("latitude", snapshot.latitude)) throw new IllegalArgumentException("Global latitude is invalid");
+            if (snapshot.longitude != null && !typed.put("longitude", snapshot.longitude)) throw new IllegalArgumentException("Global longitude is invalid");
+            if (!ProfileDocumentStore.saveGlobalDocument(appContext, typed)) throw new PersistenceFailureException("Typed Global profile was not committed");
+            if (snapshot.localeTag != null) legacy.localeTag = snapshot.localeTag;
+            if (snapshot.timeZoneId != null) legacy.timeZoneId = snapshot.timeZoneId;
+            if (snapshot.locationEnabled != null) legacy.locationEnabled = snapshot.locationEnabled;
+            if (snapshot.latitude != null) legacy.latitude = snapshot.latitude;
+            if (snapshot.longitude != null) legacy.longitude = snapshot.longitude;
+            if (!ProfileStore.saveGlobal(appContext, legacy)) throw new PersistenceFailureException("Typed Global profile is authoritative, but Legacy mirror failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -341,7 +357,12 @@ public final class AsyncCloneRepository implements AutoCloseable {
             deliver(callback, Result.<ProfileSettings>failure(Failure.INVALID_INPUT, "Clone identity is invalid"));
             return;
         }
-        enqueue(() -> ProfileStore.readCloneOverrideStrict(appContext, packageName, userId).copy(), callback);
+        enqueue(() -> {
+            ProfileSettings legacy = ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
+            ProfileDocument typed = ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
+            return ProfileRuntimeProvider.mergeDocumentFields(legacy,
+                    ProfileRuntimeProvider.mergeLegacyFields(typed, legacy));
+        }, callback);
     }
 
     public void saveCloneProfile(String packageName, int userId, ProfileSettings settings,
@@ -353,9 +374,20 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }
         final ProfileSettings snapshot = settings.copy();
         enqueue(() -> {
-            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
-            if (!ProfileStore.saveCloneOverride(appContext, packageName, userId, snapshot))
-                throw new PersistenceFailureException("Clone profile was not committed");
+            ProfileSettings legacy = ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
+            ProfileDocument typed = ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
+            if (snapshot.localeTag != null && !typed.put("localeTag", snapshot.localeTag)) throw new IllegalArgumentException("Clone locale is invalid");
+            if (snapshot.timeZoneId != null && !typed.put("timeZoneId", snapshot.timeZoneId)) throw new IllegalArgumentException("Clone time zone is invalid");
+            if (snapshot.locationEnabled != null && !typed.put("locationEnabled", snapshot.locationEnabled)) throw new IllegalArgumentException("Clone location gate is invalid");
+            if (snapshot.latitude != null && !typed.put("latitude", snapshot.latitude)) throw new IllegalArgumentException("Clone latitude is invalid");
+            if (snapshot.longitude != null && !typed.put("longitude", snapshot.longitude)) throw new IllegalArgumentException("Clone longitude is invalid");
+            if (!ProfileDocumentStore.saveCloneDocument(appContext, packageName, userId, typed)) throw new PersistenceFailureException("Typed Clone profile was not committed");
+            if (snapshot.localeTag != null) legacy.localeTag = snapshot.localeTag;
+            if (snapshot.timeZoneId != null) legacy.timeZoneId = snapshot.timeZoneId;
+            if (snapshot.locationEnabled != null) legacy.locationEnabled = snapshot.locationEnabled;
+            if (snapshot.latitude != null) legacy.latitude = snapshot.latitude;
+            if (snapshot.longitude != null) legacy.longitude = snapshot.longitude;
+            if (!ProfileStore.saveCloneOverride(appContext, packageName, userId, legacy)) throw new PersistenceFailureException("Typed Clone profile is authoritative, but Legacy mirror failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -368,9 +400,10 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
-            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
-            if (!ProfileStore.clearCloneLocationOverrides(appContext, packageName, userId))
-                throw new PersistenceFailureException("Clone location reset was not committed");
+            for (String field : new String[]{"locationEnabled", "latitude", "longitude"}) {
+                if (!ProfileDocumentStore.clearCloneField(appContext, packageName, userId, field)) throw new PersistenceFailureException("Typed Clone inheritance marker failed: " + field);
+            }
+            if (!ProfileStore.clearCloneLocationOverrides(appContext, packageName, userId)) throw new PersistenceFailureException("Clone inherits Global safely, but Legacy location cleanup failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -383,9 +416,10 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
-            ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
+            if (!ProfileDocumentStore.clearCloneField(appContext, packageName, userId, field))
+                throw new PersistenceFailureException("Typed Clone inheritance marker was not committed");
             if (!ProfileStore.clearCloneOverrideField(appContext, packageName, userId, field))
-                throw new PersistenceFailureException("Clone profile field clear was not committed");
+                throw new PersistenceFailureException("Clone inherits Global safely, but Legacy cleanup is incomplete");
             return Boolean.TRUE;
         }, callback);
     }
@@ -400,9 +434,15 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
-            ProfileStore.readGlobalStrict(appContext);
-            if (!ProfileStore.saveGlobalLocationOverrides(appContext, enabled, latitude, longitude))
-                throw new PersistenceFailureException("Global location profile was not committed");
+            ProfileDocument typed = ProfileDocumentStore.readGlobalStrict(appContext);
+            if (enabled == null) typed.markSafeDefault("locationEnabled");
+            else if (!typed.put("locationEnabled", enabled)) throw new IllegalArgumentException("Global location gate is invalid");
+            if (latitude == null) typed.markSafeDefault("latitude");
+            else if (!typed.put("latitude", latitude)) throw new IllegalArgumentException("Global latitude is invalid");
+            if (longitude == null) typed.markSafeDefault("longitude");
+            else if (!typed.put("longitude", longitude)) throw new IllegalArgumentException("Global longitude is invalid");
+            if (!ProfileDocumentStore.saveGlobalDocument(appContext, typed)) throw new PersistenceFailureException("Typed Global location profile was not committed");
+            if (!ProfileStore.saveGlobalLocationOverrides(appContext, enabled, latitude, longitude)) throw new PersistenceFailureException("Typed location profile saved, but Legacy mirror failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -410,9 +450,10 @@ public final class AsyncCloneRepository implements AutoCloseable {
     /** Clears global location defaults atomically without changing locale/time-zone defaults. */
     public void clearGlobalLocationOverrides(Callback<Boolean> callback) {
         enqueue(() -> {
-            ProfileStore.readGlobalStrict(appContext);
-            if (!ProfileStore.clearGlobalLocationOverrides(appContext))
-                throw new PersistenceFailureException("Global location reset was not committed");
+            for (String field : new String[]{"locationEnabled", "latitude", "longitude"}) {
+                if (!ProfileDocumentStore.clearGlobalField(appContext, field)) throw new PersistenceFailureException("Typed Global Safe Default location marker failed: " + field);
+            }
+            if (!ProfileStore.clearGlobalLocationOverrides(appContext)) throw new PersistenceFailureException("Global Safe Defaults saved, but Legacy location cleanup failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -423,9 +464,10 @@ public final class AsyncCloneRepository implements AutoCloseable {
             return;
         }
         enqueue(() -> {
-            ProfileStore.readGlobalStrict(appContext);
+            if (!ProfileDocumentStore.clearGlobalField(appContext, field))
+                throw new PersistenceFailureException("Typed Global Safe Default marker was not committed");
             if (!ProfileStore.clearGlobalField(appContext, field))
-                throw new PersistenceFailureException("Global profile field clear was not committed");
+                throw new PersistenceFailureException("Safe Default is authoritative, but Legacy cleanup is incomplete");
             return Boolean.TRUE;
         }, callback);
     }

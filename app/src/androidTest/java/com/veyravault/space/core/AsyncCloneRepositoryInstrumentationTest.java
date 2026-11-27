@@ -864,6 +864,57 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void typedResetMarkersPersistAndSuppressLegacyValues() throws Exception {
+        ProfileDocument global = new ProfileDocument();
+        assertTrue(global.put("localeTag", "fr-FR"));
+        assertTrue(ProfileDocumentStore.saveGlobalDocument(context, global));
+        ProfileDocument clone = new ProfileDocument();
+        assertTrue(clone.put("localeTag", "de-DE"));
+        assertTrue(ProfileDocumentStore.saveCloneDocument(context, "com.example.tombstone", 12, clone));
+        assertTrue(ProfileDocumentStore.clearCloneField(context, "com.example.tombstone", 12, "localeTag"));
+        ProfileDocument cloneReset = ProfileDocumentStore.readCloneStrict(context, "com.example.tombstone", 12);
+        assertEquals(ProfileDocument.FieldState.INHERIT_GLOBAL, cloneReset.state("localeTag"));
+        ProfileDocumentResolver.FieldResult inherited = ProfileDocumentResolver.resolve(
+                "localeTag", cloneReset, ProfileDocumentStore.readGlobalStrict(context), ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("fr-FR", inherited.value);
+        assertEquals(ProfileDocumentResolver.Source.GLOBAL, inherited.source);
+        ProfileSettings staleClone = new ProfileSettings();
+        staleClone.localeTag = "it-IT";
+        ProfileDocument mergedClone = ProfileRuntimeProvider.mergeLegacyFields(cloneReset, staleClone);
+        assertFalse(mergedClone.contains("localeTag"));
+        assertTrue(mergedClone.hasState("localeTag"));
+        assertTrue(ProfileDocumentStore.clearGlobalField(context, "localeTag"));
+        ProfileDocument globalReset = ProfileDocumentStore.readGlobalStrict(context);
+        assertEquals(ProfileDocument.FieldState.SAFE_DEFAULT, globalReset.state("localeTag"));
+        ProfileDocumentResolver.FieldResult safe = ProfileDocumentResolver.resolve(
+                "localeTag", new ProfileDocument(), globalReset, ProfileFieldRegistry.createSafeDefaults());
+        assertEquals("en-US", safe.value);
+        assertEquals(ProfileDocumentResolver.Source.SAFE_DEFAULT, safe.source);
+        ProfileSettings staleGlobal = new ProfileSettings();
+        staleGlobal.localeTag = "es-ES";
+        ProfileDocument mergedGlobal = ProfileRuntimeProvider.mergeLegacyFields(globalReset, staleGlobal);
+        assertFalse(mergedGlobal.contains("localeTag"));
+        assertTrue(mergedGlobal.hasState("localeTag"));
+    }
+
+    @Test public void legacyUiRepositoryMethodsPersistTypedValuesAndResetMarkers() throws Exception {
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        ProfileSettings global = new ProfileSettings();
+        global.localeTag = "en-GB";
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.saveGlobalProfile(global, cb)).isSuccess());
+        ProfileSettings clone = new ProfileSettings();
+        clone.localeTag = "ja-JP";
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.saveCloneProfile("com.example.ui-bridge", 14, clone, cb)).isSuccess());
+        assertEquals("ja-JP", ProfileDocumentStore.readCloneStrict(context, "com.example.ui-bridge", 14).get("localeTag"));
+        assertEquals("en-GB", ProfileDocumentStore.readGlobalStrict(context).get("localeTag"));
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.clearCloneProfileField("com.example.ui-bridge", 14, "localeTag", cb)).isSuccess());
+        assertEquals(ProfileDocument.FieldState.INHERIT_GLOBAL, ProfileDocumentStore.readCloneStrict(context, "com.example.ui-bridge", 14).state("localeTag"));
+        assertNull(awaitResult((AsyncCloneRepository.Callback<ProfileSettings>) cb -> repository.loadCloneProfile("com.example.ui-bridge", 14, cb)).getValue().localeTag);
+        assertTrue(awaitResult((AsyncCloneRepository.Callback<Boolean>) cb -> repository.clearGlobalProfileField("localeTag", cb)).isSuccess());
+        assertEquals(ProfileDocument.FieldState.SAFE_DEFAULT, ProfileDocumentStore.readGlobalStrict(context).state("localeTag"));
+        repository.close();
+    }
+
     @Test public void repositoryRejectsInvalidTypedProfileFieldWithoutWriting() throws Exception {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         AsyncCloneRepository.Result<Boolean> result = awaitResult((AsyncCloneRepository.Callback<Boolean> cb) ->
