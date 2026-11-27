@@ -28,6 +28,11 @@ public class ProfileRuntimeApplierInstrumentationTest {
         assertFalse(ProcessUtils.isBlackBoxWorkerProcess(host, host));
         assertFalse(ProcessUtils.isBlackBoxWorkerProcess(
                 "com.example.other:p0", host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess("com.veyravault.space:remote", host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess("com.veyravault.space:vpn", host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess("com.veyravault.space:p", host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess("com.veyravault.space:p2x", host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess("com.veyravault.space:p0:extra", host));
         assertFalse(ProcessUtils.isBlackBoxWorkerProcess(null, host));
     }
 
