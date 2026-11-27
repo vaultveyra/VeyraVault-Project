@@ -91,6 +91,9 @@ public final class ProfileDocumentResolver {
             case NETWORK_PROVIDER_REQUIRED:
                 status = ProfileFieldRegistry.ApplyStatus.UNSUPPORTED;
                 break;
+            case OBSERVED_ONLY:
+                status = ProfileFieldRegistry.ApplyStatus.NOT_APPLICABLE;
+                break;
             case LOCAL_PREFERENCE_ONLY:
             case NOT_IMPLEMENTED:
                 status = value == null ? ProfileFieldRegistry.ApplyStatus.NOT_TESTED
