@@ -24,6 +24,16 @@ assert "addAppLifecycleCallback" in engine
 assert "AppLifecycleCallback" in engine
 assert "beforeCreateApplication" in callback
 assert "ProfileRuntimeClient.resolve" in callback
+assert "ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved)" in callback
+assert "PROFILE_READBACK_VERIFIED" in callback
+assert "PROFILE_READBACK_FAILED" in callback
+assert "expectedPackageName.equals(actualPackageName)" in applier
+assert "Locale.getDefault()" in applier
+assert "readResourceLocaleTag(packageContext)" in applier
+assert "TimeZone.getDefault()" in applier
+assert "ApplyStatus.APPLIED" in applier
+assert "applyAndVerifyRejectsWrongTargetContextWithoutApplyingProfile" in instrumentation
+assert "verification.isFullyVerified()" in instrumentation
 assert "ProfileStore.resolveStrict" not in callback
 assert "ContentResolver().call" in client
 assert "ProfileStore.readCloneOverrideStrict" in provider
