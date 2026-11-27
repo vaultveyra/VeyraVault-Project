@@ -43,7 +43,9 @@ public final class ProfileDocumentStore {
             return empty;
         }
         JSONObject root = new JSONObject(raw);
-        if (root.optInt("schemaVersion", -1) != SCHEMA_VERSION) {
+        Object schemaVersion = root.opt("schemaVersion");
+        if (!(schemaVersion instanceof Number)
+                || Double.compare(((Number) schemaVersion).doubleValue(), SCHEMA_VERSION) != 0) {
             throw new IllegalStateException("Profile document schema is unsupported");
         }
         Object revision = root.opt("revision");
