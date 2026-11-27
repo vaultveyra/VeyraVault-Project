@@ -18,14 +18,14 @@ This is consistent with the workflow not preparing access to `/dev/kvm` before i
 
 - Add a pre-emulator step that checks for `/dev/kvm`, installs the recommended udev rule, reloads udev, and triggers the KVM device.
 - Log whether KVM is actually readable/writable after the permission update. If it is unavailable, report the TCG fallback explicitly rather than claiming hardware acceleration.
-- Set `disable-linux-hw-accel: auto` explicitly for API-34 and API-21 emulators.
-- Retain `ANDROID_I_WANT_MY_TCG=yes` on both emulator steps so a supported software fallback remains possible.
-- Increase emulator boot timeout to 1200 seconds and reduce API-34 virtual CPU count from four to two.
+- Set `disable-linux-hw-accel: auto` explicitly for API-34, API-27 and API-21 emulators.
+- Retain `ANDROID_I_WANT_MY_TCG=yes` on all three emulator steps so a supported software fallback remains possible.
+- Use a 1200-second emulator boot timeout for all three API levels and reduce API-34 virtual CPU count from four to two.
 - Stop running duplicate Push and Pull Request builds for the feature branch. Feature commits are validated by the PR event; pushes to `main` still run the workflow.
 
 ## Validation
 
-A new contract test verifies that KVM preparation precedes both emulator steps, that the udev rule and fallback diagnostics remain present, and that both emulator steps retain their required configuration. The next successful CI run must still pass the API-34 instrumentation suite and the dedicated API-21 smoke test; this stage does not turn an emulator boot into a passing test automatically.
+A new contract test verifies that KVM preparation precedes all three emulator steps, that the udev rule and fallback diagnostics remain present, and that API 34, API 27 and API 21 retain their required configuration. The next successful CI run must pass the API-34 full instrumentation suite, the API-27 full target-OS suite and the dedicated API-21 minimum-API smoke test; this stage does not turn an emulator boot into a passing test automatically.
 
 ## Scope
 
