@@ -1,6 +1,7 @@
 package com.veyravault.space.core;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -29,13 +30,14 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Tests the additive profile-document store inside the instrumentation APK's
- * private preferences. It deliberately never opens or edits the target app's
- * ProfileStore, CloneStore, accounts, sessions, or app data.
+ * Tests the additive profile-document store through real Android SharedPreferences.
+ * The production preference name is redirected to a dedicated test-only file;
+ * ProfileStore, CloneStore, accounts, sessions and production profile data stay untouched.
  */
 @RunWith(AndroidJUnit4.class)
 public class ProfileDocumentStoreInstrumentationTest {
-    private static final String PREFS_NAME = "veyravault_profile_documents_v1";
+    private static final String STORE_PREFS_NAME = "veyravault_profile_documents_v1";
+    private static final String TEST_PREFS_NAME = STORE_PREFS_NAME + "_instrumentation";
     private static final String DATA_KEY = "documents_json";
 
     private Context testContext;
@@ -44,28 +46,32 @@ public class ProfileDocumentStoreInstrumentationTest {
 
     @Before
     public void setUp() {
-        Context instrumentationContext =
-                InstrumentationRegistry.getInstrumentation().getContext();
         Context targetContext =
                 InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertNotNull("Instrumentation package Context must be available", instrumentationContext);
         assertNotNull("Target application Context must be available", targetContext);
 
-        // Use the instrumentation APK's own Context directly. ProfileDocumentStore
-        // must support this Context even when getApplicationContext() returns null.
-        // This keeps all test preferences in the instrumentation package namespace.
-        testContext = instrumentationContext;
+        // Android's instrumentation-package data directory is not writable in the
+        // current emulator harness. Keep the real Android SharedPreferences backend,
+        // but redirect the store's fixed production filename to a dedicated test file.
+        // Returning this wrapper from getApplicationContext() retains the redirect when
+        // ProfileDocumentStore resolves its storage Context.
+        testContext = new ContextWrapper(targetContext) {
+            @Override
+            public Context getApplicationContext() {
+                return this;
+            }
 
-        // Do not run this test against the production app's preference namespace.
-        assertFalse("Instrumentation preferences must be separate from target app preferences",
-                targetContext.getPackageName().equals(testContext.getPackageName()));
+            @Override
+            public SharedPreferences getSharedPreferences(String name, int mode) {
+                String isolatedName = STORE_PREFS_NAME.equals(name) ? TEST_PREFS_NAME : name;
+                return super.getSharedPreferences(isolatedName, mode);
+            }
+        };
 
-        testPrefs = testContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        testPrefs = targetContext.getSharedPreferences(TEST_PREFS_NAME, Context.MODE_PRIVATE);
         originalPreferences = testPrefs.getAll();
-        // Clear the test-only namespace in memory before each test. apply() updates
-        // the in-process map immediately; actual ProfileDocumentStore writes below
-        // still use commit() and assert durable persistence.
-        testPrefs.edit().clear().apply();
+        assertTrue("Test-only preferences must be cleared successfully",
+                testPrefs.edit().clear().commit());
         assertTrue("Test-only preferences must be empty before each test",
                 testPrefs.getAll().isEmpty());
     }
@@ -88,11 +94,8 @@ public class ProfileDocumentStoreInstrumentationTest {
                     editor.putStringSet(key, strings);
                 }
             }
-            // apply() restores this instrumentation-only namespace in memory immediately
-            // and schedules the disk write. The next setUp() uses commit() before tests,
-            // which waits for pending SharedPreferences writes.
-            editor.apply();
-            assertEquals("Test-only preferences must be restored in memory",
+            assertTrue("Test-only preferences must be restored successfully", editor.commit());
+            assertEquals("Test-only preferences must be restored",
                     originalPreferences, testPrefs.getAll());
         }
     }
