@@ -122,6 +122,7 @@ public final class ProfileDocumentStore {
             if (field == null || !field.canBeStoredAsProfileInput() || !(rawState instanceof String) || object.has(key))
                 throw new IllegalStateException("Profile field-state entry is invalid: " + key);
             if (cloneScope && "INHERIT_GLOBAL".equals(rawState)) document.markInheritGlobal(key);
+            else if (cloneScope && "SAFE_DEFAULT".equals(rawState)) document.markSafeDefault(key);
             else if (!cloneScope && "SAFE_DEFAULT".equals(rawState)) document.markSafeDefault(key);
             else throw new IllegalStateException("Profile field-state is invalid for its scope: " + key);
         }
@@ -177,7 +178,9 @@ public final class ProfileDocumentStore {
                 ProfileDocument.FieldState state = document.state(field.key);
                 if (state == null) states.remove(field.key);
                 else {
-                    if (cloneIdentity != null && state != ProfileDocument.FieldState.INHERIT_GLOBAL) return false;
+                    if (cloneIdentity != null
+                            && state != ProfileDocument.FieldState.INHERIT_GLOBAL
+                            && state != ProfileDocument.FieldState.SAFE_DEFAULT) return false;
                     if (cloneIdentity == null && state != ProfileDocument.FieldState.SAFE_DEFAULT) return false;
                     states.put(field.key, state.name());
                 }
