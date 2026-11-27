@@ -205,7 +205,7 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
-            parseDocument(existing); // Reject structural corruption before any read-modify-write.
+            parseDocument(existing, cloneIdentity != null); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.put(fieldKey, value);
             JSONObject states = updated.optJSONObject("_fieldStates");
@@ -238,7 +238,7 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
-            parseDocument(existing); // Reject structural corruption before any read-modify-write.
+            parseDocument(existing, cloneIdentity != null); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.remove(fieldKey);
             JSONObject states = updated.optJSONObject("_fieldStates");
