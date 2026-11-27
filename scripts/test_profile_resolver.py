@@ -7,6 +7,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JAVA_ROOT = os.path.join(ROOT, "app", "src", "main", "java")
 SOURCES = [
     os.path.join(JAVA_ROOT, "com", "veyravault", "space", "core", "ProfileSettings.java"),
+    os.path.join(JAVA_ROOT, "com", "veyravault", "space", "core", "ProfileFieldRegistry.java"),
+    os.path.join(JAVA_ROOT, "com", "veyravault", "space", "core", "ProfileDocument.java"),
+    os.path.join(JAVA_ROOT, "com", "veyravault", "space", "core", "ProfileDocumentResolver.java"),
     os.path.join(JAVA_ROOT, "com", "veyravault", "space", "core", "ProfileResolver.java"),
     os.path.join(ROOT, "scripts", "ProfileResolverContractTest.java"),
 ]
