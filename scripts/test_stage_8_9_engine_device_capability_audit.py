@@ -7,6 +7,8 @@ settings = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileSettings.
 provider = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeProvider.java").read_text(encoding="utf-8")
 client = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeClient.java").read_text(encoding="utf-8")
 lifecycle = (ROOT / "app/src/main/java/com/veyravault/space/core/CloneProfileLifecycleCallback.java").read_text(encoding="utf-8")
+runtime_applier = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeApplier.java").read_text(encoding="utf-8")
+runtime_trace = (ROOT / "app/src/main/java/com/veyravault/space/core/CloneRuntimeTrace.java").read_text(encoding="utf-8")
 virtual_hooks = (ROOT / "app/src/main/java/com/veyravault/space/core/VirtualHookManager.java").read_text(encoding="utf-8")
 audit = (ROOT / "docs/STAGE_8_9_ENGINE_DEVICE_CAPABILITY_AUDIT.md").read_text(encoding="utf-8")
 workflow = (ROOT / ".github/workflows/build-and-audit.yml").read_text(encoding="utf-8")
@@ -34,7 +36,17 @@ assert "ProfileStore.readCloneOverrideStrict(context, packageName, userId)" in p
 assert "ProfileStore.readGlobalStrict(context)" in provider
 assert "beforeCreateApplication" in lifecycle
 assert "ProfileRuntimeClient.resolve(appContext, packageName, userId)" in lifecycle
-assert "ProfileRuntimeApplier.apply(packageContext, resolved)" in lifecycle
+assert "ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved)" in lifecycle
+assert "verification.isFullyVerified()" in lifecycle
+assert "PROFILE_READBACK_VERIFIED" in lifecycle
+assert "PROFILE_READBACK_FAILED" in lifecycle
+assert "expectedPackageName.equals(actualPackageName)" in runtime_applier
+assert "Locale.getDefault()" in runtime_applier
+assert "readResourceLocaleTag(packageContext)" in runtime_applier
+assert "TimeZone.getDefault()" in runtime_applier
+assert "ApplyStatus.APPLIED" in runtime_applier
+assert "PROFILE_READBACK_VERIFIED" in runtime_trace
+assert "PROFILE_READBACK_FAILED" in runtime_trace
 
 for marker in (
     '"setPattern"',
