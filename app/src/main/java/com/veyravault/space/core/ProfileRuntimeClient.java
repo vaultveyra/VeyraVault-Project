@@ -204,6 +204,33 @@ public final class ProfileRuntimeClient {
                 response.getLong("revision", -1L), decoded);
     }
 
+    /** Persists only readback outcomes from the package/user-matched runtime applier. */
+    public static boolean recordRuntimeVerification(Context context, String packageName, int userId,
+                                                    long revision, String processName,
+                                                    ProfileRuntimeApplier.RuntimeApplyResult result) {
+        if (context == null || packageName == null || packageName.trim().isEmpty()
+                || userId < 0 || revision < 0 || processName == null || result == null
+                || !result.targetIdentityMatches || !packageName.equals(result.targetPackageName)) return false;
+        try {
+            Bundle request = new Bundle();
+            request.putString("packageName", packageName);
+            request.putInt("userId", userId);
+            request.putLong("revision", revision);
+            request.putString("processName", processName);
+            Bundle statuses = new Bundle();
+            statuses.putString("localeTag", result.localeStatus.name());
+            statuses.putString("timeZoneId", result.timeZoneStatus.name());
+            request.putBundle("statuses", statuses);
+            Uri endpoint = Uri.parse("content://" + context.getPackageName() + ".profile-runtime");
+            Bundle response = context.getContentResolver().call(
+                    endpoint, ProfileRuntimeProvider.METHOD_RECORD_CLONE_PROFILE_STATUS, null, request);
+            return response != null && response.getBoolean("ok", false)
+                    && response.getLong("revision", -1L) == revision;
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
     /** Compatibility facade for the existing Locale/Time Zone/Location runtime adapters. */
     public static ProfileResolver.ResolvedProfile resolve(
             Context context, String packageName, int userId) throws Exception {
