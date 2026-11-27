@@ -44,6 +44,7 @@ for event in (
     "PROFILE_APPLY_RETURNED",
     "PROFILE_READBACK_VERIFIED",
     "PROFILE_READBACK_FAILED",
+    "PROFILE_PROCESS_BOUNDARY_REJECTED",
 ):
     assert event in trace, event
 
@@ -100,12 +101,18 @@ assert "TARGET_APPLICATION_ONCREATE_COMPLETE" in after_on_create
 assert "CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED" in before_create
 assert "CloneRuntimeTrace.Event.PROFILE_READBACK_VERIFIED" in before_create
 assert "CloneRuntimeTrace.Event.PROFILE_READBACK_FAILED" in before_create
+assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in trace
+assert "ProcessUtils.currentProcessName(appContext)" in before_create
+assert "isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in before_create
+assert before_create.index("isBlackBoxWorkerProcess") < before_create.index("applySafeDefaults(packageContext)")
+assert "target_context_mismatch" in before_create
 assert '"readback_verified"' in before_create
 assert '"readback_incomplete"' in before_create
 assert "PROFILE_APPLIED" not in trace
 assert "readback verified before Application creation" in callback
 assert "readback did not verify" in callback
 assert "error.getMessage()" not in callback
+assert "blackBoxWorkerGateRejectsMainHostAndForeignProcesses" in (root / "app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java").read_text(encoding="utf-8")
 
 assert 'new CheckItem("runtime_trace"' in compatibility
 assert "adb logcat -v threadtime -s VeyraCloneRuntime:I" in compatibility
