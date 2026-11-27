@@ -19,6 +19,18 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class ProfileRuntimeApplierInstrumentationTest {
+    @Test public void blackBoxWorkerGateRejectsMainHostAndForeignProcesses() {
+        String host = "com.veyravault.space";
+        assertTrue(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+                "com.veyravault.space:p0", host));
+        assertTrue(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+                "com.veyravault.space:p12", host));
+        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(host, host));
+        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+                "com.example.other:p0", host));
+        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(null, host));
+    }
+
     @Test public void cloneLocaleAndTimeZoneAreAppliedToCurrentProcess() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
