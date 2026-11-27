@@ -272,6 +272,19 @@ jobs:
             # It is executed separately by the dedicated API-21 emulator step below.
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
 
+      # Preserve raw Gradle/AndroidJUnit reports even when emulator tests fail.
+      - name: Upload Android instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-reports
+          path: |
+            build_workspace/app/build/reports/androidTests/connected/debug/
+            build_workspace/app/build/outputs/androidTest-results/connected/
+            build_workspace/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run Android API 21 legacy compatibility smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         env:
