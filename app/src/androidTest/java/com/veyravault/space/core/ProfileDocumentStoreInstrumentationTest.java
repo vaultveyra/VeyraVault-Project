@@ -334,6 +334,20 @@ public class ProfileDocumentStoreInstrumentationTest {
     }
 
     @Test
+    public void invalidLocationTelemetryIsRejectedBeforePersistence() throws Exception {
+        long before = ProfileDocumentStore.readRevisionStrict(testContext);
+        assertFalse(ProfileDocumentStore.saveGlobalField(testContext, "locationAccuracy", -1.0d));
+        assertFalse(ProfileDocumentStore.saveGlobalField(testContext, "locationSpeed", -1.0d));
+        assertFalse(ProfileDocumentStore.saveGlobalField(testContext, "locationBearing", 361.0d));
+        assertFalse(ProfileDocumentStore.saveGlobalField(testContext, "locationTimestamp", -1L));
+        assertEquals("Rejected telemetry values must not advance the document revision",
+                before, ProfileDocumentStore.readRevisionStrict(testContext));
+        assertTrue(ProfileDocumentStore.saveGlobalField(testContext, "locationBearing", 360.0d));
+        assertEquals(Double.valueOf(360.0d),
+                ProfileDocumentStore.readGlobalStrict(testContext).get("locationBearing"));
+    }
+
+    @Test
     public void restrictedServiceOwnedAndObservedOnlyValuesAreRejectedWithoutRevisionChange()
             throws Exception {
         assertFalse(ProfileDocumentStore.saveGlobalField(
