@@ -474,7 +474,11 @@ public final class AsyncCloneRepository implements AutoCloseable {
 
     /** Reads the expanded Global profile document on the repository worker. */
     public void loadGlobalProfileDocument(Callback<ProfileDocument> callback) {
-        enqueue(() -> ProfileDocumentStore.readGlobalStrict(appContext).copy(), callback);
+        enqueue(() -> {
+            ProfileSettings legacy = ProfileStore.readGlobalStrict(appContext);
+            ProfileDocument typed = ProfileDocumentStore.readGlobalStrict(appContext);
+            return ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+        }, callback);
     }
 
     /** Reads one Clone's expanded profile document without consulting another Clone. */
@@ -485,7 +489,11 @@ public final class AsyncCloneRepository implements AutoCloseable {
                     Failure.INVALID_INPUT, "Clone identity is invalid"));
             return;
         }
-        enqueue(() -> ProfileDocumentStore.readCloneStrict(appContext, packageName, userId).copy(), callback);
+        enqueue(() -> {
+            ProfileSettings legacy = ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
+            ProfileDocument typed = ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
+            return ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+        }, callback);
     }
 
     /** Replaces editable Global fields only; storage I/O remains off the UI thread. */
@@ -555,6 +563,9 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> {
             if (!ProfileDocumentStore.clearGlobalField(appContext, field))
                 throw new PersistenceFailureException("Global profile field reset was not committed");
+            if (isLegacyRuntimeProfileField(field) && !ProfileStore.clearGlobalField(appContext, field))
+                throw new PersistenceFailureException(
+                        "Typed Global Safe Default is saved, but legacy value cleanup failed");
             return Boolean.TRUE;
         }, callback);
     }
@@ -570,6 +581,10 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> {
             if (!ProfileDocumentStore.clearCloneField(appContext, packageName, userId, field))
                 throw new PersistenceFailureException("Clone profile field reset was not committed");
+            if (isLegacyRuntimeProfileField(field)
+                    && !ProfileStore.clearCloneOverrideField(appContext, packageName, userId, field))
+                throw new PersistenceFailureException(
+                        "Typed Clone inheritance is saved, but legacy override cleanup failed");
             return Boolean.TRUE;
         }, callback);
     }
