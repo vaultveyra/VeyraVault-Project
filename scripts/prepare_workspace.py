@@ -660,6 +660,10 @@ android {{
         }}
         // Debug instrumentation exercises Room without starting the virtual engine.
         debug {{
+            // Keep instrumentation preferences, files, databases and PackageManager state
+            // in a separate package from the user's production VeyraVault installation.
+            // This suffix applies only to the temporary CI/debug test APK; Release is unchanged.
+            applicationIdSuffix ".instrumentation"
             // The CI emulator is x86_64. Release keeps the production ARM ABI filters above.
             ndk {{
                 abiFilters "x86_64"
