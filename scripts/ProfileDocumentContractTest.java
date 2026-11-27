@@ -148,6 +148,10 @@ public final class ProfileDocumentContractTest {
                     "every field must have a stable ID: " + field.key);
             check(field.label != null && !field.label.isEmpty(),
                     "every field must have a UI label: " + field.key);
+            check(field.category != null && !field.category.isEmpty(),
+                    "every field must have a UI category: " + field.key);
+            check(field.validationRule != null && !field.validationRule.isEmpty(),
+                    "every field must have a validation rule: " + field.key);
             check(field.adapterId != null && !field.adapterId.isEmpty(),
                     "every field must declare adapter mapping: " + field.key);
             check(field.apiSupport != null && !field.apiSupport.isEmpty(),
