@@ -356,6 +356,18 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             toast((fa ? "اعتبارسنجی ناموفق: " : "Validation failed: ") + field.validationRule);
             return;
         }
+        if ("Location".equals(field.category)) {
+            ProfileDocument candidateClone = cloneDocument.copy();
+            ProfileDocument candidateGlobal = globalDocument.copy();
+            boolean accepted = cloneMode
+                    ? candidateClone.put(field.key, value)
+                    : candidateGlobal.put(field.key, value);
+            if (!accepted || !validLocationConfiguration(candidateClone, candidateGlobal)) {
+                toast(fa ? "برای فعال‌بودن موقعیت، طول و عرض جغرافیایی معتبر هر دو باید تنظیم شوند."
+                        : "Enabled location requires both valid latitude and longitude values.");
+                return;
+            }
+        }
         performMutation(card, callback -> {
             if (cloneMode) repository.saveCloneProfileField(packageName, userId, field.key, value, callback);
             else repository.saveGlobalProfileField(field.key, value, callback);
@@ -363,6 +375,17 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void resetField(ProfileFieldRegistry.Field field, View card) {
+        if ("Location".equals(field.category)) {
+            ProfileDocument candidateClone = cloneDocument.copy();
+            ProfileDocument candidateGlobal = globalDocument.copy();
+            if (cloneMode) candidateClone.markInheritGlobal(field.key);
+            else candidateGlobal.markSafeDefault(field.key);
+            if (!validLocationConfiguration(candidateClone, candidateGlobal)) {
+                toast(fa ? "ابتدا موقعیت را غیرفعال کنید یا مختصات کامل جایگزین کنید."
+                        : "Disable location first or provide a complete replacement coordinate pair.");
+                return;
+            }
+        }
         performMutation(card, callback -> {
             if (cloneMode) repository.clearCloneProfileDocumentField(packageName, userId, field.key, callback);
             else repository.clearGlobalProfileDocumentField(field.key, callback);
@@ -370,8 +393,25 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void setCloneSafeDefault(ProfileFieldRegistry.Field field, View card) {
+        ProfileDocument candidateClone = cloneDocument.copy();
+        candidateClone.markSafeDefault(field.key);
+        if ("Location".equals(field.category)
+                && !validLocationConfiguration(candidateClone, globalDocument)) {
+            toast(fa ? "پیش‌فرض امن موقعیت باید غیرفعال بماند." :
+                    "The Safe Default must keep location disabled.");
+            return;
+        }
         performMutation(card, callback ->
                 repository.setCloneProfileFieldSafeDefault(packageName, userId, field.key, callback));
+    }
+
+    private boolean validLocationConfiguration(ProfileDocument candidateClone,
+                                                ProfileDocument candidateGlobal) {
+        Map<String, ProfileDocumentResolver.FieldResult> fields =
+                ProfileDocumentResolver.resolveAll(candidateClone, candidateGlobal);
+        Object enabled = fields.get("locationEnabled").value;
+        if (!Boolean.TRUE.equals(enabled)) return true;
+        return fields.get("latitude").value != null && fields.get("longitude").value != null;
     }
 
     private void performMutation(View card, Mutation mutation) {
