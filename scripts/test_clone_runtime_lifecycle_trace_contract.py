@@ -42,6 +42,8 @@ for event in (
     "TARGET_APPLICATION_ONCREATE_BEGIN",
     "TARGET_APPLICATION_ONCREATE_COMPLETE",
     "PROFILE_APPLY_RETURNED",
+    "PROFILE_READBACK_VERIFIED",
+    "PROFILE_READBACK_FAILED",
 ):
     assert event in trace, event
 
@@ -96,9 +98,13 @@ assert "VIRTUAL_PROCESS_BEFORE_APP_CREATE" in before_create
 assert "TARGET_APPLICATION_ONCREATE_BEGIN" in before_on_create
 assert "TARGET_APPLICATION_ONCREATE_COMPLETE" in after_on_create
 assert "CloneRuntimeTrace.Event.PROFILE_APPLY_RETURNED" in before_create
-assert '"apply_returned"' in before_create
+assert "CloneRuntimeTrace.Event.PROFILE_READBACK_VERIFIED" in before_create
+assert "CloneRuntimeTrace.Event.PROFILE_READBACK_FAILED" in before_create
+assert '"readback_verified"' in before_create
+assert '"readback_incomplete"' in before_create
 assert "PROFILE_APPLIED" not in trace
-assert "profile apply operation returned" in callback
+assert "readback verified before Application creation" in callback
+assert "readback did not verify" in callback
 assert "error.getMessage()" not in callback
 
 assert 'new CheckItem("runtime_trace"' in compatibility
