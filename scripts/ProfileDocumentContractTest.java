@@ -70,6 +70,36 @@ public final class ProfileDocumentContractTest {
         explicitState.markInheritGlobal("timeZoneId");
         check(explicitState.state("timeZoneId") == ProfileDocument.FieldState.INHERIT_GLOBAL,
                 "storable fields retain valid field states");
+
+        // Explicit per-Clone Safe Default must override a configured Global value.
+        ProfileDocument safeOverride = new ProfileDocument();
+        safeOverride.markSafeDefault("timeZoneId");
+        ProfileDocumentResolver.FieldResult explicitSafe =
+                ProfileDocumentResolver.resolve("timeZoneId", safeOverride, global, safe);
+        check("UTC".equals(explicitSafe.value)
+                        && explicitSafe.source == ProfileDocumentResolver.Source.SAFE_DEFAULT,
+                "explicit Clone Safe Default must block Global inheritance");
+
+        // INHERIT_GLOBAL must skip the Clone layer and select Global when valid.
+        ProfileDocument inheritGlobal = new ProfileDocument();
+        inheritGlobal.put("timeZoneId", "Asia/Tokyo");
+        inheritGlobal.markInheritGlobal("timeZoneId");
+        ProfileDocumentResolver.FieldResult inherited =
+                ProfileDocumentResolver.resolve("timeZoneId", inheritGlobal, global, safe);
+        check("America/New_York".equals(inherited.value)
+                        && inherited.source == ProfileDocumentResolver.Source.GLOBAL,
+                "explicit Inherit Global must select Global instead of Clone");
+
+        // If Global itself requests Safe Default, clones inheriting it must not reuse
+        // an old Global value or fall through to a host-derived setting.
+        ProfileDocument globalSafe = new ProfileDocument();
+        globalSafe.put("timeZoneId", "America/New_York");
+        globalSafe.markSafeDefault("timeZoneId");
+        ProfileDocumentResolver.FieldResult globalSafeResult =
+                ProfileDocumentResolver.resolve("timeZoneId", new ProfileDocument(), globalSafe, safe);
+        check("UTC".equals(globalSafeResult.value)
+                        && globalSafeResult.source == ProfileDocumentResolver.Source.SAFE_DEFAULT,
+                "Global Safe Default must override its former value");
         check(!clone.put("latitude", 91.0), "invalid coordinates rejected");
         check(!clone.put("countryCode", "USA"), "country must be ISO alpha-2");
         check(!clone.put("currencyCode", "US"), "currency must be ISO alpha-3");
