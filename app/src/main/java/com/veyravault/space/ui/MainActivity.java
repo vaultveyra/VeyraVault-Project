@@ -27,6 +27,8 @@ import com.veyravault.space.core.AsyncCloneLaunchRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.ProfileDocument;
+import com.veyravault.space.core.ProfileDocumentResolver;
 import com.veyravault.space.core.AsyncCloneProvisionRepository;
 import com.veyravault.space.core.EngineOperationQueue;
 import com.veyravault.space.core.ShortcutHelper;
@@ -157,7 +159,7 @@ public class MainActivity extends BaseActivity {
         banner.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, GlobalEnvironmentActivity.class));
+                startActivity(new Intent(MainActivity.this, ProfileDocumentEditorActivity.class));
             }
         });
         root.addView(banner, bannerLp);
@@ -239,18 +241,31 @@ public class MainActivity extends BaseActivity {
     }
 
     private void loadGlobalProfileSummary() {
-        repository.loadGlobalEnvironment(result -> {
+        repository.loadGlobalProfileDocument(result -> {
             if (isFinishing() || isDestroyed() || globalProfileSummary == null) return;
             if (!result.isSuccess() || result.getValue() == null) {
-                globalProfileSummary.setText(fa ? "پروفایل ذخیره‌شده در دسترس نیست" : "Saved profile is unavailable");
+                globalProfileSummary.setText(fa
+                        ? "پروفایل سراسری در دسترس نیست"
+                        : "Global profile is unavailable");
                 return;
             }
-            CloneStore.GlobalEnvConfig profile = result.getValue();
+            ProfileDocument global = result.getValue();
+            Map<String, ProfileDocumentResolver.FieldResult> fields =
+                    ProfileDocumentResolver.resolveAll(new ProfileDocument(), global);
+            int configured = global.values().size() + global.fieldStates().size();
+            int storedOnly = 0, unsupported = 0, notTested = 0;
+            for (ProfileDocumentResolver.FieldResult field : fields.values()) {
+                if (field.status == com.veyravault.space.core.ProfileFieldRegistry.ApplyStatus.STORED_ONLY) storedOnly++;
+                else if (field.status == com.veyravault.space.core.ProfileFieldRegistry.ApplyStatus.UNSUPPORTED) unsupported++;
+                else if (field.status == com.veyravault.space.core.ProfileFieldRegistry.ApplyStatus.NOT_TESTED) notTested++;
+            }
             globalProfileSummary.setText(fa
-                    ? ("پروفایل ذخیره‌شده: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
-                            + " " + profile.model + " | منطقه: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT))
-                    : ("Saved Profile: " + profile.brand.toUpperCase(java.util.Locale.ROOT)
-                            + " " + profile.model + " | Region: " + profile.countryIso.toUpperCase(java.util.Locale.ROOT)));
+                    ? ("پروفایل سراسری: " + configured + " فیلد پیکربندی‌شده از "
+                            + fields.size() + " | فقط ذخیره‌شده: " + storedOnly
+                            + " | پشتیبانی‌نشده: " + unsupported + " | نیازمند آزمون: " + notTested)
+                    : ("Global Profile: " + configured + " configured / " + fields.size()
+                            + " fields | Stored only: " + storedOnly
+                            + " | Unsupported: " + unsupported + " | Not tested: " + notTested));
         });
     }
 
