@@ -142,7 +142,7 @@ public final class ProfileDocumentContractTest {
         try { all.clear(); } catch (UnsupportedOperationException expected) { immutable = true; }
         check(immutable, "resolveAll snapshot must be immutable");
 
-        check(ProfileFieldRegistry.all().size() >= 90, "registry must cover the complete researched field inventory");
+        check(ProfileFieldRegistry.all().size() >= 100, "registry must cover the complete researched field inventory");
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
             check(field.id != null && !field.id.isEmpty() && field.id.equals(field.key),
                     "every field must have a stable ID: " + field.key);
@@ -177,6 +177,13 @@ public final class ProfileDocumentContractTest {
         check(ProfileFieldRegistry.get("webViewLocalStorageIsolation") != null
                         && ProfileFieldRegistry.get("tlsNetworkStackProfile") != null,
                 "browser/WebView inventory must be complete");
+        check(ProfileFieldRegistry.get("cameraPolicy") != null
+                        && ProfileFieldRegistry.get("microphonePolicy") != null,
+                "camera and microphone policy inventory must be complete");
+        check(ProfileFieldRegistry.get("androidIdSsaid") != null
+                        && ProfileFieldRegistry.get("safetyNetAttestation") != null
+                        && ProfileFieldRegistry.get("simOperatorIdentity") != null,
+                "restricted and service-owned identifier inventory must be complete");
         check(!clone.put("ipv6LeakStatus", "PASS"),
                 "observed network leak status cannot be manually asserted");
         check(!clone.put("batteryState", "100%"),
