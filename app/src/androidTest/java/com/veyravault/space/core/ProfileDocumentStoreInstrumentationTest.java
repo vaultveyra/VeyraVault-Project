@@ -334,6 +334,35 @@ public class ProfileDocumentStoreInstrumentationTest {
     }
 
     @Test
+    public void legacyInternalInstanceIdIsPreservedButNeverResolvedAsAnOverride() throws Exception {
+        JSONObject global = new JSONObject();
+        global.put("appInstallInstanceId", "legacy-user-entered-value");
+        JSONObject root = new JSONObject();
+        root.put("schemaVersion", 1);
+        root.put("revision", 4L);
+        root.put("updatedAt", 100L);
+        root.put("global", global);
+        assertTrue(testPrefs.edit().putString(DATA_KEY, root.toString()).commit());
+
+        ProfileDocument loaded = ProfileDocumentStore.readGlobalStrict(testContext);
+        assertTrue("Legacy internal ID must be treated as invalid, not trusted",
+                loaded.isInvalid("appInstallInstanceId"));
+        assertFalse(loaded.contains("appInstallInstanceId"));
+
+        assertTrue("Unrelated valid profile update must still commit",
+                ProfileDocumentStore.saveGlobalField(testContext, "timeZoneId", "UTC"));
+        JSONObject persisted = new JSONObject(testPrefs.getString(DATA_KEY, ""));
+        assertEquals("Legacy internal ID bytes must be preserved",
+                "legacy-user-entered-value",
+                persisted.getJSONObject("global").getString("appInstallInstanceId"));
+        ProfileDocumentResolver.FieldResult id = ProfileDocumentResolver.resolve(
+                "appInstallInstanceId", new ProfileDocument(), loaded,
+                ProfileFieldRegistry.createSafeDefaults());
+        assertEquals(ProfileDocumentResolver.Source.UNSET, id.source);
+        assertEquals(ProfileFieldRegistry.ApplyStatus.NOT_TESTED, id.status);
+    }
+
+    @Test
     public void invalidLocationTelemetryIsRejectedBeforePersistence() throws Exception {
         long before = ProfileDocumentStore.readRevisionStrict(testContext);
         assertFalse(ProfileDocumentStore.saveGlobalField(testContext, "locationAccuracy", -1.0d));
