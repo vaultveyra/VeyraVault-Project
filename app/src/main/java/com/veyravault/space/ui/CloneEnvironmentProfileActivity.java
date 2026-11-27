@@ -1,6 +1,6 @@
 package com.veyravault.space.ui;
 
-import android.app.AlertDialog;
+import android.app.AlertDialog;\nimport android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -60,10 +60,12 @@ public class CloneEnvironmentProfileActivity extends BaseActivity {
             finish();
             return;
         }
-        repository = AsyncCloneRepository.getInstance(getApplicationContext());
-        buildUi();
-        setControlsEnabled(false);
-        loadProfiles();
+        Intent editor = new Intent(this, ProfileDocumentEditorActivity.class);
+        editor.putExtra("pkg", packageName);
+        editor.putExtra("uid", userId);
+        startActivity(editor);
+        finish();
+        return;
     }
 
     private void buildUi() {
