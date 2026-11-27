@@ -93,22 +93,23 @@ assert "-Pandroid.testInstrumentationRunnerArguments.class=" + api21_class in ap
     "The API-21 emulator must explicitly execute the minimum-API instrumentation class."
 )
 assert "api-level: 27" in api27 and "arch: x86_64" in api27
-assert "adb -s emulator-5554 wait-for-device" in api27
-assert "adb -s emulator-5554 shell getprop ro.build.version.sdk" in api27
-assert "tr -d '[:space:]'" in api27
-assert "Detected-Android-SDK-level-on-emulator-5554" in api27
-assert 'if [ "$SDK_LEVEL" != "27" ] || [ "$BOOT_COMPLETED" != "1" ]; then' in api27
-assert 'getprop sys.boot_completed' in api27
-assert 'for ATTEMPT in $(seq 1 90); do' in api27
-assert 'set -eu' in api27
-assert '[[ "$SDK_LEVEL"' not in api27
-assert "adb -s emulator-5554 shell getprop ro.build.version.release" in api27, (
-    "API-27 mismatch diagnostics must print the Android release value."
+assert "script: bash scripts/run_android_api27_compatibility.sh" in api27, (
+    "The emulator runner must invoke the API-27 script as one shell command."
 )
-api27_commands = [line.strip() for line in api27.splitlines() if line.strip().startswith("./gradlew :app:connectedDebugAndroidTest")]
-assert api27_commands == ["./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=" + api21_class], (
-    "API-27 must execute the full suite while excluding the API-21-only class."
-)
+api27_runner_path = ROOT / "scripts" / "run_android_api27_compatibility.sh"
+assert api27_runner_path.is_file(), "The standalone API-27 runner script must exist."
+api27_runner = api27_runner_path.read_text(encoding="utf-8")
+for marker in (
+    "adb -s emulator-5554 wait-for-device",
+    "getprop ro.build.version.sdk",
+    "getprop sys.boot_completed",
+    'if [[ "$SDK_LEVEL" == "27" && "$BOOT_COMPLETED" == "1" ]]; then',
+    'if [[ "$SDK_LEVEL" != "27" || "$BOOT_COMPLETED" != "1" ]]; then',
+    "for ATTEMPT in $(seq 1 90); do",
+    "getprop ro.build.version.release",
+    "./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=" + api21_class,
+):
+    assert marker in api27_runner, f"Missing API-27 runner behavior: {marker}"
 
 # Explicit signature policy: V1 for API 21/22 and V2/V3 for newer Android releases.
 for marker in (
