@@ -23,12 +23,12 @@ public class ProfileRuntimeApplierInstrumentationTest {
         String host = "com.veyravault.space";
         assertTrue(ProcessUtils.isBlackBoxWorkerProcess(
                 "com.veyravault.space:p0", host));
-        assertTrue(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+        assertTrue(ProcessUtils.isBlackBoxWorkerProcess(
                 "com.veyravault.space:p12", host));
-        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(host, host));
-        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess(host, host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess(
                 "com.example.other:p0", host));
-        assertFalse(CloneProfileLifecycleCallback.isBlackBoxWorkerProcess(null, host));
+        assertFalse(ProcessUtils.isBlackBoxWorkerProcess(null, host));
     }
 
     @Test public void cloneLocaleAndTimeZoneAreAppliedToCurrentProcess() {
