@@ -93,7 +93,7 @@ assert "-Pandroid.testInstrumentationRunnerArguments.class=" + api21_class in ap
     "The API-21 emulator must explicitly execute the minimum-API instrumentation class."
 )
 assert "api-level: 27" in api27 and "arch: x86_64" in api27
-assert "script: bash scripts/run_android_api27_compatibility.sh" in api27, (
+assert "script: bash ../scripts/run_android_api27_compatibility.sh" in api27, (
     "The emulator runner must invoke the API-27 script as one shell command."
 )
 api27_runner_path = ROOT / "scripts" / "run_android_api27_compatibility.sh"
