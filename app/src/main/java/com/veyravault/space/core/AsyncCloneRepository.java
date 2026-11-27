@@ -496,6 +496,17 @@ public final class AsyncCloneRepository implements AutoCloseable {
         }, callback);
     }
 
+    /** Reads only current-revision runtime readback metadata for one Clone. */
+    public void loadCloneRuntimeStatus(String packageName, int userId,
+                                       Callback<ProfileRuntimeStatusStore.Snapshot> callback) {
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) {
+            deliver(callback, Result.<ProfileRuntimeStatusStore.Snapshot>failure(
+                    Failure.INVALID_INPUT, "Clone identity is invalid"));
+            return;
+        }
+        enqueue(() -> ProfileRuntimeStatusStore.read(appContext, packageName, userId), callback);
+    }
+
     /** Replaces editable Global fields only; storage I/O remains off the UI thread. */
     public void saveGlobalProfileDocument(ProfileDocument document, Callback<Boolean> callback) {
         if (!isValidDocument(document)) {
