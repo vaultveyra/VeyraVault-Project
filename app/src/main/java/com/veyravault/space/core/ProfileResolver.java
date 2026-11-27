@@ -47,6 +47,92 @@ public final class ProfileResolver {
         final T value; final Source source;
         Value(T value, Source source) { this.value = value; this.source = source; }
     }
+
+    private ResolvedProfile(String localeTag, Source localeSource,
+                            String timeZoneId, Source timeZoneSource,
+                            Boolean locationEnabled, Source locationEnabledSource,
+                            Double latitude, Source latitudeSource,
+                            Double longitude, Source longitudeSource) {
+        this.localeTag = localeTag;
+        this.localeSource = safeSource(localeSource);
+        this.timeZoneId = timeZoneId;
+        this.timeZoneSource = safeSource(timeZoneSource);
+        this.locationEnabled = locationEnabled;
+        this.locationEnabledSource = safeSource(locationEnabledSource);
+        this.latitude = latitude;
+        this.latitudeSource = safeSource(latitudeSource);
+        this.longitude = longitude;
+        this.longitudeSource = safeSource(longitudeSource);
+    }
+
+    private static Source safeSource(Source source) {
+        return source == null ? Source.UNSET : source;
+    }
+
+    /** Builds the legacy runtime view from the canonical typed per-field resolver. */
+    public static ResolvedProfile resolveDocuments(ProfileDocument clone, ProfileDocument global) {
+        java.util.Map<String, ProfileDocumentResolver.FieldResult> fields =
+                ProfileDocumentResolver.resolveAll(clone, global);
+        return fromDocumentResults(fields);
+    }
+
+    /** Converts a provider-returned immutable typed result map into the supported runtime view. */
+    public static ResolvedProfile fromDocumentResults(
+            java.util.Map<String, ProfileDocumentResolver.FieldResult> fields) {
+        if (fields == null) throw new IllegalArgumentException("Resolved profile fields are required");
+        ProfileDocumentResolver.FieldResult locale = required(fields, "localeTag");
+        ProfileDocumentResolver.FieldResult zone = required(fields, "timeZoneId");
+        ProfileDocumentResolver.FieldResult enabled = required(fields, "locationEnabled");
+        ProfileDocumentResolver.FieldResult latitude = required(fields, "latitude");
+        ProfileDocumentResolver.FieldResult longitude = required(fields, "longitude");
+        return fromResolvedValues(
+                value(locale, String.class), source(locale),
+                value(zone, String.class), source(zone),
+                value(enabled, Boolean.class), source(enabled),
+                value(latitude, Double.class), source(latitude),
+                value(longitude, Double.class), source(longitude));
+    }
+
+    private static ProfileDocumentResolver.FieldResult required(
+            java.util.Map<String, ProfileDocumentResolver.FieldResult> fields, String key) {
+        ProfileDocumentResolver.FieldResult result = fields.get(key);
+        if (result == null) throw new IllegalStateException("Resolved profile is missing " + key);
+        return result;
+    }
+
+    private static <T> T value(ProfileDocumentResolver.FieldResult result, Class<T> type) {
+        if (result.value == null) return null;
+        if (!type.isInstance(result.value)) {
+            if (type == Double.class && result.value instanceof Number) {
+                return type.cast(Double.valueOf(((Number) result.value).doubleValue()));
+            }
+            throw new IllegalStateException("Resolved profile value has the wrong type: " + result.key);
+        }
+        return type.cast(result.value);
+    }
+
+    private static Source source(ProfileDocumentResolver.FieldResult result) {
+        switch (result.source) {
+            case CLONE: return Source.CLONE;
+            case GLOBAL: return Source.GLOBAL;
+            case SAFE_DEFAULT: return Source.SAFE_DEFAULT;
+            case UNSET:
+            default: return Source.UNSET;
+        }
+    }
+
+    /** Constructs an immutable supported-field snapshot decoded from the trusted provider. */
+    public static ResolvedProfile fromResolvedValues(
+            String localeTag, Source localeSource,
+            String timeZoneId, Source timeZoneSource,
+            Boolean locationEnabled, Source locationEnabledSource,
+            Double latitude, Source latitudeSource,
+            Double longitude, Source longitudeSource) {
+        return new ResolvedProfile(localeTag, localeSource, timeZoneId, timeZoneSource,
+                locationEnabled, locationEnabledSource, latitude, latitudeSource,
+                longitude, longitudeSource);
+    }
+
     private ProfileResolver() { }
     public static ResolvedProfile resolve(ProfileSettings cloneOverride,
                                           ProfileSettings globalDefault,
