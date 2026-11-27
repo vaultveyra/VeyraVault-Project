@@ -22,7 +22,12 @@ public final class ProfileDocumentStore {
 
     private static SharedPreferences prefs(Context context) {
         if (context == null) throw new IllegalArgumentException("Context is required");
-        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // Instrumentation and some wrapped/test Contexts may not expose an
+        // Application Context. Fall back to the supplied Context without
+        // switching packages or touching the target application's preferences.
+        Context applicationContext = context.getApplicationContext();
+        Context storageContext = applicationContext != null ? applicationContext : context;
+        return storageContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private static String cloneKey(String packageName, int userId) {

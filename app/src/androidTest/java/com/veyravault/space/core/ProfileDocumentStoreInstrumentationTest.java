@@ -1,7 +1,6 @@
 package com.veyravault.space.core;
 
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -52,15 +51,10 @@ public class ProfileDocumentStoreInstrumentationTest {
         assertNotNull("Instrumentation package Context must be available", instrumentationContext);
         assertNotNull("Target application Context must be available", targetContext);
 
-        // The instrumentation package Context may return null from getApplicationContext()
-        // on some emulator/API combinations. Supply a test-only application context wrapper
-        // so ProfileDocumentStore uses the instrumentation package's private preferences.
-        testContext = new ContextWrapper(instrumentationContext) {
-            @Override
-            public Context getApplicationContext() {
-                return this;
-            }
-        };
+        // Use the instrumentation APK's own Context directly. ProfileDocumentStore
+        // must support this Context even when getApplicationContext() returns null.
+        // This keeps all test preferences in the instrumentation package namespace.
+        testContext = instrumentationContext;
 
         // Do not run this test against the production app's preference namespace.
         assertFalse("Instrumentation preferences must be separate from target app preferences",
