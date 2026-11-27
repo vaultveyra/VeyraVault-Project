@@ -7,7 +7,9 @@ assert "AsyncCloneRepository.getInstance(getApplicationContext())" in source
 assert "repository.loadClones" in source
 assert "repository.loadCollapsedSpaces" in source
 assert "repository.setSpaceCollapsed" in source
-assert "repository.loadGlobalEnvironment" in source
+assert "repository.loadGlobalProfileDocument" in source
+assert "ProfileDocumentResolver.resolveAll" in source
+assert "ProfileDocumentEditorActivity.class" in source
 on_resume = source[source.index("protected void onResume()"):source.index("private void buildDashboardUi()")]
 assert "loadGlobalProfileSummary()" in on_resume
 assert "CloneStore.getGroupedBySpace" not in source
@@ -49,6 +51,7 @@ assert "EngineOperationQueue.submit(" in source
 assert "Engine.uninstallClone(item.packageName, item.userId)" in source
 assert "Engine.uninstallClone(entry.packageName, entry.userId)" in source
 
-print("PASS: MainActivity uses strict asynchronous repository reads for Spaces and global profile summary.")
+print("PASS: MainActivity uses strict asynchronous repository reads for Spaces and the complete Global profile status summary.")
+print("PASS: The Spaces Global profile banner opens the registry-driven all-fields editor.")
 print("PASS: Collapse/expand actions are commit-aware and preserve the last rendered UI on read failure.")
 print("PASS: Clone provisioning and uninstall work are delegated to the shared Engine operation queue.")
