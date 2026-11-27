@@ -37,7 +37,11 @@ assert "Binder.getCallingUid() != Process.myUid()" in provider, (
 assert "ProfileStore.readCloneOverrideStrict(context, packageName, userId)" in provider
 assert "ProfileStore.readGlobalStrict(context)" in provider
 assert "beforeCreateApplication" in lifecycle
-assert "ProfileRuntimeClient.resolve(appContext, packageName, userId)" in lifecycle
+assert "ProfileRuntimeClient.resolveDocument(appContext, packageName, userId)" in lifecycle
+assert "document.toRuntimeProfile()" in lifecycle
+assert "PROFILE_DOCUMENT_RESOLVED" in lifecycle
+assert "class ResolvedDocument" in client
+assert "Collections.unmodifiableMap" in client
 assert "ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved)" in lifecycle
 assert "verification.isFullyVerified()" in lifecycle
 assert "PROFILE_READBACK_VERIFIED" in lifecycle
@@ -105,8 +109,8 @@ assert "test_stage_8_9_engine_device_capability_audit.py" in workflow, (
 )
 
 print("PASS: The Engine source audit is tied to the exact immutable build pin.")
-print("PASS: The current runtime profile transports only Locale, Time Zone, and package/user-scoped Location fields.")
-print("PASS: Profile runtime IPC remains same-UID and resolves strict per-Clone/global settings.")
+print("PASS: The provider transports an immutable, typed per-field profile snapshot; only verified Locale/Time Zone adapters are applied in this lifecycle.")
+print("PASS: Profile runtime IPC remains same-UID and exposes Clone/Global/Safe Default source, capability and status metadata for every registry field.")
 print("PASS: Location hooks use package/user-scoped Engine calls with pattern/coordinate readback.")
 print("PASS: Device identifiers and unsupported Build/Wi-Fi fields are not silently represented as configurable ProfileSettings.")
 print("PASS: The audit documents active Engine proxies separately from genuine per-Clone profile APIs.")
