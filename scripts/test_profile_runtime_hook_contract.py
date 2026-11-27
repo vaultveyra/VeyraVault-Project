@@ -37,7 +37,14 @@ assert "verification.isFullyVerified()" in instrumentation
 assert "ProfileStore.resolveStrict" not in callback
 assert "ContentResolver().call" in client
 assert "METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT" in client
-assert "decodeResolved(fields)" in client
+assert "resolveDocument(Context context, String packageName, int userId)" in client
+assert "class ResolvedDocument" in client
+assert "Collections.unmodifiableMap" in client
+assert "PROFILE_PROVIDER_FAILURE:FIELD_COUNT_MISMATCH" in client
+assert "verifyMetadata(item, definition)" in client
+assert "document.toRuntimeProfile()" in callback
+assert "PROFILE_DOCUMENT_RESOLVED" in callback
+assert "PROFILE_DOCUMENT_RESOLVED" in (root / "core/CloneRuntimeTrace.java").read_text(encoding="utf-8")
 assert "ProfileResolver.resolveDocuments" in provider
 assert "ProfileDocumentResolver.resolveAll" in provider
 assert "ProfileStore.readCloneOverrideStrict" in provider
