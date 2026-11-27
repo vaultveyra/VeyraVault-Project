@@ -12,12 +12,22 @@ import java.util.List;
 public final class ProcessUtils {
     private ProcessUtils() { }
 
-    /** BlackBox virtual apps use host-owned worker processes such as host:p0, not host main. */
+    /**
+     * The pinned BlackBox ProxyManifest names workers as hostPackage:p followed by a numeric slot.
+     * Other host subprocesses (for example :remote or :vpn) are not virtual-app workers.
+     */
     public static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName) {
         if (currentProcessName == null || hostPackageName == null
                 || hostPackageName.trim().isEmpty()) return false;
-        return currentProcessName.startsWith(hostPackageName + ":")
-                && currentProcessName.length() > hostPackageName.length() + 1;
+        String slotPrefix = hostPackageName + ":p";
+        if (!currentProcessName.startsWith(slotPrefix)) return false;
+        String slot = currentProcessName.substring(slotPrefix.length());
+        if (slot.isEmpty()) return false;
+        for (int i = 0; i < slot.length(); i++) {
+            char value = slot.charAt(i);
+            if (value < '0' || value > '9') return false;
+        }
+        return true;
     }
 
     public static String currentProcessName(Context context) {
