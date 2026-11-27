@@ -167,6 +167,7 @@ public final class ProfileRuntimeClient {
     private static void verifyMetadata(Bundle item, ProfileFieldRegistry.Field field) {
         if (!field.capability.name().equals(item.getString("capability"))
                 || !field.type.name().equals(item.getString("type"))
+                || !field.scope.equals(item.getString("scope"))
                 || !field.adapterId.equals(item.getString("adapterId"))
                 || !field.apiSupport.equals(item.getString("apiSupport"))
                 || !field.privacyClass.equals(item.getString("privacyClass"))
