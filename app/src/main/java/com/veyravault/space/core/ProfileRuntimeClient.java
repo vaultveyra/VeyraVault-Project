@@ -45,6 +45,28 @@ public final class ProfileRuntimeClient {
             this.readbackMethod = definition.readbackMethod;
             this.unsupportedReason = definition.unsupportedReason;
         }
+
+        private ResolvedField withStatus(ProfileFieldRegistry.ApplyStatus verifiedStatus) {
+            return new ResolvedField(this, verifiedStatus);
+        }
+
+        private ResolvedField(ResolvedField original,
+                              ProfileFieldRegistry.ApplyStatus verifiedStatus) {
+            this.key = original.key;
+            this.value = original.value;
+            this.source = original.source;
+            this.status = verifiedStatus;
+            this.capability = original.capability;
+            this.type = original.type;
+            this.scope = original.scope;
+            this.label = original.label;
+            this.adapterId = original.adapterId;
+            this.apiSupport = original.apiSupport;
+            this.privacyClass = original.privacyClass;
+            this.editable = original.editable;
+            this.readbackMethod = original.readbackMethod;
+            this.unsupportedReason = original.unsupportedReason;
+        }
     }
 
     public static final class ResolvedDocument {
@@ -63,6 +85,29 @@ public final class ProfileRuntimeClient {
 
         public Map<String, ResolvedField> fields() { return fields; }
         public ResolvedField field(String key) { return fields.get(key); }
+
+        /**
+         * Promotes only the two fields whose same-process readback is returned by the
+         * existing runtime applier. The result object cannot be constructed outside
+         * ProfileRuntimeApplier, so a save/resolve operation cannot claim APPLIED.
+         */
+        ResolvedDocument withRuntimeVerification(ProfileRuntimeApplier.RuntimeApplyResult result) {
+            if (result == null || !result.targetIdentityMatches) return this;
+            Map<String, ResolvedField> verified = new LinkedHashMap<>(fields);
+            promoteRuntimeField(verified, "localeTag", result.localeStatus);
+            promoteRuntimeField(verified, "timeZoneId", result.timeZoneStatus);
+            return new ResolvedDocument(packageName, userId, revision, verified);
+        }
+
+        private static void promoteRuntimeField(Map<String, ResolvedField> target, String key,
+                                                ProfileFieldRegistry.ApplyStatus status) {
+            ResolvedField field = target.get(key);
+            if (field == null || field.capability != ProfileFieldRegistry.Capability.PROCESS_SCOPED) return;
+            if (status != ProfileFieldRegistry.ApplyStatus.APPLIED
+                    && status != ProfileFieldRegistry.ApplyStatus.FAILED
+                    && status != ProfileFieldRegistry.ApplyStatus.NOT_TESTED) return;
+            target.put(key, field.withStatus(status));
+        }
 
         /** Legacy runtime adapter view; only its verified supported fields are consumed. */
         public ProfileResolver.ResolvedProfile toRuntimeProfile() {
