@@ -80,7 +80,7 @@ public final class ProfileDocumentResolver {
     }
 
     private static boolean valid(ProfileFieldRegistry.Field field, ProfileDocument document) {
-        return document != null && document.contains(field.key)
+        return document != null && !document.hasState(field.key) && !document.isInvalid(field.key) && document.contains(field.key)
                 && ProfileFieldRegistry.isValidValue(field, document.get(field.key));
     }
 

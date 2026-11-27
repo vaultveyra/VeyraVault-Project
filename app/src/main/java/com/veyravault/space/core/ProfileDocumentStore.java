@@ -86,7 +86,7 @@ public final class ProfileDocumentStore {
         }
     }
 
-    private static ProfileDocument parseDocument(JSONObject object) {
+    private static ProfileDocument parseDocument(JSONObject object, boolean cloneScope) {
         ProfileDocument document = new ProfileDocument();
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
             Object value = object.opt(field.key);
@@ -106,18 +106,32 @@ public final class ProfileDocumentStore {
                 document.markInvalid(field.key);
             }
         }
+        Object rawStates = object.opt("_fieldStates");
+        if (rawStates != null && !(rawStates instanceof JSONObject)) throw new IllegalStateException("Profile field-state map is structurally invalid");
+        JSONObject states = rawStates instanceof JSONObject ? (JSONObject) rawStates : new JSONObject();
+        java.util.Iterator<String> stateKeys = states.keys();
+        while (stateKeys.hasNext()) {
+            String key = stateKeys.next();
+            ProfileFieldRegistry.Field field = ProfileFieldRegistry.get(key);
+            Object rawState = states.opt(key);
+            if (field == null || !field.canBeStoredAsProfileInput() || !(rawState instanceof String) || object.has(key))
+                throw new IllegalStateException("Profile field-state entry is invalid: " + key);
+            if (cloneScope && "INHERIT_GLOBAL".equals(rawState)) document.markInheritGlobal(key);
+            else if (!cloneScope && "SAFE_DEFAULT".equals(rawState)) document.markSafeDefault(key);
+            else throw new IllegalStateException("Profile field-state is invalid for its scope: " + key);
+        }
         return document;
     }
 
     public static synchronized ProfileDocument readGlobalStrict(Context context) throws Exception {
         JSONObject root = readRoot(context);
-        return parseDocument(readProfileObject(root, null));
+        return parseDocument(readProfileObject(root, null), false);
     }
 
     public static synchronized ProfileDocument readCloneStrict(
             Context context, String packageName, int userId) throws Exception {
         JSONObject root = readRoot(context);
-        return parseDocument(readProfileObject(root, cloneKey(packageName, userId)));
+        return parseDocument(readProfileObject(root, cloneKey(packageName, userId)), true);
     }
 
     public static synchronized long readRevisionStrict(Context context) throws Exception {
@@ -142,20 +156,29 @@ public final class ProfileDocumentStore {
         try {
             JSONObject root = readRoot(context);
             JSONObject existing = readProfileObject(root, cloneIdentity);
-            parseDocument(existing); // Reject structural corruption before any read-modify-write.
+            parseDocument(existing, cloneIdentity != null); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
 
             // Replace only registered profile-input fields. Unknown future keys remain intact.
+            JSONObject states = updated.optJSONObject("_fieldStates");
+            if (states == null) states = new JSONObject();
             for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
                 if (!field.canBeStoredAsProfileInput()) continue;
                 if (document.contains(field.key)) {
                     Object value = document.get(field.key);
                     if (!ProfileFieldRegistry.isValidValue(field, value)) return false;
                     updated.put(field.key, value);
-                } else {
-                    updated.remove(field.key);
+                } else updated.remove(field.key);
+                ProfileDocument.FieldState state = document.state(field.key);
+                if (state == null) states.remove(field.key);
+                else {
+                    if (cloneIdentity != null && state != ProfileDocument.FieldState.INHERIT_GLOBAL) return false;
+                    if (cloneIdentity == null && state != ProfileDocument.FieldState.SAFE_DEFAULT) return false;
+                    states.put(field.key, state.name());
                 }
             }
+            if (states.length() == 0) updated.remove("_fieldStates");
+            else updated.put("_fieldStates", states);
             return commitProfile(context, root, cloneIdentity, updated);
         } catch (Exception invalidOrCorrupt) {
             return false;
@@ -185,6 +208,11 @@ public final class ProfileDocumentStore {
             parseDocument(existing); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.put(fieldKey, value);
+            JSONObject states = updated.optJSONObject("_fieldStates");
+            if (states != null) {
+                states.remove(fieldKey);
+                if (states.length() == 0) updated.remove("_fieldStates");
+            }
             return commitProfile(context, root, cloneIdentity, updated);
         } catch (Exception invalidOrCorrupt) {
             return false;
@@ -213,12 +241,10 @@ public final class ProfileDocumentStore {
             parseDocument(existing); // Reject structural corruption before any read-modify-write.
             JSONObject updated = new JSONObject(existing.toString());
             updated.remove(fieldKey);
-            if (cloneIdentity != null && updated.length() == 0) {
-                JSONObject clones = root.optJSONObject("clones");
-                if (clones != null) clones.remove(cloneIdentity);
-                root.put("clones", clones == null ? new JSONObject() : clones);
-                return commitRoot(context, root);
-            }
+            JSONObject states = updated.optJSONObject("_fieldStates");
+            if (states == null) states = new JSONObject();
+            states.put(fieldKey, cloneIdentity == null ? "SAFE_DEFAULT" : "INHERIT_GLOBAL");
+            updated.put("_fieldStates", states);
             return commitProfile(context, root, cloneIdentity, updated);
         } catch (Exception invalidOrCorrupt) {
             return false;
