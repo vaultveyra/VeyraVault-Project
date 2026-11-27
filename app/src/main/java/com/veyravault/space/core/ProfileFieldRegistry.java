@@ -108,6 +108,21 @@ public final class ProfileFieldRegistry {
                     || capability == Capability.SERVICE_OWNED) return "restricted-sensitive";
             if (capability == Capability.OBSERVED_ONLY) return "observed-telemetry";
             if ("appInstallInstanceId".equals(key)) return "pseudonymous-internal";
+            if ("latitude".equals(key) || "longitude".equals(key) || key.startsWith("location")) {
+                return "sensitive-location";
+            }
+            if (key.toLowerCase(java.util.Locale.ROOT).contains("network")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("dns")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("ip")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("vpn")) {
+                return "sensitive-network";
+            }
+            if (key.toLowerCase(java.util.Locale.ROOT).contains("cookie")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("storage")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("account")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("push")) {
+                return "private-app-data";
+            }
             return "profile-preference";
         }
 
