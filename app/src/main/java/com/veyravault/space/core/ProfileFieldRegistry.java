@@ -21,6 +21,8 @@ public final class ProfileFieldRegistry {
         public final String id;
         public final String key;
         public final String label;
+        public final String category;
+        public final String validationRule;
         public final ValueType type;
         public final Capability capability;
         public final Object safeDefault;
@@ -39,6 +41,8 @@ public final class ProfileFieldRegistry {
             this.id = key;
             this.key = key;
             this.label = humanize(key);
+            this.category = categoryFor(key);
+            this.validationRule = validationFor(key, type);
             this.type = type;
             this.capability = capability;
             this.safeDefault = safeDefault;
@@ -75,6 +79,62 @@ public final class ProfileFieldRegistry {
                     && !"observed-only".equals(scope)
                     && !"read-only".equals(scope)
                     && !"service-owned".equals(scope);
+        }
+
+        private static String categoryFor(String key) {
+            if ("localeTag".equals(key) || "timeZoneId".equals(key)
+                    || "countryCode".equals(key) || "regionCode".equals(key)
+                    || "cityName".equals(key) || "currencyCode".equals(key)
+                    || "dateFormat".equals(key) || "timeFormat".equals(key)
+                    || "measurementSystem".equals(key) || "distanceUnit".equals(key)
+                    || "temperatureUnit".equals(key) || "weightUnit".equals(key)
+                    || "lengthUnit".equals(key) || "weekStart".equals(key)
+                    || "calendarFormat".equals(key) || "numberFormat".equals(key)) return "Locale & Formatting";
+            if ("locationEnabled".equals(key) || "latitude".equals(key) || "longitude".equals(key)
+                    || key.startsWith("location") || "altitude".equals(key)) return "Location";
+            if ("deviceLabel".equals(key) || "manufacturer".equals(key) || "deviceModel".equals(key)
+                    || "androidRelease".equals(key) || "screenProfile".equals(key)
+                    || "buildFingerprint".equals(key) || "cpuAbiProfile".equals(key)
+                    || "screenMetrics".equals(key) || "screenDensity".equals(key)
+                    || "hardwareFeatures".equals(key) || "batteryState".equals(key)
+                    || "memoryState".equals(key) || "storageState".equals(key)
+                    || "sensorAvailability".equals(key)) return "Device & OS";
+            if (key.toLowerCase(java.util.Locale.ROOT).contains("network")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("dns")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("ipv")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("ip")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("vpn")
+                    || key.toLowerCase(java.util.Locale.ROOT).contains("proxy")
+                    || "latencyMs".equals(key) || "pingMs".equals(key)
+                    || "throughputMbps".equals(key)) return "Network";
+            if ("appInstallInstanceId".equals(key) || "advertisingIdPolicy".equals(key)
+                    || "appSetId".equals(key) || "firebaseInstallationId".equals(key)
+                    || "androidId".equals(key) || "androidIdSsaid".equals(key)
+                    || "imei".equals(key) || "meid".equals(key) || "imsi".equals(key)
+                    || "iccid".equals(key) || "serialNumber".equals(key)
+                    || "wifiMac".equals(key) || "wifiBssid".equals(key)
+                    || "phoneNumber".equals(key) || "accountId".equals(key)
+                    || "playIntegrityVerdict".equals(key) || "safetyNetAttestation".equals(key)
+                    || "simOperatorIdentity".equals(key) || "purchaseState".equals(key)) return "Identifiers & Services";
+            if ("webViewUserAgentProfile".equals(key) || key.startsWith("webView")
+                    || "serviceWorkerIsolation".equals(key) || "javascriptLocaleTimeZone".equals(key)
+                    || "screenSurfaceProfile".equals(key) || "fontSurfaceProfile".equals(key)
+                    || "canvasSurfaceProfile".equals(key) || "webGlSurfaceProfile".equals(key)
+                    || "tlsNetworkStackProfile".equals(key)) return "Browser & WebView";
+            return "App Data & Privacy";
+        }
+
+        private static String validationFor(String key, ValueType type) {
+            if ("localeTag".equals(key)) return "BCP-47 language tag";
+            if ("timeZoneId".equals(key)) return "IANA time-zone ID";
+            if ("countryCode".equals(key)) return "ISO 3166-1 alpha-2";
+            if ("currencyCode".equals(key)) return "ISO 4217 alpha-3";
+            if ("latitude".equals(key)) return "finite decimal, -90..90";
+            if ("longitude".equals(key)) return "finite decimal, -180..180";
+            if (type == ValueType.BOOLEAN) return "boolean true/false";
+            if (type == ValueType.INTEGER) return "integer";
+            if (type == ValueType.DECIMAL) return "finite decimal number";
+            return "non-empty string, max 256 characters";
         }
 
         private static String adapterFor(Capability capability, String key) {
