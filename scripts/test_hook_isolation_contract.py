@@ -45,6 +45,8 @@ process_utils = Path("app/src/main/java/com/veyravault/space/core/ProcessUtils.j
 assert "ProcessUtils.currentProcessName(appContext)" in lifecycle
 assert "ProcessUtils.isBlackBoxWorkerProcess(hostProcessName, appContext.getPackageName())" in lifecycle
 assert "isBlackBoxWorkerProcess" in process_utils
+assert 'String slotPrefix = hostPackageName + ":p"' in process_utils
+assert "value < '0' || value > '9'" in process_utils
 assert lifecycle.index("isBlackBoxWorkerProcess") < lifecycle.index("ProfileRuntimeApplier.applySafeDefaults(packageContext)")
 assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in lifecycle
 
