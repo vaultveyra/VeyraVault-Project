@@ -131,6 +131,11 @@ public final class ProfileFieldRegistry {
             if ("currencyCode".equals(key)) return "ISO 4217 alpha-3";
             if ("latitude".equals(key)) return "finite decimal, -90..90";
             if ("longitude".equals(key)) return "finite decimal, -180..180";
+            if ("altitude".equals(key)) return "finite decimal, meters";
+            if ("locationAccuracy".equals(key)) return "finite decimal, >= 0 meters";
+            if ("locationBearing".equals(key)) return "finite decimal, 0..360 degrees";
+            if ("locationSpeed".equals(key)) return "finite decimal, >= 0 meters/second";
+            if ("locationTimestamp".equals(key)) return "non-negative epoch timestamp";
             if (type == ValueType.BOOLEAN) return "boolean true/false";
             if (type == ValueType.INTEGER) return "integer";
             if (type == ValueType.DECIMAL) return "finite decimal number";
@@ -251,7 +256,7 @@ public final class ProfileFieldRegistry {
         add(fields, "cookieStorageIsolation", ValueType.BOOLEAN, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified Engine-owned per-Clone WebView/storage isolation.");
         add(fields, "permissionPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires enforced package/user-scoped permission hooks.");
         add(fields, "sensorPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires verified package/user-scoped sensor adapters.");
-        add(fields, "appInstallInstanceId", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Must be generated and stored internally per Clone; not yet wired.");
+        add(fields, "appInstallInstanceId", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "read-only", "VeyraVault-owned internal per-Clone ID; must be generated internally, never user-entered. Generation is not yet wired.");
         add(fields, "advertisingIdPolicy", ValueType.STRING, Capability.NOT_IMPLEMENTED, null, "clone/global", "Requires a compliant app-scoped identifier adapter.");
 
         add(fields, "networkRouteProfileId", ValueType.STRING, Capability.NETWORK_PROVIDER_REQUIRED, null, "clone/global", "Requires a real per-Clone traffic-routing provider.");
@@ -387,13 +392,21 @@ public final class ProfileFieldRegistry {
             case BOOLEAN:
                 return value instanceof Boolean;
             case INTEGER:
-                return value instanceof Integer || value instanceof Long;
+                if (!(value instanceof Integer || value instanceof Long)) return false;
+                if ("locationTimestamp".equals(field.key)) {
+                    return ((Number) value).longValue() >= 0L;
+                }
+                return true;
             case DECIMAL:
                 if (!(value instanceof Number)) return false;
                 double number = ((Number) value).doubleValue();
                 if (Double.isNaN(number) || Double.isInfinite(number)) return false;
                 if ("latitude".equals(field.key)) return number >= -90.0 && number <= 90.0;
                 if ("longitude".equals(field.key)) return number >= -180.0 && number <= 180.0;
+                if ("locationAccuracy".equals(field.key) || "locationSpeed".equals(field.key)) {
+                    return number >= 0.0;
+                }
+                if ("locationBearing".equals(field.key)) return number >= 0.0 && number <= 360.0;
                 return true;
             default:
                 return false;
