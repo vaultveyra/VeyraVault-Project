@@ -321,7 +321,7 @@ jobs:
           working-directory: build_workspace
           # Keep the runner's script field to one command. Multi-line scripts
           # are dispatched line-by-line by this action's shell wrapper.
-          script: bash scripts/run_android_api27_compatibility.sh
+          script: bash ../scripts/run_android_api27_compatibility.sh
 
       - name: Test source audit contract
         run: python3 scripts/test_source_audit_contract.py
