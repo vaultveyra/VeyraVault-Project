@@ -101,6 +101,65 @@ public class ProfileDocumentStoreInstrumentationTest {
     }
 
     @Test
+    public void everyEditableRegistryFieldRoundTripsAndCloneDocumentsRemainIndependent()
+            throws Exception {
+        ProfileDocument global = new ProfileDocument();
+        Map<String, Object> expectedGlobal = new java.util.LinkedHashMap<>();
+        for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
+            if (!field.editable) continue;
+            Object value = sampleValue(field);
+            assertTrue("Registry field must accept its typed sample: " + field.key,
+                    global.put(field.key, value));
+            expectedGlobal.put(field.key, value);
+        }
+        assertTrue("All editable Global fields must persist",
+                ProfileDocumentStore.saveGlobalDocument(testContext, global));
+        ProfileDocument loadedGlobal = ProfileDocumentStore.readGlobalStrict(testContext);
+        assertEquals(expectedGlobal.size(), loadedGlobal.values().size());
+        for (Map.Entry<String, Object> entry : expectedGlobal.entrySet()) {
+            assertEquals("Global field round-trip failed: " + entry.getKey(),
+                    entry.getValue(), loadedGlobal.get(entry.getKey()));
+        }
+
+        String cloneA = "com.veyravault.fixture.registry-a";
+        String cloneB = "com.veyravault.fixture.registry-b";
+        ProfileDocument a = new ProfileDocument();
+        ProfileDocument b = new ProfileDocument();
+        assertTrue(a.put("deviceLabel", "Clone-A-Display"));
+        assertTrue(a.put("timeZoneId", "America/New_York"));
+        assertTrue(b.put("deviceLabel", "Clone-B-Display"));
+        assertTrue(b.put("timeZoneId", "Asia/Tokyo"));
+        assertTrue(ProfileDocumentStore.saveCloneDocument(testContext, cloneA, 101, a));
+        assertTrue(ProfileDocumentStore.saveCloneDocument(testContext, cloneB, 102, b));
+
+        ProfileDocument loadedA = ProfileDocumentStore.readCloneStrict(testContext, cloneA, 101);
+        ProfileDocument loadedB = ProfileDocumentStore.readCloneStrict(testContext, cloneB, 102);
+        assertEquals("Clone-A-Display", loadedA.get("deviceLabel"));
+        assertEquals("America/New_York", loadedA.get("timeZoneId"));
+        assertEquals("Clone-B-Display", loadedB.get("deviceLabel"));
+        assertEquals("Asia/Tokyo", loadedB.get("timeZoneId"));
+        assertEquals("Global data must remain independent",
+                "UTC", loadedGlobal.get("timeZoneId"));
+        assertEquals(ProfileFieldRegistry.all().size(),
+                ProfileDocumentResolver.resolveAll(loadedA, loadedGlobal).size());
+    }
+
+    private static Object sampleValue(ProfileFieldRegistry.Field field) {
+        if ("localeTag".equals(field.key)) return "en-US";
+        if ("timeZoneId".equals(field.key)) return "UTC";
+        if ("countryCode".equals(field.key)) return "US";
+        if ("currencyCode".equals(field.key)) return "USD";
+        if ("latitude".equals(field.key) || "longitude".equals(field.key)) return Double.valueOf(0.0d);
+        switch (field.type) {
+            case BOOLEAN: return Boolean.FALSE;
+            case INTEGER: return Long.valueOf(123L);
+            case DECIMAL: return Double.valueOf(1.25d);
+            case STRING: return "fixture-" + field.key;
+            default: throw new AssertionError("Unknown field type: " + field.key);
+        }
+    }
+
+    @Test
     public void globalAndCloneDocumentsRoundTripIndependentlyWithPerFieldResolution()
             throws Exception {
         String cloneA = "com.veyravault.fixture.clonea";
