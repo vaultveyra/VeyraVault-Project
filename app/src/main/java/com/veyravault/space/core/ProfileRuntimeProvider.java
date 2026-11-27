@@ -76,6 +76,8 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                     item.putString("type", definition.type.name());
                     item.putString("scope", definition.scope);
                     item.putString("label", definition.label);
+                    item.putString("category", definition.category);
+                    item.putString("validationRule", definition.validationRule);
                     item.putString("adapterId", definition.adapterId);
                     item.putString("apiSupport", definition.apiSupport);
                     item.putString("privacyClass", definition.privacyClass);
