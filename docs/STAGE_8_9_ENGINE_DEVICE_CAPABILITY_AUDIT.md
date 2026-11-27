@@ -70,17 +70,20 @@ Source references:
 
 ## Current VeyraVault profile boundary
 
-At this commit, ProfileSettings contains exactly these nullable fields:
+At the current feature-branch implementation, two profile layers coexist intentionally:
 
-- localeTag
-- timeZoneId
-- locationEnabled
-- latitude
-- longitude
+- Legacy ProfileSettings/ProfileStore remain the compatibility source for five runtime fields: localeTag, timeZoneId, locationEnabled, latitude and longitude.
+- The additive ProfileDocumentStore uses a typed 97-field ProfileFieldRegistry. It preserves independent Global and per-Clone documents and does not replace or destructively migrate the legacy store.
+- The non-exported ProfileRuntimeProvider checks same-UID callers and returns an immutable per-field snapshot containing effective value, source, capability, editability, adapter mapping, API-support note, privacy class, readback method and unsupported reason.
+- ProfileRuntimeClient validates the complete registry-sized snapshot and its metadata before exposing it to the lifecycle callback.
+- CloneProfileLifecycleCallback resolves the full snapshot before target Application creation. The existing process-scoped Locale/Time Zone adapters remain the only fields promoted to APPLIED by this lifecycle readback. Package/user-scoped location continues through VirtualHookManager and its separate Engine API/readback path.
+- Other fields remain STORED_ONLY, UNSUPPORTED, NOT_TESTED or NOT_APPLICABLE according to their capability. A full IPC snapshot is not proof that all fields have runtime adapters.
 
-The non-exported ProfileRuntimeProvider checks same-UID callers and transports those fields from the default process to the matching virtual package/user. CloneProfileLifecycleCallback resolves and applies Locale/Time Zone before target Application creation. VirtualHookManager separately applies the package/user-scoped location hook.
+Brand, manufacturer, model, country/SIM and similar values elsewhere in legacy/global environment data remain metadata unless a separately verified scoped API applies them. The presence of a value in a form, registry or storage is not proof that a target app observes it.
 
-Brand, manufacturer, model, device, country/SIM and similar values elsewhere in the legacy/global environment data are metadata unless a separately verified scoped API applies them. The presence of a value in a form or in storage is not proof that a target app observes it.
+### Dated update — 2026-11-27
+
+The feature branch now contains the 97-field inventory and complete typed IPC snapshot described above. This update does not change the pinned Engine revision or claim new device/network identity capabilities. The original Engine findings and restrictions in the matrix above remain in force.
 
 VeyraVault source references:
 - ProfileSettings.java: https://github.com/vaultveyra/VeyraVault-Project/blob/bbef9fd41f98ee52959bac7915ec0b79c292415f/app/src/main/java/com/veyravault/space/core/ProfileSettings.java#L10-L40
