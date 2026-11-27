@@ -356,7 +356,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             toast((fa ? "اعتبارسنجی ناموفق: " : "Validation failed: ") + field.validationRule);
             return;
         }
-        if ("Location".equals(field.category)) {
+        if (isCoordinateCriticalField(field.key)) {
             ProfileDocument candidateClone = cloneDocument.copy();
             ProfileDocument candidateGlobal = globalDocument.copy();
             boolean accepted = cloneMode
@@ -375,7 +375,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void resetField(ProfileFieldRegistry.Field field, View card) {
-        if ("Location".equals(field.category)) {
+        if (isCoordinateCriticalField(field.key)) {
             ProfileDocument candidateClone = cloneDocument.copy();
             ProfileDocument candidateGlobal = globalDocument.copy();
             if (cloneMode) candidateClone.markInheritGlobal(field.key);
@@ -395,7 +395,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private void setCloneSafeDefault(ProfileFieldRegistry.Field field, View card) {
         ProfileDocument candidateClone = cloneDocument.copy();
         candidateClone.markSafeDefault(field.key);
-        if ("Location".equals(field.category)
+        if (isCoordinateCriticalField(field.key)
                 && !validLocationConfiguration(candidateClone, globalDocument)) {
             toast(fa ? "پیش‌فرض امن موقعیت باید غیرفعال بماند." :
                     "The Safe Default must keep location disabled.");
@@ -403,6 +403,10 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         }
         performMutation(card, callback ->
                 repository.setCloneProfileFieldSafeDefault(packageName, userId, field.key, callback));
+    }
+
+    private boolean isCoordinateCriticalField(String key) {
+        return "locationEnabled".equals(key) || "latitude".equals(key) || "longitude".equals(key);
     }
 
     private boolean validLocationConfiguration(ProfileDocument candidateClone,
