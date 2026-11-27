@@ -12,6 +12,14 @@ import java.util.List;
 public final class ProcessUtils {
     private ProcessUtils() { }
 
+    /** BlackBox virtual apps use host-owned worker processes such as host:p0, not host main. */
+    public static boolean isBlackBoxWorkerProcess(String currentProcessName, String hostPackageName) {
+        if (currentProcessName == null || hostPackageName == null
+                || hostPackageName.trim().isEmpty()) return false;
+        return currentProcessName.startsWith(hostPackageName + ":")
+                && currentProcessName.length() > hostPackageName.length() + 1;
+    }
+
     public static String currentProcessName(Context context) {
         if (Build.VERSION.SDK_INT >= 28) {
             String name = Application.getProcessName();
