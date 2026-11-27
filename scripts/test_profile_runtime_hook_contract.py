@@ -36,6 +36,10 @@ assert "applyAndVerifyRejectsWrongTargetContextWithoutApplyingProfile" in instru
 assert "verification.isFullyVerified()" in instrumentation
 assert "ProfileStore.resolveStrict" not in callback
 assert "ContentResolver().call" in client
+assert "METHOD_RESOLVE_CLONE_PROFILE_DOCUMENT" in client
+assert "decodeResolved(fields)" in client
+assert "ProfileResolver.resolveDocuments" in provider
+assert "ProfileDocumentResolver.resolveAll" in provider
 assert "ProfileStore.readCloneOverrideStrict" in provider
 assert "ProfileStore.readGlobalStrict" in provider
 assert 'android:exported="false"' in manifest
