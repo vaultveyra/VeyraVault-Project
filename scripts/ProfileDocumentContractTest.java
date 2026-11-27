@@ -50,6 +50,26 @@ public final class ProfileDocumentContractTest {
         check(!clone.put("imei", "123456789"), "restricted identifiers cannot be profile inputs");
         check(!clone.put("phoneNumber", "+15551234567"), "service-owned identity cannot be configured");
         check(!clone.put("publicIpAddress", "203.0.113.1"), "observed IP cannot be configured");
+
+        boolean restrictedStateRejected = false;
+        try { clone.markInheritGlobal("imei"); }
+        catch (IllegalArgumentException expected) { restrictedStateRejected = true; }
+        check(restrictedStateRejected, "platform-restricted identifiers cannot carry profile field states");
+
+        boolean observedStateRejected = false;
+        try { clone.markSafeDefault("publicIpAddress"); }
+        catch (IllegalArgumentException expected) { observedStateRejected = true; }
+        check(observedStateRejected, "observed-only fields cannot carry profile field states");
+
+        boolean serviceOwnedStateRejected = false;
+        try { clone.markInheritGlobal("accountId"); }
+        catch (IllegalArgumentException expected) { serviceOwnedStateRejected = true; }
+        check(serviceOwnedStateRejected, "service-owned identity cannot carry profile field states");
+
+        ProfileDocument explicitState = new ProfileDocument();
+        explicitState.markInheritGlobal("timeZoneId");
+        check(explicitState.state("timeZoneId") == ProfileDocument.FieldState.INHERIT_GLOBAL,
+                "storable fields retain valid field states");
         check(!clone.put("latitude", 91.0), "invalid coordinates rejected");
         check(!clone.put("countryCode", "USA"), "country must be ISO alpha-2");
         check(!clone.put("currencyCode", "US"), "currency must be ISO alpha-3");
