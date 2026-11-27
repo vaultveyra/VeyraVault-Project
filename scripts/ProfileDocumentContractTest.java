@@ -143,6 +143,28 @@ public final class ProfileDocumentContractTest {
         check(immutable, "resolveAll snapshot must be immutable");
 
         check(ProfileFieldRegistry.all().size() >= 90, "registry must cover the complete researched field inventory");
+        for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
+            check(field.id != null && !field.id.isEmpty() && field.id.equals(field.key),
+                    "every field must have a stable ID: " + field.key);
+            check(field.label != null && !field.label.isEmpty(),
+                    "every field must have a UI label: " + field.key);
+            check(field.adapterId != null && !field.adapterId.isEmpty(),
+                    "every field must declare adapter mapping: " + field.key);
+            check(field.apiSupport != null && !field.apiSupport.isEmpty(),
+                    "every field must declare API support state: " + field.key);
+            check(field.privacyClass != null && !field.privacyClass.isEmpty(),
+                    "every field must declare privacy class: " + field.key);
+            check(field.readbackMethod != null && !field.readbackMethod.isEmpty(),
+                    "every field must declare readback method: " + field.key);
+            check(field.unsupportedReason != null && !field.unsupportedReason.isEmpty(),
+                    "every field must declare capability reason: " + field.key);
+            check(field.editable == field.canBeStoredAsProfileInput(),
+                    "field editability must match storage policy: " + field.key);
+        }
+        check(!ProfileFieldRegistry.get("imei").editable
+                        && !ProfileFieldRegistry.get("publicIpAddress").editable
+                        && !ProfileFieldRegistry.get("batteryState").editable,
+                "restricted and observed-only values must never be editable");
         check(ProfileFieldRegistry.get("altitude") != null
                         && ProfileFieldRegistry.get("locationProviderState") != null,
                 "location metadata inventory must be complete");
