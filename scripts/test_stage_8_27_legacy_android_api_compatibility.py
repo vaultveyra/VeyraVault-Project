@@ -97,7 +97,11 @@ assert "adb -s emulator-5554 wait-for-device" in api27
 assert "adb -s emulator-5554 shell getprop ro.build.version.sdk" in api27
 assert "tr -d '[:space:]'" in api27
 assert "Detected-Android-SDK-level-on-emulator-5554" in api27
-assert 'if [[ "$SDK_LEVEL" != "27" ]]; then' in api27
+assert 'if [ "$SDK_LEVEL" != "27" ] || [ "$BOOT_COMPLETED" != "1" ]; then' in api27
+assert 'getprop sys.boot_completed' in api27
+assert 'for ATTEMPT in $(seq 1 90); do' in api27
+assert 'set -eu' in api27
+assert '[[ "$SDK_LEVEL"' not in api27
 assert "adb -s emulator-5554 shell getprop ro.build.version.release" in api27, (
     "API-27 mismatch diagnostics must print the Android release value."
 )
