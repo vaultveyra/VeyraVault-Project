@@ -87,6 +87,10 @@ assert 'abiFilters "x86_64"' in prepare
 assert 'debugCompileOnly project(\':Bcore\')' in prepare
 assert 'releaseImplementation project(\':Bcore\')' in prepare
 assert '("x86_64", "x86_64-linux-android21"' in (ROOT / "scripts/build_neon_probe.py").read_text(encoding="utf-8")
+assert 'applicationIdSuffix ".instrumentation"' in prepare, (
+    "Debug instrumentation APK must use a package ID separate from the production Release app"
+)
+assert 'applicationId "com.veyravault.space"' in prepare
 assert "reactivecircus/android-emulator-runner@v2" in workflow
 assert 'ANDROID_I_WANT_MY_TCG: "yes"' in workflow, "Hosted Linux emulator must explicitly allow TCG when KVM is unavailable"
 assert ":app:connectedDebugAndroidTest" in workflow
