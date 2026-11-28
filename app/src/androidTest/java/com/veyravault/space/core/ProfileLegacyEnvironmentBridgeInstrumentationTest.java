@@ -77,6 +77,7 @@ public class ProfileLegacyEnvironmentBridgeInstrumentationTest {
                     context, cloneA, sharedUserId, new ProfileDocument());
             ProfileDocument profileB = ProfileLegacyEnvironmentBridge.mergeClone(
                     context, cloneB, sharedUserId, new ProfileDocument());
+            Map<String, ?> cloneAfterSetup = clonePrefs.getAll();
 
             assertEquals("Google", global.get("manufacturer"));
             assertEquals("Pixel 9", global.get("deviceModel"));
@@ -97,7 +98,7 @@ public class ProfileLegacyEnvironmentBridgeInstrumentationTest {
             assertEquals(ProfileFieldRegistry.ApplyStatus.STORED_ONLY, bModel.status);
 
             // The bridge is read-only: it must not rewrite CloneStore or either profile store.
-            assertEquals(clonePrefs.getAll(), clonePrefs.getAll());
+            assertEquals(cloneAfterSetup, clonePrefs.getAll());
             assertEquals(documentBefore, documentPrefs.getAll());
             assertEquals(legacyProfileBefore, legacyProfilePrefs.getAll());
 
