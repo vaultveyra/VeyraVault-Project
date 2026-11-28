@@ -45,8 +45,10 @@ assert "CloneIdentityAudit.auditInventory(snapshot, engineIds)" in activity
 assert "renderRegistryOnly(snapshot, failure)" in activity
 assert "No all-clear result is reported." in activity
 assert "if (!result.isSuccess() || result.getValue() == null)" in activity
-assert "No current cross-package numeric userId overlap was found." in activity
-assert "historical Engine account records are absent" in activity
+assert "No all-clear result is reported." in activity
+assert "does not prove historical deleted-user account buckets are empty" in activity
+assert "Engine IDs without a current Clone record" in activity
+assert "Clone IDs missing from the current Engine inventory" in activity
 for forbidden in (
     "Engine.getCloneInstallState",
     "CloneStore.removeClone(",
