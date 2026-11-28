@@ -1,6 +1,6 @@
 # Stage 8.45 — Complete profile editor discoverability and settings-path clarity
 
-Status: implementation committed; CI validation pending.
+Status: implementation committed; CI validation passed on the current PR head.
 
 ## Scope
 
@@ -27,4 +27,4 @@ This stage improves the two entry points for the canonical 104-field profile reg
 
 ## Validation boundary
 
-The existing CI contract scripts/test_profile_document_editor_contract.py now asserts search wiring and Settings navigation clarity. A green CI run validates source/build/instrumentation contracts; it does not prove every editable profile field is applied inside every third-party cloned app. Physical-device and per-field runtime readback remain separate acceptance gates.
+The existing CI contract scripts/test_profile_document_editor_contract.py now asserts search wiring and Settings navigation clarity. Current PR-head validation: workflow run `46161616974` completed successfully; all 88 steps in the unsigned-build job passed, including Room instrumentation, Android API 21 compatibility smoke tests, Android 8.1 / API 27 target-device compatibility instrumentation, source audit, unsigned Release APK compilation, APK audit, and artifact upload. The signing job was skipped, so this run produced no signed APK. The unsigned artifact is `VeyraVault-unsigned-build` (artifact ID `15269509942`, SHA-256 `79f7f8ee314d929211603c4f6335162e0c14980d21e65a130b373ce0ec6f4f33`). A green CI run validates source/build/instrumentation contracts; it does not prove every editable profile field is applied inside every third-party cloned app. Physical-device and per-field runtime readback remain separate acceptance gates.
