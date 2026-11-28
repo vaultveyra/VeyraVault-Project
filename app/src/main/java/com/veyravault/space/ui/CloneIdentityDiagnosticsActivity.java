@@ -50,8 +50,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         TextView intro = new TextView(this);
         intro.setText(fa
-                ? "این گزارش فقط رجیستری فعلی Cloneها را می‌خواند و بسته‌هایی را نشان می‌دهد که userId عددی یکسان دارند. هیچ حساب، رمز، Token، Cookie، فایل خصوصی یا نشست خوانده نمی‌شود؛ هیچ شناسه یا داده‌ای تغییر نمی‌کند."
-                : "This report reads only the current Clone registry and lists different packages that share the same numeric virtual userId. It does not read accounts, passwords, tokens, cookies, private files or sessions, and it never changes an ID or stored record.");
+                ? "این گزارش فقط رجیستری Cloneها و فهرست شناسه‌های کاربر مجازی موتور را می‌خواند. هم‌پوشانی بسته‌ها و شناسه‌های بدون رکورد متناظر را نشان می‌دهد؛ هیچ حساب، رمز، Token، Cookie، فایل خصوصی یا نشست خوانده نمی‌شود و هیچ شناسه یا داده‌ای تغییر نمی‌کند."
+                : "This report reads the current Clone registry and the Engine virtual-user ID list only. It lists cross-package numeric overlaps and unmatched Engine IDs. It does not read accounts, passwords, tokens, cookies, private files or sessions, and never changes an ID or stored record.");
         intro.setTextSize(13f);
         intro.setTextColor(UiPalette.textSecondary(this));
         intro.setPadding(0, dp(10), 0, dp(14));
@@ -75,7 +75,7 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         Button refresh = new Button(this);
         refresh.setAllCaps(false);
-        refresh.setText(fa ? "بررسی دوباره رجیستری" : "Refresh registry audit");
+        refresh.setText(fa ? "بررسی دوباره رجیستری و موتور" : "Refresh registry and Engine audit");
         refresh.setOnClickListener(v -> refreshAudit());
         root.addView(refresh);
 
@@ -91,8 +91,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
     private void refreshAudit() {
         final int generation = ++refreshGeneration;
-        status.setText(fa ? "در حال خواندن سخت‌گیرانه رجیستری Cloneها..." :
-                "Reading the Clone registry with strict validation...");
+        status.setText(fa ? "در حال خواندن رجیستری Cloneها..." :
+                "Reading the Clone registry...");
         rows.removeAllViews();
 
         repository.loadClones(result -> {
@@ -104,42 +104,135 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
                 return;
             }
 
-            List<CloneStore.CloneEntry> snapshot = result.getValue();
-            final List<CloneIdentityAudit.CollisionGroup> collisions;
+            final List<CloneStore.CloneEntry> snapshot = result.getValue();
+            status.setText(fa
+                    ? "در حال خواندن فهرست شناسه‌های کاربر مجازی موتور؛ فقط شناسه‌ها..."
+                    : "Reading Engine virtual-user IDs only; no account data...");
             try {
-                collisions = CloneIdentityAudit.findCrossPackageCollisions(snapshot);
-            } catch (RuntimeException invalid) {
-                status.setText(fa
-                        ? "گزارش متوقف شد؛ ساختار هویت‌های رجیستری معتبر نیست."
-                        : "Audit stopped because the registry identity structure is invalid.");
-                return;
-            }
-
-            if (collisions.isEmpty()) {
-                status.setText((fa ? "Cloneهای ثبت‌شده: " : "Registered Clones: ")
-                        + snapshot.size()
-                        + (fa ? "\nهم‌پوشانی عددی بین بسته‌های فعلی پیدا نشد." :
-                                "\nNo current cross-package numeric userId overlap was found."));
-                TextView note = new TextView(this);
-                note.setText(fa
-                        ? "این نتیجه جداسازی کامل حساب‌ها یا نبود سوابق قدیمی در موتور را ثابت نمی‌کند."
-                        : "This result does not certify full account isolation or prove that historical Engine account records are absent.");
-                note.setTextSize(12f);
-                note.setTextColor(UiPalette.textSecondary(this));
-                note.setPadding(0, dp(10), 0, 0);
-                rows.addView(note);
-                return;
-            }
-
-            status.setText((fa ? "Cloneهای ثبت‌شده: " : "Registered Clones: ")
-                    + snapshot.size()
-                    + (fa ? "\nگروه‌های دارای userId مشترک بین بسته‌ها: " :
-                            "\nCross-package shared userId groups: ")
-                    + collisions.size());
-            for (CloneIdentityAudit.CollisionGroup group : collisions) {
-                addCollisionRow(group);
+                EngineOperationQueue.submit(
+                        () -> Engine.getKnownVirtualUserIds(),
+                        (engineIds, failure) -> {
+                            if (!isCurrent(generation)) return;
+                            if (failure != null || engineIds == null) {
+                                renderRegistryOnly(snapshot, failure);
+                                return;
+                            }
+                            try {
+                                CloneIdentityAudit.InventoryReport report =
+                                        CloneIdentityAudit.auditInventory(snapshot, engineIds);
+                                renderInventoryReport(snapshot.size(), report);
+                            } catch (RuntimeException invalid) {
+                                status.setText(fa
+                                        ? "گزارش متوقف شد؛ فهرست شناسه‌های موتور یا رجیستری معتبر نیست."
+                                        : "Audit stopped because the Engine inventory or Clone registry is invalid.");
+                            }
+                        });
+            } catch (RuntimeException rejected) {
+                renderRegistryOnly(snapshot, rejected);
             }
         });
+    }
+
+    private void renderRegistryOnly(List<CloneStore.CloneEntry> snapshot, Throwable failure) {
+        final List<CloneIdentityAudit.CollisionGroup> collisions;
+        try {
+            collisions = CloneIdentityAudit.findCrossPackageCollisions(snapshot);
+        } catch (RuntimeException invalid) {
+            status.setText(fa
+                    ? "گزارش متوقف شد؛ ساختار هویت‌های رجیستری معتبر نیست."
+                    : "Audit stopped because the registry identity structure is invalid.");
+            return;
+        }
+        status.setText(fa
+                ? "فهرست Cloneها خوانده شد، اما فهرست شناسه‌های موتور تأیید نشد. نبود هم‌پوشانی قابل اعلام نیست."
+                : "Clone registry read, but the Engine user inventory could not be confirmed. No all-clear result is reported.");
+        if (failure != null) {
+            TextView reason = new TextView(this);
+            reason.setText((fa ? "علت: " : "Reason: ") + failure.getClass().getSimpleName());
+            reason.setTextSize(11f);
+            reason.setTextColor(UiPalette.textSecondary(this));
+            rows.addView(reason);
+        }
+        for (CloneIdentityAudit.CollisionGroup group : collisions) addCollisionRow(group);
+    }
+
+    private void renderInventoryReport(int cloneCount,
+                                       CloneIdentityAudit.InventoryReport report) {
+        status.setText((fa ? "Cloneهای ثبت‌شده: " : "Registered Clones: ")
+                + cloneCount
+                + (fa ? "\nشناسه‌های ثبت‌شده در موتور: " : "\nEngine virtual user IDs: ")
+                + report.knownEngineUserIds.size()
+                + (fa ? "\nگروه‌های هم‌پوشانی بین بسته‌ها: " : "\nCross-package overlap groups: ")
+                + report.crossPackageCollisions.size());
+
+        for (CloneIdentityAudit.CollisionGroup group : report.crossPackageCollisions) {
+            addCollisionRow(group);
+        }
+
+        addUserIdListRow(
+                fa ? "شناسه‌های موتور بدون رکورد Clone فعلی" : "Engine IDs without a current Clone record",
+                report.engineUserIdsWithoutRegisteredClone,
+                fa
+                        ? "این شناسه‌ها در موتور هنوز ثبت هستند، اما در رجیستری فعلی Clone متناظر ندارند. آن‌ها را شناسه آزاد فرض نکنید؛ ممکن است وضعیت یا داده قدیمی موتور باقی مانده باشد."
+                        : "These IDs still exist in the Engine but have no matching current Clone registry row. Do not treat them as free; old Engine state or account data may remain.");
+
+        addUserIdListRow(
+                fa ? "شناسه‌های Clone که در فهرست فعلی موتور نیستند" : "Clone IDs missing from the current Engine inventory",
+                report.registeredCloneUserIdsMissingFromEngine,
+                fa
+                        ? "رجیستری به این شناسه‌ها اشاره می‌کند، اما موتور آن‌ها را در فهرست فعلی نشان نمی‌دهد. هیچ نصب، ترمیم یا حذف خودکاری انجام نشده است."
+                        : "The Clone registry references these IDs, but the Engine does not list them now. No install, repair or removal was attempted.");
+
+        if (report.crossPackageCollisions.isEmpty()
+                && report.engineUserIdsWithoutRegisteredClone.isEmpty()
+                && report.registeredCloneUserIdsMissingFromEngine.isEmpty()) {
+            TextView note = new TextView(this);
+            note.setText(fa
+                    ? "در رجیستری و فهرست فعلی شناسه‌های موتور، ناسازگاری عددی پیدا نشد. این نتیجه پاک‌بودن حساب‌های حذف‌شده در گذشته یا جداسازی کامل نشست‌ها را ثابت نمی‌کند."
+                    : "No numeric mismatch was found between the current Clone registry and Engine user list. This does not prove historical deleted-user account buckets are empty or certify full session isolation.");
+            note.setTextSize(12f);
+            note.setTextColor(UiPalette.textSecondary(this));
+            note.setPadding(0, dp(12), 0, 0);
+            rows.addView(note);
+        }
+    }
+
+    private void addUserIdListRow(String headingText, List<Integer> ids, String detailText) {
+        if (ids == null || ids.isEmpty()) return;
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(12);
+        rows.addView(card, params);
+
+        TextView heading = new TextView(this);
+        heading.setText(headingText + " (" + ids.size() + ")");
+        heading.setTextSize(14f);
+        heading.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        heading.setTextColor(UiPalette.warning(this));
+        card.addView(heading);
+
+        TextView values = new TextView(this);
+        StringBuilder joined = new StringBuilder();
+        for (Integer id : ids) {
+            if (joined.length() > 0) joined.append(", ");
+            joined.append(id);
+        }
+        values.setText(joined.toString());
+        values.setTextSize(13f);
+        values.setTextColor(UiPalette.textPrimary(this));
+        values.setPadding(0, dp(8), 0, 0);
+        card.addView(values);
+
+        TextView detail = new TextView(this);
+        detail.setText(detailText);
+        detail.setTextSize(11f);
+        detail.setTextColor(UiPalette.textSecondary(this));
+        detail.setPadding(0, dp(8), 0, 0);
+        card.addView(detail);
     }
 
     private void addCollisionRow(CloneIdentityAudit.CollisionGroup group) {
