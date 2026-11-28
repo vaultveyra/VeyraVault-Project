@@ -39,11 +39,13 @@ This establishes a scope mismatch:
 
 Depending on the app's AccountManager API calls and account visibility, credentials/account data may be reused across different package Clones that share a numeric userId. This is not evidence that every app's private database or app-local session token is shared; those remain package/user-path scoped. It is sufficient to prevent a blanket claim that all account/session state is Clone-isolated.
 
-### 1.4 Package-scoped uninstall does not establish AccountManager cleanup
+### 1.4 Package-scoped uninstall, account retention and numeric ID reuse
 
 VeyraVault Engine.uninstallClone calls the pinned Engine uninstallPackageAsUser(packageName, userId) API and then checks package/user data directories. It does not call deleteUser(userId).
 
-The pinned BAccountManagerService package-uninstall callback reloads authenticator metadata; it does not remove the BUserAccounts object or purge that userId's account records from accounts.conf. Therefore account records can outlive an individual package Clone's data directory. Reusing that numeric userId can expose retained virtual-user account state to a later Clone, subject to AccountManager visibility and API behavior.
+The pinned BAccountManagerService package-uninstall callback reloads authenticator metadata; it does not remove the BUserAccounts object or purge that userId's account records from accounts.conf. The package-scoped Engine uninstall removes the selected package/user app-data directories and package user-state entry, but does not remove the BUserInfo virtual-user record from BUserManagerService.
+
+CloneStore.removeClone removes the package/user registry row without writing a permanent retired-ID tombstone. The package-scoped nextFreeUserIdForPackage allocator then chooses the lowest free number again. This is independently covered by a synthetic Android instrumentation test. Together, these source paths mean an uninstalled Clone's AccountManager bucket can outlive its package data and its numeric userId can later be assigned again, including to a different package. A recreated Clone may therefore encounter old virtual-user AccountManager records, subject to package visibility and API behavior.
 
 The separate BUserManagerService.deleteUser(userId) path is not a safe per-Clone substitute: it asks BPackageManagerService to uninstall that user across all packages and deletes the entire internal and external virtual-user roots. Never invoke this user-wide operation to remove one VeyraVault Clone.
 
