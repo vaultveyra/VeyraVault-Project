@@ -38,7 +38,7 @@ assert 'new File(getSystemDir(), "accounts.conf")' in environment
 
 # 2. CloneStore identity is composite, and the allocator deliberately reuses the
 # numeric user-ID sequence independently for each package.
-assert 'return packageName + "\\u0000" + userId;' in clone_store
+assert 'return packageName + "\\\\u0000" + userId;' in clone_store
 reserve_start = clone_store.index("static synchronized CloneReservation reserveNextUserId")
 reserve_end = clone_store.index("static synchronized List<CloneReservation>", reserve_start)
 reserve_body = clone_store[reserve_start:reserve_end]
