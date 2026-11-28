@@ -72,7 +72,7 @@ assert "ProfileRuntimeFingerprint.isValid(profileFingerprint)" in provider
 assert "ProfileRuntimeFingerprint" in status_store
 assert "currentRuntimeFingerprint" in status_store
 assert 'profile.put("profileFingerprint", profileFingerprint)' in status_store
-assert "ProfileRuntimeFingerprint.compute(profile)" in fingerprint
+assert "compute(profile.localeTag, profile.timeZoneId)" in fingerprint
 assert "document.runtimeFingerprint" in callback
 assert "profileFingerprint" in client
 assert "runtimeProviderCallerIdentityRejectsCrossCloneAndUserAndProcess" in instrumentation
