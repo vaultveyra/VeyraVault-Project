@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only contract for the Clone Identity Overlap diagnostics screen."""
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,9 +58,12 @@ assert 'getMethod("getKnownAccountUserIds")' in account_inventory_method
 assert "Collections.unmodifiableList" in account_inventory_method
 for forbidden in ("getPassword(", "getUserData(", "getAuthToken(", "setAuthToken(", "saveAllAccounts", "deleteUser", "clearPackage"):
     assert forbidden not in account_inventory_method, "AccountManager inventory must remain ID-only and read-only: " + forbidden
-for forbidden in ("SharedPreferences", "ContentResolver", "Engine.", "FileInputStream",
+for forbidden in ("SharedPreferences", "ContentResolver", "FileInputStream",
                   "getPassword(", "getUserData(", "getAuthToken(", "setAuthToken("):
     assert forbidden not in audit, "Identity grouping must not access account data or external runtime state: " + forbidden
+# Reject an actual static Engine method call, not a field name ending in "Engine".
+assert re.search(r"\\bEngine\\s*\\.\\s*[A-Za-z_$][A-Za-z0-9_$]*\\s*\\(", audit) is None, \
+    "Identity grouping must not invoke Engine APIs"
 
 # The UI reads the strict Clone registry asynchronously and delegates only to the pure audit.
 assert "repository.loadClones(result ->" in activity
