@@ -486,7 +486,8 @@ def harden_account_manager_id_inventory(workspace):
         service_source,
         "VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY",
         r"    private void loadAccounts\(\) \{\n[\s\S]*?\n    \}\n\n    private void saveAllAccounts\(\) \{",
-        """    private void loadAccounts() {
+        """    // VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY
+    private void loadAccounts() {
         mAccountsLoadSucceeded = false;
         Parcel parcel = Parcel.obtain();
         InputStream is = null;
