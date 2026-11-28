@@ -39,9 +39,9 @@ reserve = method_body(STORE, "static synchronized CloneReservation reserveNextUs
 assert "readAllStrict(c)" in reserve
 assert "readReservationsStrict(c)" in reserve
 assert "Reservation journal conflicts with the clone registry" in reserve
-assert "prefs(c).edit().putString(KEY_PENDING_RESERVATIONS" in reserve
+assert "prefs(c).edit()" in reserve and "putString(KEY_PENDING_RESERVATIONS" in reserve
 assert ".commit()" in reserve
-assert "throw new PersistenceException(\"Reservation journal commit failed\")" in reserve
+assert "throw new PersistenceException(\"Global ID high-water and reservation commit failed\")" in reserve
 assert "CloneStore.PersistenceException) return Failure.PERSISTENCE_FAILURE" in REPO
 assert "reservationJournalCommitFailureIsClassifiedAsPersistenceFailure" in TEST
 
