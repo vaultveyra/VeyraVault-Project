@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only audit of trusted Binder identity propagation in pinned AccountManager source."""
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE = ROOT / "build_workspace"
@@ -122,13 +123,11 @@ assert "mPackageName" not in session
 
 # Listener APIs exist but are empty in the pinned service.
 for method in ("registerAccountListener", "unregisterAccountListener"):
-    body = section(
-        service,
-        f"public void {method}(String[] accountTypes, String opPackageName, int userId)",
-        "\n    @Override",
-        method,
+    pattern = (
+        rf"public void {method}\(String\[\] accountTypes, "
+        rf"String opPackageName, int userId\) throws RemoteException \{{\s*\}}"
     )
-    assert body.rstrip().endswith("{\n\n    }"), f"{method} changed; re-audit listener behavior"
+    assert re.search(pattern, service), f"{method} changed; re-audit listener behavior"
 
 # The AIDL currently passes numeric userId. Trusted package identity must be captured server-side.
 assert "String getPassword(in Account account, int userId);" in aidl
