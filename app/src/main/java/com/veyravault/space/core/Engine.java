@@ -5,6 +5,10 @@ import android.content.Context;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.TreeSet;
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.utils.FileUtils;
 
@@ -37,6 +41,41 @@ public class Engine {
             } catch (Throwable ignored) {}
         }
         return null;
+    }
+
+    /**
+     * Read-only inventory of virtual users persisted by the pinned Engine.
+     *
+     * This returns IDs only. It does not read AccountManager records, credentials, tokens,
+     * package data, or app sessions. A failure is explicit; callers must not interpret
+     * an unavailable Engine inventory as an empty set when making ID-allocation decisions.
+     */
+    public static List<Integer> getKnownVirtualUserIds() throws Exception {
+        Object core = getCore();
+        if (core == null) {
+            throw new IllegalStateException("Engine is unavailable; virtual-user inventory is unconfirmed");
+        }
+        Method getUsers = core.getClass().getMethod("getUsers");
+        Object rawUsers = getUsers.invoke(core);
+        if (!(rawUsers instanceof List)) {
+            throw new IllegalStateException("Engine returned an invalid virtual-user inventory");
+        }
+
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        for (Object user : (List<?>) rawUsers) {
+            if (user == null) {
+                throw new IllegalStateException("Engine virtual-user inventory contains a null entry");
+            }
+            Field idField = user.getClass().getField("id");
+            Object rawId = idField.get(user);
+            if (!(rawId instanceof Integer) || ((Integer) rawId) < 0) {
+                throw new IllegalStateException("Engine virtual-user inventory contains an invalid ID");
+            }
+            if (!ids.add((Integer) rawId)) {
+                throw new IllegalStateException("Engine virtual-user inventory contains a duplicate ID");
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<Integer>(ids));
     }
 
     public static void doAttachBaseContext(Application app, final Context base) {
