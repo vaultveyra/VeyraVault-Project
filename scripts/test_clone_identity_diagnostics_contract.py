@@ -30,7 +30,10 @@ assert "registeredCloneUserIdsMissingFromEngine" in audit
 
 # Engine inventory returns only sorted IDs and fails closed if the Engine is unavailable.
 assert "getKnownVirtualUserIds()" in engine
-assert 'getMethod("getUsers")' in engine
+assert 'Class.forName(\n                "top.niunaijun.blackbox.fake.frameworks.BUserManager")' in engine
+assert 'getMethod("getService")' in engine
+assert 'Class.forName(\n                "top.niunaijun.blackbox.core.system.user.IBUserManagerService")' in engine
+assert 'serviceInterface.getMethod("getUsers")' in engine
 assert 'getField("id")' in engine
 assert "Collections.unmodifiableList(new ArrayList<Integer>(ids))" in engine
 inventory_method = engine[engine.index("public static List<Integer> getKnownVirtualUserIds()"):engine.index("\n    public static void doAttachBaseContext")]
