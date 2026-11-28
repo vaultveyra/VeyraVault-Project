@@ -595,6 +595,40 @@ public class AsyncCloneRepositoryInstrumentationTest {
         repository.close();
     }
 
+    @Test public void releasingLegacyPendingReservationSeedsGlobalHighWaterMark() throws Exception {
+        String legacyJournal = "{\\"schemaVersion\\":1,\\"reservations\\":[{"
+                + "\\"token\\":\\"legacy-release-token\\","
+                + "\\"pkg\\":\\"com.example.legacyrelease\\",\\"uid\\":41}]}";
+        assertTrue(preferences.edit()
+                .putString("pending_clone_reservations_json", legacyJournal).commit());
+        assertFalse(preferences.contains("last_reserved_global_user_id"));
+
+        AsyncCloneRepository repository = new AsyncCloneRepository(context);
+        CountDownLatch loaded = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<List<CloneStore.CloneReservation>>> pending =
+                new AtomicReference<>();
+        repository.loadPendingReservations(result -> {
+            pending.set(result);
+            loaded.countDown();
+        });
+        assertTrue(loaded.await(10, TimeUnit.SECONDS));
+        assertTrue(pending.get().isSuccess());
+        assertEquals(1, pending.get().getValue().size());
+
+        CountDownLatch released = new CountDownLatch(1);
+        AtomicReference<AsyncCloneRepository.Result<Boolean>> releaseResult = new AtomicReference<>();
+        repository.releaseReservationAfterEngineAbsence(
+                pending.get().getValue().get(0), true, result -> {
+                    releaseResult.set(result);
+                    released.countDown();
+                });
+        assertTrue(released.await(10, TimeUnit.SECONDS));
+        assertTrue(releaseResult.get().isSuccess());
+        assertEquals(41, preferences.getInt("last_reserved_global_user_id", -1));
+        assertFalse(preferences.contains("pending_clone_reservations_json"));
+        repository.close();
+    }
+
     @Test public void reservationReleaseRefusesRegistryConflictAndPreservesJournal() throws Exception {
         AsyncCloneRepository repository = new AsyncCloneRepository(context);
         CountDownLatch reserved = new CountDownLatch(1);

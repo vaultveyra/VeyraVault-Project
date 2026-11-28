@@ -58,12 +58,14 @@ assert "putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId)" in save_all
 assert "return editor.commit();" in save_all
 release = body(STORE, "static synchronized boolean releaseReservationAfterEngineAbsence(")
 remove = body(STORE, "public static synchronized boolean removeClone(")
-assert "KEY_GLOBAL_HIGH_WATER_MARK" not in release and "KEY_GLOBAL_HIGH_WATER_MARK" not in remove
+assert "KEY_GLOBAL_HIGH_WATER_MARK" in release
+assert "putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId)" in release
+assert "KEY_GLOBAL_HIGH_WATER_MARK" not in remove
 assert "@Deprecated" in STORE[STORE.index("public static synchronized int nextFreeUserIdForPackage") - 250:]
 for name in ("globalAllocatorUsesCloneEngineAndAccountManagerInventories",
              "missingOrInvalidEngineInventoriesBlockReservationWithoutChangingLedger",
              "globalAllocatorRejectsIntegerOverflowWithoutWrapping",
-             "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId"):
+             "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",\n             "releasingLegacyPendingReservationSeedsGlobalHighWaterMark"):
     assert name in TEST
 for name in ("globalAllocatorNeverReservesSameNumericUserIdForDifferentPackages",
              "removedCloneRegistryEntryDoesNotLowerGlobalHighWaterMark"):

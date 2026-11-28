@@ -309,7 +309,26 @@ public class CloneStore {
             else remaining.add(reservation);
         }
         if (!found) return false;
-        SharedPreferences.Editor editor = prefs(c).edit();
+
+        // Legacy reservations may predate the global ledger. Seed the high-water mark
+        // before consuming the journal entry so a confirmed rollback cannot erase its ID.
+        int maxKnownId = -1;
+        for (CloneEntry clone : readAllStrict(c))
+            maxKnownId = Math.max(maxKnownId, clone.userId);
+        for (CloneReservation reservation : reservations)
+            maxKnownId = Math.max(maxKnownId, reservation.userId);
+        Map<String, ?> storedValues = prefs(c).getAll();
+        if (storedValues.containsKey(KEY_GLOBAL_HIGH_WATER_MARK)) {
+            Object rawHighWater = storedValues.get(KEY_GLOBAL_HIGH_WATER_MARK);
+            if (!(rawHighWater instanceof Integer) || ((Integer) rawHighWater) < 0)
+                throw new IllegalStateException("Global user-ID high-water mark is malformed");
+            maxKnownId = Math.max(maxKnownId, (Integer) rawHighWater);
+        }
+        if (maxKnownId < 0)
+            throw new IllegalStateException("Released reservation has no valid user ID");
+
+        SharedPreferences.Editor editor = prefs(c).edit()
+                .putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId);
         if (remaining.isEmpty()) editor.remove(KEY_PENDING_RESERVATIONS);
         else editor.putString(KEY_PENDING_RESERVATIONS, serializeReservations(remaining));
         return editor.commit();

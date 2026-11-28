@@ -107,6 +107,7 @@ for test_name in (
     "independentRepositoriesCannotReserveSamePackageUserId",
     "reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken",
     "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",
+    "releasingLegacyPendingReservationSeedsGlobalHighWaterMark",
     "globalAllocatorUsesCloneEngineAndAccountManagerInventories",
     "missingOrInvalidEngineInventoriesBlockReservationWithoutChangingLedger",
     "globalAllocatorRejectsIntegerOverflowWithoutWrapping",
