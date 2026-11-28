@@ -55,6 +55,15 @@ assert "ProfileStore.readGlobalStrict" in provider
 assert 'android:exported="false"' in manifest
 assert 'android:authorities="${applicationId}.profile-runtime"' in manifest
 assert "Binder.getCallingUid() != Process.myUid()" in provider
+assert "Binder.getCallingPid()" in provider
+assert "BProcessManagerService" in provider
+assert "findProcessByPid" in provider
+assert "matchesCloneIdentity(packageName, userId, callerPackage, callerUserId" in provider
+assert "CALLER_CLONE_IDENTITY_MISMATCH" in provider
+assert "expectedProcessName.equals(callerProcessName)" in provider
+assert provider.index("isAuthorizedCaller(context, packageName, userId, null)") < provider.index("ProfileStore.readCloneOverrideStrict")
+assert "runtimeProviderCallerIdentityRejectsCrossCloneAndUserAndProcess" in instrumentation
+assert "matchesCloneIdentity(" in instrumentation
 assert "ProcessUtils.isMainProcess(this)" in vault
 assert "ProfileStore.migrateLegacyLocationSettings(this)" in vault
 assert "Application.getProcessName()" in process
@@ -89,4 +98,5 @@ assert "TimeZone.setDefault" not in engine
 print("Clone lifecycle callback registration contract: PASS")
 print("Safe isolated defaults before profile IPC contract: PASS")
 print("Pre-Application package/user profile resolution contract: PASS")
+print("Runtime Provider authenticates virtual callers by Engine PID, package, user and process identity: PASS")
 print("Process-scoped locale/time-zone application contract: PASS")
