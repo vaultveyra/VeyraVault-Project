@@ -229,6 +229,9 @@ jobs:
       - name: Test Stage 8.35 Clone session and account data isolation audit
         run: python3 scripts/test_stage_8_35_session_data_isolation_audit.py
 
+      - name: Test read-only Clone identity diagnostics contract
+        run: python3 scripts/test_clone_identity_diagnostics_contract.py
+
       - name: Enable KVM for Android Emulator
         run: |
           set -euo pipefail
