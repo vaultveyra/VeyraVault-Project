@@ -28,6 +28,7 @@ user_accounts = read("Bcore/src/main/java/top/niunaijun/blackbox/core/system/acc
 user_manager = read("Bcore/src/main/java/top/niunaijun/blackbox/core/system/user/BUserManagerService.java")
 hook_manager = read("Bcore/src/main/java/top/niunaijun/blackbox/fake/hook/HookManager.java")
 webview_proxy = read("Bcore/src/main/java/top/niunaijun/blackbox/fake/service/WebViewProxy.java")
+activity_thread = read("Bcore/src/main/java/top/niunaijun/blackbox/app/BActivityThread.java")
 
 # 1. The ordinary virtual app data tree is keyed by both package and user.
 assert 'String.format(Locale.CHINA, "data/user/%d/%s", userId, packageName)' in environment
@@ -92,8 +93,13 @@ uninstall_body = engine_wrapper[uninstall_start:uninstall_end]
 assert '"uninstallPackageAsUser", String.class, int.class' in uninstall_body
 assert "deleteUser" not in uninstall_body
 
-# 5. WebViewProxy exists in the pinned source but is not installed as an active
-# HookManager injector. Its source presence is not proof of effective isolation.
+# 5. The active WebView path is in BActivityThread, not the unused WebViewProxy.
+# It is gated to API 28+ and called before VirtualRuntime binds the target app.
+suffix_call = 'WebView.setDataDirectorySuffix(getUserId() + ":" + packageName + ":" + processName);'
+suffix_position = activity_thread.index(suffix_call)
+assert "if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)" in activity_thread[suffix_position - 160:suffix_position]
+assert activity_thread.index("Context packageContext = createPackageContext(applicationInfo);") < suffix_position
+assert suffix_position < activity_thread.index("VirtualRuntime.setupRuntime(processName, applicationInfo);")
 assert "class WebViewProxy" in webview_proxy
 assert "WebViewProxy" not in hook_manager
 assert "new WebViewProxy()" not in hook_manager
@@ -113,7 +119,8 @@ print("PASS: VeyraVault package-scoped ID allocation was identified.")
 print("PASS: pinned Engine AccountManager persistence is keyed by userId only.")
 print("PASS: per-package uninstall does not purge the virtual-user account collection.")
 print("PASS: user-wide deletion is distinguished from package-scoped Clone uninstall.")
-print("PASS: WebViewProxy is not mistaken for an active registered isolation hook.")
+print("PASS: WebView uses the pinned package/user/process suffix before target Application binding.")
+print("PASS: the unused WebViewProxy class is not mistaken for the active mechanism.")
 print("PASS: unverified storage/session fields remain NOT_IMPLEMENTED.")
 print("KNOWN BLOCKER: AccountManager scope can cross package Clones sharing a numeric userId.")
 print("AUDIT ONLY: no Clone data, account, token, session or runtime state was accessed or changed.")
