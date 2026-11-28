@@ -10,6 +10,13 @@ repository = (root / "java/com/veyravault/space/core/AsyncCloneRepository.java")
 registry = (root / "java/com/veyravault/space/core/ProfileFieldRegistry.java").read_text(encoding="utf-8")
 
 assert "ProfileFieldRegistry.all()" in editor
+assert "addSearchControls(resolved.size())" in editor
+assert "filterFields(s == null ? \"\" : s.toString())" in editor
+assert "searchableText.put(fieldCard, searchable)" in editor
+assert "categoryHeaders.put(field.category, category)" in editor
+assert "No profile fields match this search." in editor
+assert "نمایش " in editor
+assert "فقط ذخیره‌شده:" in editor
 assert "field.category" in editor
 assert "field.label" in editor
 assert "field.validationRule" in editor
