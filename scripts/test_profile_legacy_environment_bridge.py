@@ -32,7 +32,7 @@ assert "ProfileLegacyEnvironmentBridge.mergeClone(appContext, packageName, userI
 assert "saveGlobalEnv" not in bridge
 assert "saveAll" not in bridge
 assert "ProfileDocumentStore.save" not in bridge
-assert "same numeric Space/user ID, different package" in instrumentation
+assert "Same numeric Space/user ID, different package" in instrumentation
 assert "ProfileRuntimeClient.resolveDocument" in instrumentation
 assert "ProfileDocumentStore.clearCloneField" in instrumentation
 assert "ProfileDocumentStore.clearGlobalField" in instrumentation
