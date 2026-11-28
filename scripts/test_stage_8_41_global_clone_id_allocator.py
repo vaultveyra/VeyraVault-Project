@@ -42,7 +42,7 @@ assert PROVISION.index("persistence.inspectNativeAbi(packageName") < PROVISION.i
 assert PROVISION.index("EngineOperationQueue.submit(") < PROVISION.index("Engine.getKnownVirtualUserIds()")
 assert PROVISION.index("Engine.getKnownAccountUserIds()") < PROVISION.index("persistence.reserveNextUserId(packageName")
 assert PROVISION.index("persistence.reserveNextUserId(packageName") < PROVISION.index("Engine.installPackageAsUser(")
-assert "inventories could not be verified" in PROVISION
+assert "ID inventory could not be verified" in PROVISION
 assert "no ID was reserved and installation did not start" in PROVISION
 assert "private static final ExecutorService ENGINE" in QUEUE
 assert "getKnownVirtualUserIds() throws Exception" in ENGINE
