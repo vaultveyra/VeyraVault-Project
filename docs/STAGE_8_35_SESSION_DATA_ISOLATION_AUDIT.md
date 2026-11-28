@@ -51,12 +51,13 @@ The separate BUserManagerService.deleteUser(userId) path is not a safe per-Clone
 
 ### 1.6 Read-only Engine virtual-user inventory
 
-The pinned BlackBoxCore exposes getUsers(), backed by BUserManagerService.getUsers(). Each returned BUserInfo contains a numeric id. VeyraVault now exposes this through Engine.getKnownVirtualUserIds(), which:
-- invokes only the Engine user-list API;
+The pinned Engine exposes the AIDL IBUserManagerService.getUsers() method, backed by BUserManagerService.getUsers(). Each returned BUserInfo contains a numeric id. VeyraVault exposes this through Engine.getKnownVirtualUserIds(), which:
+- resolves the BUserManager facade and obtains its Binder service directly;
+- invokes getUsers() through the public AIDL interface instead of BlackBoxCore.getUsers(), whose facade can turn service failures into an empty list;
 - reads only each BUserInfo.id field;
-- validates null, negative and duplicate IDs;
+- validates service availability, interface type, null entries, negative IDs and duplicates;
 - returns a sorted immutable list;
-- fails explicitly if the Engine or method is unavailable.
+- fails explicitly if the Engine, Binder service or method is unavailable.
 
 The Settings Clone Identity diagnostics compares three read-only views:
 - cross-package duplicate IDs in the strict current Clone registry;
