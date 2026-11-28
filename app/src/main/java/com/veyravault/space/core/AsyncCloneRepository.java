@@ -477,7 +477,8 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> {
             ProfileSettings legacy = ProfileStore.readGlobalStrict(appContext);
             ProfileDocument typed = ProfileDocumentStore.readGlobalStrict(appContext);
-            return ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+            ProfileDocument merged = ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+            return ProfileLegacyEnvironmentBridge.mergeGlobal(appContext, merged);
         }, callback);
     }
 
@@ -492,7 +493,8 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> {
             ProfileSettings legacy = ProfileStore.readCloneOverrideStrict(appContext, packageName, userId);
             ProfileDocument typed = ProfileDocumentStore.readCloneStrict(appContext, packageName, userId);
-            return ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+            ProfileDocument merged = ProfileRuntimeProvider.mergeLegacyFields(typed, legacy);
+            return ProfileLegacyEnvironmentBridge.mergeClone(appContext, packageName, userId, merged);
         }, callback);
     }
 
