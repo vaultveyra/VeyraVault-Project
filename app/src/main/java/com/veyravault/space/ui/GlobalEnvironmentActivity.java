@@ -76,7 +76,7 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         sv.addView(root);
 
         TextView title = new TextView(this);
-        title.setText(fa ? "پروفایل سراسری دستگاه (اطلاعات ذخیره‌شده)" : "Global Device Profile (Saved Metadata)");
+        title.setText(fa ? "کنترل پیشرفته موقعیت و اطلاعات قدیمی" : "Advanced Location & Legacy Metadata");
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
@@ -87,8 +87,8 @@ public class GlobalEnvironmentActivity extends BaseActivity {
         desc.setTextColor(UiPalette.textSecondary(getApplicationContext()));
         desc.setPadding(0, 12, 0, 28);
         desc.setText(fa
-                ? "توجه: مدل دستگاه، کشور و اپراتور در این نسخه فقط به‌عنوان اطلاعات پروفایل ذخیره می‌شوند و توسط موتور فعلی روی کلون‌ها اعمال نمی‌شوند. موقعیت مکانی هر کلون جداگانه از طریق API محدود به بسته و کاربر مجازی موتور تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
-                : "Note: device model, country and operator values are saved as profile metadata only and are not applied to clones. The pinned engine version does not expose a verified package/user-scoped API to apply these values. Clone locations are configured separately through the engine's package- and virtual-user-scoped location API. This setting does not bypass third-party regional restrictions.");
+                ? "این صفحه فقط برای کلید اصلی موقعیت و تنظیمات قدیمی سازگار است؛ تمام فیلدهای پروفایل سراسری را از گزینه «پروفایل کامل محیط» مدیریت کنید. مدل دستگاه، کشور و اپراتور در این نسخه فقط اطلاعات ذخیره‌شده‌اند و توسط موتور روی کلون‌ها اعمال نمی‌شوند. موقعیت هر کلون جداگانه و با API محدود به بسته و کاربر مجازی تنظیم می‌شود. این گزینه محدودیت منطقه‌ای سرویس‌های دیگر را دور نمی‌زند."
+                : "This page is limited to the Master Location switch and legacy-compatible controls; use Complete Environment Profile for the full Global field registry. Device model, country and operator are stored metadata only and are not applied to clones. Clone locations use the Engine's package- and virtual-user-scoped API. This setting does not bypass third-party regional restrictions.");
         root.addView(desc);
 
         root.addView(buildGlobalLocaleTimeZoneSection());
