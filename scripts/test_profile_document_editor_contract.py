@@ -52,6 +52,11 @@ assert "both valid latitude and longitude" in editor
 assert "ProfileDocumentStore" not in editor
 assert "ProfileStore" not in editor
 assert "ProfileDocumentEditorActivity.class" in settings
+assert "Advanced Location & Legacy Controls" in settings
+assert "Complete Environment Profile" in settings
+global_legacy = (root / "java/com/veyravault/space/ui/GlobalEnvironmentActivity.java").read_text(encoding="utf-8")
+assert "Advanced Location & Legacy Metadata" in global_legacy
+assert "use Complete Environment Profile for the full Global field registry" in global_legacy
 assert "ProfileDocumentEditorActivity.class" in spaces
 assert "repository.loadGlobalProfileDocument" in spaces
 assert "ProfileDocumentResolver.resolveAll" in spaces
