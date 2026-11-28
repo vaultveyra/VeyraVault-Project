@@ -356,6 +356,76 @@ def harden_clone_cleanup_semantics(workspace):
     print("[+] Pinned Engine Clone cleanup fails closed on residual directories and failed reset-directory recreation.")
 
 
+
+
+def harden_account_manager_token_user_scope(workspace):
+    """Derive BUserAccounts.userId from its authoritative map key before TokenCache use."""
+    relative_path = (
+        "Bcore/src/main/java/top/niunaijun/blackbox/core/system/accounts/"
+        "BAccountManagerService.java"
+    )
+    path, source = _read_engine_source_file(workspace, relative_path)
+
+    source = _patch_engine_fragment(
+        source,
+        "VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY",
+        r"                for \(Integer key : accountsMap\.keySet\(\)\) \{\n"
+        r"                    mUserAccountsMap\.put\(key, accountsMap\.get\(key\)\);\n"
+        r"                \}",
+        """                for (Integer key : accountsMap.keySet()) {
+                    BUserAccounts userAccounts = accountsMap.get(key);
+                    if (key == null || key.intValue() < 0 || userAccounts == null) {
+                        throw new IllegalStateException("Invalid AccountManager user bucket");
+                    }
+                    // VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY
+                    // The persisted Map key is authoritative. Older records may carry
+                    // the BUserAccounts default userId (0) inside the Parcelable value.
+                    userAccounts.userId = key.intValue();
+                    mUserAccountsMap.put(key, userAccounts);
+                }""",
+        ("VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY",
+         "userAccounts.userId = key.intValue();",
+         "Invalid AccountManager user bucket"),
+        relative_path,
+    )
+
+    source = _patch_engine_fragment(
+        source,
+        "VEYRAVAULT_USE_REQUESTED_USER_ID_FOR_TOKEN_CACHE",
+        r"    public BUserAccounts getUserAccounts\(int userId\) \{\n"
+        r"        synchronized \(mUserAccountsMap\) \{\n"
+        r"            BUserAccounts bUserAccounts = mUserAccountsMap\.get\(userId\);\n"
+        r"            if \(bUserAccounts == null\) \{\n"
+        r"                bUserAccounts = new BUserAccounts\(\);\n"
+        r"                mUserAccountsMap\.put\(userId, bUserAccounts\);\n"
+        r"            \}\n"
+        r"            return mUserAccountsMap\.get\(userId\);\n"
+        r"        \}\n"
+        r"    \}",
+        """    public BUserAccounts getUserAccounts(int userId) {
+        synchronized (mUserAccountsMap) {
+            BUserAccounts bUserAccounts = mUserAccountsMap.get(userId);
+            if (bUserAccounts == null) {
+                bUserAccounts = new BUserAccounts();
+                mUserAccountsMap.put(userId, bUserAccounts);
+            }
+            // VEYRAVAULT_USE_REQUESTED_USER_ID_FOR_TOKEN_CACHE
+            // Always repair this derived field from the authoritative map key before
+            // any caller can use it to construct or match an in-memory TokenCache entry.
+            bUserAccounts.userId = userId;
+            return bUserAccounts;
+        }
+    }""",
+        ("VEYRAVAULT_USE_REQUESTED_USER_ID_FOR_TOKEN_CACHE",
+         "bUserAccounts.userId = userId;",
+         "mUserAccountsMap.get(userId)"),
+        relative_path,
+    )
+
+    with open(path, "w", encoding="utf-8", newline="") as destination:
+        destination.write(source)
+
+
 def accept_android_sdk_licenses():
     print("[*] Accepting Android SDK & NDK licenses...")
     sdk_dirs = []
@@ -564,6 +634,7 @@ def main():
 
     verify_engine_source(WORKSPACE)
     harden_clone_cleanup_semantics(WORKSPACE)
+    harden_account_manager_token_user_scope(WORKSPACE)
     disable_remote_log_upload(WORKSPACE)
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")
