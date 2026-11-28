@@ -12,6 +12,7 @@ def read(relative: str) -> str:
 
 
 audit = read("app/src/main/java/com/veyravault/space/core/CloneIdentityAudit.java")
+engine = read("app/src/main/java/com/veyravault/space/core/Engine.java")
 activity = read("app/src/main/java/com/veyravault/space/ui/CloneIdentityDiagnosticsActivity.java")
 settings = read("app/src/main/java/com/veyravault/space/ui/SettingsHubActivity.java")
 manifest = read("app/src/main/AndroidManifest.xml")
@@ -23,18 +24,31 @@ assert "new TreeMap<Integer, Map<String, CloneIdentity>>()" in audit
 assert "group.getValue().size() <= 1" in audit
 assert "Collections.unmodifiableList" in audit
 assert "Collections.unmodifiableList(new ArrayList<>(clones))" in audit
+assert "auditInventory(" in audit
+assert "engineUserIdsWithoutRegisteredClone" in audit
+assert "registeredCloneUserIdsMissingFromEngine" in audit
+
+# Engine inventory returns only sorted IDs and fails closed if the Engine is unavailable.
+assert "getKnownVirtualUserIds()" in engine
+assert 'getMethod("getUsers")' in engine
+assert 'getField("id")' in engine
+assert "Collections.unmodifiableList(new ArrayList<Integer>(ids))" in engine
+assert "AccountManager" not in engine[engine.index("public static List<Integer> getKnownVirtualUserIds()"):]
 for forbidden in ("SharedPreferences", "ContentResolver", "AccountManager", "Engine.", "FileInputStream"):
     assert forbidden not in audit, "Identity grouping must not access external/runtime state: " + forbidden
 
 # The UI reads the strict Clone registry asynchronously and delegates only to the pure audit.
 assert "repository.loadClones(result ->" in activity
-assert "CloneIdentityAudit.findCrossPackageCollisions(snapshot)" in activity
+assert "EngineOperationQueue.submit(" in activity
+assert "Engine.getKnownVirtualUserIds()" in activity
+assert "CloneIdentityAudit.auditInventory(snapshot, engineIds)" in activity
+assert "renderRegistryOnly(snapshot, failure)" in activity
+assert "No all-clear result is reported." in activity
 assert "if (!result.isSuccess() || result.getValue() == null)" in activity
 assert "No current cross-package numeric userId overlap was found." in activity
 assert "historical Engine account records are absent" in activity
 for forbidden in (
     "Engine.getCloneInstallState",
-    "EngineOperationQueue",
     "CloneStore.removeClone(",
     "CloneStore.upsertClone(",
     "CloneStore.saveAll(",
@@ -55,10 +69,15 @@ for test_name in (
     "returnsNoCollisionForOnePackageOrUniqueNumericIds",
     "rejectsDuplicateCompositeIdentityInsteadOfHidingCorruptRegistryData",
     "collisionReportIsImmutable",
+    "engineInventoryReportsUnlinkedAndMissingCloneUserIds",
+    "engineInventoryRejectsDuplicateOrInvalidIds",
+    "inventoryReportCollectionsAreImmutable",
 ):
     assert test_name in tests
 
-print("PASS: duplicate userId groups are computed from a supplied Clone registry snapshot only.")
+print("PASS: duplicate userId groups are computed from a strict Clone registry snapshot.")
+print("PASS: Engine inventory exposes IDs only and fails closed when unavailable.")
+print("PASS: diagnostics classifies Engine-only IDs and Clone-only IDs without reading accounts.")
 print("PASS: diagnostics reads the Clone registry asynchronously and fails closed on invalid data.")
 print("PASS: the Settings entry and non-exported Activity are registered.")
 print("PASS: synthetic tests cover overlap, no-overlap, invalid identity and immutable output.")
