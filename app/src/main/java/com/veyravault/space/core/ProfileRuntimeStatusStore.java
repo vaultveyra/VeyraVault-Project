@@ -121,7 +121,11 @@ public final class ProfileRuntimeStatusStore {
             if (revision < 0 || updatedAt <= 0 || processName == null || fields == null) {
                 return Snapshot.empty(currentRevision);
             }
-            if (revision != currentRevision || !ProfileRuntimeFingerprint.isValid(storedFingerprint)) {
+            // The document revision is global across Global and every Clone. This status only
+            // certifies the effective process-scoped Locale/Time Zone values, so an unrelated
+            // edit must not invalidate this Clone's readback. Reject impossible future revisions;
+            // the fingerprint below determines whether the verified runtime values still match.
+            if (revision > currentRevision || !ProfileRuntimeFingerprint.isValid(storedFingerprint)) {
                 return new Snapshot(true, false, revision, updatedAt, processName,
                         Collections.<String, ProfileFieldRegistry.ApplyStatus>emptyMap());
             }
