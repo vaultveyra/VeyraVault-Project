@@ -33,7 +33,9 @@ assert "getKnownVirtualUserIds()" in engine
 assert 'getMethod("getUsers")' in engine
 assert 'getField("id")' in engine
 assert "Collections.unmodifiableList(new ArrayList<Integer>(ids))" in engine
-assert "AccountManager" not in engine[engine.index("public static List<Integer> getKnownVirtualUserIds()"):]
+inventory_method = engine[engine.index("public static List<Integer> getKnownVirtualUserIds()"):engine.index("\n    public static void doAttachBaseContext")]
+for forbidden in ("BAccountManager", "getAuthToken", "accounts.conf", "AccountManager.get", "deleteUser", "clearPackage"):
+    assert forbidden not in inventory_method, "Engine ID inventory must not read or mutate account/session data: " + forbidden
 for forbidden in ("SharedPreferences", "ContentResolver", "AccountManager", "Engine.", "FileInputStream"):
     assert forbidden not in audit, "Identity grouping must not access external/runtime state: " + forbidden
 
