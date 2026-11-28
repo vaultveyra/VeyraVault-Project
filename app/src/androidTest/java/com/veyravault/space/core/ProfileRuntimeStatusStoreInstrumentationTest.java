@@ -82,7 +82,7 @@ public class ProfileRuntimeStatusStoreInstrumentationTest {
         }
     }
 
-    @Test public void cloneReadbacksRemainScopedAndTypedRevisionChangesInvalidate() throws Exception {
+    @Test public void cloneReadbacksRemainScopedAndOnlyEffectiveRuntimeChangesInvalidate() throws Exception {
         Context context = ApplicationProvider.getApplicationContext();
         SharedPreferences documents = context.getSharedPreferences(
                 "veyravault_profile_documents_v1", Context.MODE_PRIVATE);
@@ -130,15 +130,47 @@ public class ProfileRuntimeStatusStoreInstrumentationTest {
             assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED, snapshotA.statuses.get("localeTag"));
             assertEquals(ProfileFieldRegistry.ApplyStatus.FAILED, snapshotB.statuses.get("localeTag"));
 
+            // An Engine-scoped edit changes the global document revision but does not
+            // change either effective Locale/Time Zone value verified by this status store.
             assertTrue(ProfileDocumentStore.saveGlobalField(context, "latitude", 35.7d));
+            ProfileRuntimeStatusStore.Snapshot afterUnrelatedEditA =
+                    ProfileRuntimeStatusStore.read(context, cloneA, userA);
+            ProfileRuntimeStatusStore.Snapshot afterUnrelatedEditB =
+                    ProfileRuntimeStatusStore.read(context, cloneB, userB);
+            assertTrue(afterUnrelatedEditA.current);
+            assertTrue(afterUnrelatedEditB.current);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+                    afterUnrelatedEditB.statuses.get("localeTag"));
+
+            // Editing Clone A's effective Locale must stale A, but must not stale Clone B.
+            assertTrue(ProfileDocumentStore.saveCloneField(
+                    context, cloneA, userA, "localeTag", "it-IT"));
             ProfileRuntimeStatusStore.Snapshot staleA =
                     ProfileRuntimeStatusStore.read(context, cloneA, userA);
-            ProfileRuntimeStatusStore.Snapshot staleB =
+            ProfileRuntimeStatusStore.Snapshot stillCurrentB =
                     ProfileRuntimeStatusStore.read(context, cloneB, userB);
             assertFalse(staleA.current);
-            assertFalse(staleB.current);
             assertTrue(staleA.statuses.isEmpty());
-            assertTrue(staleB.statuses.isEmpty());
+            assertTrue(stillCurrentB.current);
+            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+                    stillCurrentB.statuses.get("localeTag"));
+
+            // The stale runtime must not be re-recorded against an older document revision.
+            assertFalse(ProfileRuntimeStatusStore.record(context, cloneA, userA, revision,
+                    ProfileRuntimeFingerprint.compute(resolvedA),
+                    "com.veyravault.space:p0", verifiedStatuses()));
+
+            // Both Clones inherit Global Time Zone, so changing it invalidates both readbacks.
+            assertTrue(ProfileDocumentStore.saveGlobalField(
+                    context, "timeZoneId", "Europe/London"));
+            ProfileRuntimeStatusStore.Snapshot staleAfterGlobalRuntimeEditA =
+                    ProfileRuntimeStatusStore.read(context, cloneA, userA);
+            ProfileRuntimeStatusStore.Snapshot staleAfterGlobalRuntimeEditB =
+                    ProfileRuntimeStatusStore.read(context, cloneB, userB);
+            assertFalse(staleAfterGlobalRuntimeEditA.current);
+            assertFalse(staleAfterGlobalRuntimeEditB.current);
+            assertTrue(staleAfterGlobalRuntimeEditA.statuses.isEmpty());
+            assertTrue(staleAfterGlobalRuntimeEditB.statuses.isEmpty());
         } finally {
             restorePreferences(documents, documentsBefore);
             restorePreferences(legacy, legacyBefore);
