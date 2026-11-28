@@ -584,7 +584,7 @@ public class AsyncCloneRepositoryInstrumentationTest {
 
         CountDownLatch reused = new CountDownLatch(1);
         AtomicReference<AsyncCloneRepository.Result<CloneStore.CloneReservation>> reusedRef = new AtomicReference<>();
-        repository.reserveNextUserId("com.example.release", result -> {
+        repository.reserveNextUserId("com.example.release", Collections.<Integer>emptyList(), Collections.<Integer>emptyList(), result -> {
             reusedRef.set(result);
             reused.countDown();
         });
