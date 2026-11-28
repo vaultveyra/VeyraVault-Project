@@ -25,7 +25,7 @@ This is positive structural evidence for ordinary app-private files, databases a
 
 The pinned Engine stores its account registry in one Engine-wide system file, accounts.conf. BAccountManagerService loads and saves a map keyed by Integer userId. Its getUserAccounts(int userId) lookup uses only that integer. BUserAccounts contains the account records, passwords, user data, auth-token values and visibility metadata.
 
-The AccountManager service APIs and BAccountManager facade pass BActivityThread.getUserId(); they do not add the current package name to the persistent account-store key. Package visibility is tracked within account records, but the underlying account collection is still selected by userId.
+The AccountManager service APIs and BAccountManager facade pass BActivityThread.getUserId(); they do not add the current package name to the persistent account-store key. Package visibility is tracked within account records and listing APIs apply that visibility filter. However, direct operations such as getPassword, getUserData, peekAuthToken, setAuthToken and getAuthToken are dispatched through the facade with the virtual userId and account handle, without adding a package-scoped storage key. Persistent auth-token values are stored in the BAccount record by token type. Thus the account collection is shared by userId; visibility can restrict enumeration, so this audit does not claim that every Clone can automatically list every other Clone's accounts. A synthetic runtime test is required to establish the precise read/write boundary for each API.
 
 ### 1.3 VeyraVault currently allocates numeric user IDs independently per package
 
