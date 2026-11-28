@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:name=".RoomTestApplication" tools:replace="android:name">
+        <service
+            android:name="com.veyravault.space.core.persistence.CloneMigrationCrashTestService"
+            android:process=":migration_recovery_test"
+            android:exported="false" />
+        <service
+            android:name="com.veyravault.space.security.AppLockSessionProbeService"
+            android:process=":app_lock_session_probe"
+            android:exported="false" />
+        <activity
+            android:name="com.veyravault.space.security.AppLockLifecycleProbeActivity"
+            android:exported="false" />
+    </application>
+</manifest>

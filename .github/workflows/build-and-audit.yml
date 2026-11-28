@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
 jobs:
   build:
     name: Build and audit unsigned APK
@@ -35,11 +40,327 @@ jobs:
       - name: Validate staged V3 migration scripts
         run: python3 -c "import ast; [ast.parse(open(p, encoding='utf-8').read(), filename=p) for p in ('scripts/upgrade_v3_part1.py', 'scripts/upgrade_v3_part2.py')]"
 
+      - name: Test Stage 8.20 immutable Engine source identity and clean-tree gate
+        run: python3 scripts/test_stage_8_20_engine_source_pin.py
+
+      - name: Test Stage 8.25 pinned Engine cleanup failure semantics patch
+        run: python3 scripts/test_stage_8_25_engine_cleanup_failure_semantics.py
+
+      - name: Test Stage 8.37 AccountManager TokenCache virtual-user scope patch
+        run: python3 scripts/test_stage_8_37_account_manager_token_user_scope.py
+      - name: Test Stage 8.38 read-only AccountManager numeric user-ID inventory
+        run: python3 scripts/test_stage_8_38_account_manager_id_inventory.py
+      - name: Test Stage 8.27 legacy Android compatibility contract
+        run: python3 scripts/test_stage_8_27_legacy_android_api_compatibility.py
+      - name: Test Stage 8.28 Room runtime Release isolation
+        run: python3 scripts/test_stage_8_28_room_release_isolation.py
+      - name: Test Stage 8.29 Release META-INF provenance contract
+        run: python3 scripts/test_stage_8_29_release_meta_inf_provenance.py
+      - name: Test Stage 8.30 exact V1 META-INF policy
+        run: python3 scripts/test_stage_8_30_v1_meta_inf_policy.py
+      - name: Test Stage 8.31 Native ELF compatibility
+        run: python3 scripts/test_stage_8_31_native_elf_compatibility.py
+      - name: Test Stage 8.32 Emulator KVM readiness
+        run: python3 scripts/test_stage_8_32_emulator_kvm_readiness.py
+      - name: Test Stage 8.33 ARMv7 NEON preflight guard
+        run: python3 scripts/test_stage_8_33_armv7_neon_guard.py
+
+      - name: Test typed profile document registry and resolver engine
+        run: python3 scripts/test_profile_document_engine.py
+
+      - name: Test registry-driven Global and Clone profile editor
+        run: python3 scripts/test_profile_document_editor_contract.py
+      - name: Test read-only legacy environment profile bridge contract
+        run: python3 scripts/test_profile_legacy_environment_bridge.py
+
+      - name: Test profile resolver contract
+        run: python3 scripts/test_profile_resolver.py
+
+      - name: Test clone profile runtime hook contract
+        run: python3 scripts/test_profile_runtime_hook_contract.py
+
+      - name: Test strict location profile hook contract
+        run: python3 scripts/test_profile_location_hook_contract.py
+
+      - name: Test security credential contract
+        run: python3 scripts/test_security_credentials.py
+
+      - name: Test engine install/launch failure contract
+        run: python3 scripts/test_engine_contract.py
+
+      - name: Test Stage 8.10 Clone install-state diagnostics contract
+        run: python3 scripts/test_stage_8_10_compatibility_diagnostics.py
+
+      - name: Test read-only per-Clone diagnostic report contract
+        run: python3 scripts/test_stage_8_10_clone_diagnostic_screen.py
+
+      - name: Test Clone runtime lifecycle trace contract
+        run: python3 scripts/test_clone_runtime_lifecycle_trace_contract.py
+
+      - name: Test fail-closed CloneStore mutations
+        run: python3 scripts/test_clone_store_safe_mutations.py
+
+      - name: Test async CloneStore repository contract
+        run: python3 scripts/test_async_clone_repository_contract.py
+
+      - name: Test async clone launch orchestration contract
+        run: python3 scripts/test_async_clone_launch_contract.py
+
+      - name: Test serialized asynchronous Clone provisioning contract
+        run: python3 scripts/test_async_clone_provision_contract.py
+
+      - name: Test Stage 8.24 destructive safety and serialized Engine diagnostics
+        run: python3 scripts/test_stage_8_24_destructive_safety_engine_queue.py
+
+      - name: Test async location persistence UI contract
+        run: python3 scripts/test_location_persistence_ui_contract.py
+
+      - name: Test global environment async persistence UI contract
+        run: python3 scripts/test_global_environment_persistence_ui_contract.py
+
+      - name: Test per-clone environment profile UI contract
+        run: python3 scripts/test_clone_environment_profile_ui_contract.py
+
+      - name: Test MainActivity async Spaces persistence contract
+        run: python3 scripts/test_main_activity_async_spaces_contract.py
+
+      - name: Test MainActivity async clone mutations contract
+        run: python3 scripts/test_main_activity_clone_mutations_async_contract.py
+      - name: Test compact Spaces bottom navigation UI contract
+        run: python3 scripts/test_spaces_bottom_navigation_ui_contract.py
+      - name: Test Spaces cards UI contract
+        run: python3 scripts/test_spaces_cards_ui_contract.py
+      - name: Test Dashboard clocks and device info contract
+        run: python3 scripts/test_dashboard_clocks_device_info_contract.py
+      - name: Test verified Dashboard environment summary contract
+        run: python3 scripts/test_dashboard_verified_environment_summary.py
+
+      - name: Test Dashboard five-destination navigation contract
+        run: python3 scripts/test_dashboard_bottom_navigation_contract.py
+
+      - name: Test Dashboard Tehran Jalali and New York Gregorian dates
+        run: python3 scripts/test_dashboard_date_format_contract.py
+      - name: Test appearance preferences and immediate lock contract
+        run: python3 scripts/test_appearance_preferences_quick_lock_contract.py
+      - name: Test main-process app-lock lifecycle contract
+        run: python3 scripts/test_app_lock_lifecycle_contract.py
+      - name: Test app-lock deadline math against production Java
+        run: python3 scripts/test_app_lock_deadline_contract.py
+      - name: Test app-lock attempt-throttling contract
+        run: python3 scripts/test_app_lock_attempt_throttling_contract.py
+      - name: Test app-lock Activity lifecycle state contract
+        run: python3 scripts/test_app_lock_lifecycle_state_contract.py
+      - name: Test app-lock isolated-process instrumentation wiring
+        run: python3 scripts/test_app_lock_process_isolation_contract.py
+      - name: Test app-lock runtime Activity lifecycle contract
+        run: python3 scripts/test_app_lock_lifecycle_runtime_contract.py
+      - name: Test actual Device Admin state contract
+        run: python3 scripts/test_device_admin_state_contract.py
+      - name: Test Dashboard read-only security and Engine summary
+        run: python3 scripts/test_dashboard_read_only_security_engine_contract.py
+      - name: Test launcher icon and truthful About contract
+        run: python3 scripts/test_launcher_icon_and_about_contract.py
+      - name: Test Add App picker UI contract
+        run: python3 scripts/test_add_app_picker_ui_contract.py
+
+      - name: Test AddApp and Dashboard async persistence contract
+        run: python3 scripts/test_add_app_dashboard_async_persistence_contract.py
+
+      - name: Test atomic clone ID reservation contract
+        run: python3 scripts/test_clone_id_reservation_contract.py
+
+      - name: Test pending reservation recovery contract
+        run: python3 scripts/test_pending_reservation_recovery_contract.py
+
+      - name: Test clone hook isolation contract
+        run: python3 scripts/test_hook_isolation_contract.py
+      - name: Test Stage 8.9 Engine device capability audit
+        run: python3 scripts/test_stage_8_9_engine_device_capability_audit.py
+
+      - name: Test CloneStore migration inventory contract
+        run: python3 scripts/test_clone_store_migration_inventory.py
+
+      - name: Test inactive Room foundation contract
+        run: python3 scripts/test_room_foundation_contract.py
+
+      - name: Test read-only legacy CloneStore snapshot contract
+        run: python3 scripts/test_legacy_clone_snapshot_contract.py
+
+      - name: Test atomic legacy snapshot backup contract
+        run: python3 scripts/test_legacy_clone_snapshot_backup_contract.py
+
+      - name: Test opt-in legacy Room import contract
+        run: python3 scripts/test_legacy_room_import_contract.py
+
+      - name: Test Android Room instrumentation wiring
+        run: python3 scripts/test_room_instrumentation_wiring.py
+
+      - name: Install isolated NDK r23 for baseline CPU probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          test -x "$SDKMANAGER"
+          mkdir -p "$SDK_ROOT/licenses"
+          for LICENSE_HASH in \
+            8933bad161af4178b1185d1a37fbf41ea5269c55 \
+            d56f5187479451eabf01fb78af6dfcb131a6481e \
+            24333f8a63b6825ea9c5514f83c2829b004d1fee \
+            859f317696f67ef3d7f30a50a5560e7834b43903; do
+            grep -qxF "$LICENSE_HASH" "$SDK_ROOT/licenses/android-sdk-license" 2>/dev/null || echo "$LICENSE_HASH" >> "$SDK_ROOT/licenses/android-sdk-license"
+          done
+          grep -qxF "24333f8a63b6825ea9c5514f83c2829b004d1fee" "$SDK_ROOT/licenses/android-ndk-license" 2>/dev/null || echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$SDK_ROOT/licenses/android-ndk-license"
+          "$SDKMANAGER" --install "ndk;23.2.8568313"
+          test -x "$SDK_ROOT/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+
       - name: Prepare build workspace
         run: python3 scripts/prepare_workspace.py
 
+      - name: Build independent ARMv7/ARM64 NEON probe
+        run: python3 scripts/build_neon_probe.py
+
+      - name: Test Stage 8.17 isolated install transaction recovery harness
+        run: python3 scripts/test_stage_8_17_install_transaction_recovery.py
+
+      - name: Test Stage 8.18 pinned Engine install failure semantics audit
+        run: python3 scripts/test_stage_8_18_engine_install_failure_semantics.py
+
+      - name: Test Stage 8.19 non-destructive package scan quarantine harness
+        run: python3 scripts/test_stage_8_19_package_scan_quarantine.py
+
+      - name: Test Stage 8.13 pinned Engine ABI and split APK source contract
+        run: python3 scripts/test_stage_8_13_engine_abi_contract.py
+
+      - name: Test Stage 8.35 Clone session and account data isolation audit
+        run: python3 scripts/test_stage_8_35_session_data_isolation_audit.py
+
+      - name: Test Stage 8.40 AccountManager direct API package-scope gate
+        run: python3 scripts/test_stage_8_40_account_manager_package_scope_gate.py
+
+      - name: Test Stage 8.44 AccountManager Binder identity audit
+        run: python3 scripts/test_stage_8_44_account_manager_binder_identity_audit.py
+
+      - name: Test Stage 8.41 Space identity semantics guard
+        run: python3 scripts/test_stage_8_41_space_identity_semantics.py
+
+      - name: Test read-only Clone identity diagnostics contract
+        run: python3 scripts/test_clone_identity_diagnostics_contract.py
+
+      - name: Enable KVM for Android Emulator
+        run: |
+          set -euo pipefail
+          if [[ -e /dev/kvm ]]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+            if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+              echo "KVM is readable and writable; hardware acceleration is available."
+              ls -l /dev/kvm
+            else
+              echo "::warning:: /dev/kvm exists but is not accessible after the permission rule; Android Emulator will use TCG."
+              ls -l /dev/kvm || true
+            fi
+          else
+            echo "::warning:: /dev/kvm is not present on this runner; Android Emulator will use TCG."
+          fi
+
+      - name: Run Room Android instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Current Android Emulator releases require explicit opt-in to TCG
+          # when hosted Linux runners do not expose KVM/hardware acceleration.
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          emulator-boot-timeout: 1200
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+            echo "=== DEBUG APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== ANDROID TEST APK NATIVE LIBRARIES ==="
+            unzip -l app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk | grep -E 'lib/.+\\.so' || true
+            echo "=== MERGED DEBUG NATIVE LIBRARY INPUTS ==="
+            find app/build/intermediates/merged_native_libs/debug -type f -name '*.so' -print 2>/dev/null || true
+            echo "=== INSTALL AND RUN ROOM INSTRUMENTATION ==="
+            # Keep the API-21-only smoke class out of this API-34 instrumentation suite.
+            # It is executed separately by the dedicated API-21 emulator step below.
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notClass=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
+
+      # Preserve raw Gradle/AndroidJUnit reports even when emulator tests fail.
+      - name: Upload Android instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-reports
+          path: |
+            build_workspace/app/build/reports/androidTests/connected/debug/
+            build_workspace/app/build/outputs/androidTest-results/connected/
+            build_workspace/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Run Android API 21 legacy compatibility smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 21
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          emulator-boot-timeout: 1200
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.class=com.veyravault.space.core.LegacyApi21CompatibilityInstrumentationTest
+
+      - name: Run Android 8.1 API 27 target-device compatibility instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
+        with:
+          api-level: 27
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          emulator-boot-timeout: 1200
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          working-directory: build_workspace
+          # Keep the runner's script field to one command. Multi-line scripts
+          # are dispatched line-by-line by this action's shell wrapper.
+          script: bash ../scripts/run_android_api27_compatibility.sh
+
+      - name: Test source audit contract
+        run: python3 scripts/test_source_audit_contract.py
+
       - name: Run source audit
         run: python3 scripts/audit_source.py > source_audit_report.txt
+
+      - name: Inspect Release runtime dependency provenance
+        working-directory: ./build_workspace
+        run: |
+          set -euo pipefail
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency kotlinx-coroutines-android --no-daemon --console=plain
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency kotlinx-coroutines-core --no-daemon --console=plain
+          ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency androidx.room:room-runtime --no-daemon --console=plain
 
       - name: Compile unsigned release APK
         working-directory: ./build_workspace
@@ -95,12 +416,45 @@ jobs:
           mkdir -p signed
           cp unsigned/VeyraVault-release.apk signed/VeyraVault-release.apk
           "$APKSIGNER" sign \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
             --ks "$RUNNER_TEMP/veyravault-release.keystore" \
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KS_PASS \
             --key-pass env:KEY_PASS \
             signed/VeyraVault-release.apk
-          "$APKSIGNER" verify --verbose signed/VeyraVault-release.apk
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --min-sdk-version 21 signed/VeyraVault-release.apk 2>&1)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+
+          # AOSP apksig deliberately warns that ordinary META-INF entries are not V1-covered.
+          # Keep V1 enabled and verified; V2/V3 verify the complete APK, including these files.
+          # Only the exact runtime/provenance entries permitted by the unsigned audit may warn.
+          UNPROTECTED_WARNINGS="$(grep -F "not protected by signature" <<< "$VERIFY_OUTPUT" || true)"
+          while IFS= read -r WARNING; do
+            [[ -z "$WARNING" ]] && continue
+            case "$WARNING" in
+              *"META-INF/com/android/build/gradle/app-metadata.properties not protected by signature."*|\
+              *"META-INF/services/kotlinx.coroutines.CoroutineExceptionHandler not protected by signature."*|\
+              *"META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory not protected by signature."*)
+                echo "INFO: Allow-listed META-INF V1 warning; V2/V3 verification remains mandatory."
+                ;;
+              *)
+                echo "ERROR: Unexpected V1-unprotected entry: $WARNING" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$UNPROTECTED_WARNINGS"
+
+          for REQUIRED_SIGNATURE in \
+            "Verified using v1 scheme (JAR signing): true" \
+            "Verified using v2 scheme (APK Signature Scheme v2): true" \
+            "Verified using v3 scheme (APK Signature Scheme v3): true"; do
+            if ! grep -Fq "$REQUIRED_SIGNATURE" <<< "$VERIFY_OUTPUT"; then
+              echo "ERROR: Required APK signature scheme verification failed: $REQUIRED_SIGNATURE" >&2
+              exit 1
+            fi
+          done
           cp unsigned/source_audit_report.txt signed/ 2>/dev/null || true
           cp unsigned/apk_audit_report.txt signed/ 2>/dev/null || true
           echo "signed=true" >> "$GITHUB_OUTPUT"

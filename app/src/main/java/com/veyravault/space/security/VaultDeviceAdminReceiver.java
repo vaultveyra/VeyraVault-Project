@@ -28,8 +28,8 @@ public class VaultDeviceAdminReceiver extends DeviceAdminReceiver {
             intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp);
             intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                     LocaleHelper.isPersian(act)
-                            ? "با فعال کردن این گزینه، برنامه VeyraVault تا زمانی که خودتان در تنظیمات امنیت آن را غیرفعال نکنید، قابل حذف شدن نخواهد بود."
-                            : "Enabling this prevents VeyraVault from being uninstalled until you disable this switch inside VeyraVault Security Settings.");
+                            ? "این گزینه دسترسی مدیر دستگاه اندروید را فعال می‌کند. برای حذف VeyraVault ابتدا باید این دسترسی را از تنظیمات سیستم غیرفعال کنید. این قابلیت برنامه را غیرقابل‌حذف نمی‌کند و مدیر دستگاه نیز از تنظیمات اندروید قابل لغو است."
+                            : "This activates Android Device Admin. To uninstall VeyraVault, first deactivate its admin access in Android Settings. This does not make the app impossible to uninstall, and admin access can be revoked in system settings.");
             act.startActivityForResult(intent, reqCode);
         } else if (!enable && dpm.isAdminActive(comp)) {
             dpm.removeActiveAdmin(comp);

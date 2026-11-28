@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public class CloneStore {
     private static final String PREF = "veyravault_clones_v2";
@@ -20,6 +21,30 @@ public class CloneStore {
     private static final String KEY_MASTER_GPS = "master_mock_gps";
     private static final String KEY_GLOBAL_DEV = "global_device_json";
     private static final String KEY_ACTIVE_LAUNCH = "active_launch_json";
+    private static final String KEY_PENDING_RESERVATIONS = "pending_clone_reservations_json";
+    private static final int RESERVATION_SCHEMA_VERSION = 1;
+
+    /** Checked signal that SharedPreferences declined a durable commit. */
+    static final class PersistenceException extends Exception {
+        PersistenceException(String message) { super(message); }
+    }
+
+    /** Immutable handle for a durable package/user creation reservation. */
+    public static final class CloneReservation {
+        private final String token;
+        private final String packageName;
+        private final int userId;
+
+        private CloneReservation(String token, String packageName, int userId) {
+            this.token = token;
+            this.packageName = packageName;
+            this.userId = userId;
+        }
+
+        public String getToken() { return token; }
+        public String getPackageName() { return packageName; }
+        public int getUserId() { return userId; }
+    }
 
     public static class CloneEntry {
         public String packageName;
@@ -43,45 +68,285 @@ public class CloneStore {
         public boolean enabled = true;
         public String brand = "samsung";
         public String manufacturer = "samsung";
-        public String model = "SM-S928B"; // Galaxy S24 Ultra (Masks Huawei/old device)
+        public String model = "SM-S928B"; // Saved profile metadata; not applied by the pinned engine.
         public String device = "e3q";
         public String countryIso = "us";
         public String simOperator = "310260";
         public String simOperatorName = "T-Mobile";
     }
 
+
+    private static String identityKey(String packageName, int userId) {
+        return packageName + "\\u0000" + userId;
+    }
+
+    private static List<CloneReservation> readReservationsStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_PENDING_RESERVATIONS)) return new ArrayList<CloneReservation>();
+        Object raw = values.get(KEY_PENDING_RESERVATIONS);
+        if (!(raw instanceof String)) throw new IllegalStateException("Reservation journal is not a String");
+        JSONObject root = new JSONObject((String) raw);
+        Object version = root.opt("schemaVersion");
+        if (!(version instanceof Number)
+                || ((Number) version).intValue() != RESERVATION_SCHEMA_VERSION
+                || ((Number) version).doubleValue() != RESERVATION_SCHEMA_VERSION) {
+            throw new IllegalStateException("Reservation journal schema is unsupported");
+        }
+        Object rawItems = root.opt("reservations");
+        if (!(rawItems instanceof JSONArray)) throw new IllegalStateException("Reservation journal entries are invalid");
+        JSONArray array = (JSONArray) rawItems;
+        List<CloneReservation> result = new ArrayList<CloneReservation>();
+        Set<String> tokens = new HashSet<String>();
+        Set<String> identities = new HashSet<String>();
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) throw new IllegalStateException("Reservation entry is not an object");
+            Object rawToken = item.opt("token");
+            Object rawPackage = item.opt("pkg");
+            Object rawUserId = item.opt("uid");
+            if (!(rawToken instanceof String) || ((String) rawToken).trim().isEmpty()
+                    || !(rawPackage instanceof String) || ((String) rawPackage).trim().isEmpty()
+                    || !(rawUserId instanceof Number) || ((Number) rawUserId).intValue() < 0
+                    || ((Number) rawUserId).doubleValue() != ((Number) rawUserId).intValue()) {
+                throw new IllegalStateException("Reservation entry identity or token is invalid");
+            }
+            String token = (String) rawToken;
+            String packageName = (String) rawPackage;
+            int userId = ((Number) rawUserId).intValue();
+            if (!tokens.add(token) || !identities.add(identityKey(packageName, userId))) {
+                throw new IllegalStateException("Reservation journal contains duplicate token or identity");
+            }
+            result.add(new CloneReservation(token, packageName, userId));
+        }
+        return result;
+    }
+
+    private static String serializeReservations(List<CloneReservation> reservations) throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("schemaVersion", RESERVATION_SCHEMA_VERSION);
+        JSONArray array = new JSONArray();
+        for (CloneReservation reservation : reservations) {
+            JSONObject item = new JSONObject();
+            item.put("token", reservation.token);
+            item.put("pkg", reservation.packageName);
+            item.put("uid", reservation.userId);
+            array.put(item);
+        }
+        root.put("reservations", array);
+        return root.toString();
+    }
+
+    private static String serializeEntries(List<CloneEntry> list) throws Exception {
+        JSONArray arr = new JSONArray();
+        Set<String> identities = new HashSet<String>();
+        for (CloneEntry e : list) {
+            if (e == null || e.packageName == null || e.packageName.trim().isEmpty()
+                    || e.userId < 0 || e.deniedPermissions == null) {
+                throw new IllegalArgumentException("Clone entry is invalid");
+            }
+            if (e.mockGpsEnabled && (Double.isNaN(e.latitude) || Double.isInfinite(e.latitude)
+                    || Double.isNaN(e.longitude) || Double.isInfinite(e.longitude)
+                    || e.latitude < -90.0d || e.latitude > 90.0d
+                    || e.longitude < -180.0d || e.longitude > 180.0d)) {
+                throw new IllegalArgumentException("Enabled clone location is invalid");
+            }
+            if (!identities.add(identityKey(e.packageName, e.userId))) {
+                throw new IllegalArgumentException("Duplicate clone identity");
+            }
+            JSONObject o = new JSONObject();
+            o.put("pkg", e.packageName);
+            o.put("uid", e.userId);
+            o.put("name", e.displayName == null ? e.packageName : e.displayName);
+            o.put("gpsOn", e.mockGpsEnabled);
+            o.put("lat", e.latitude);
+            o.put("lng", e.longitude);
+            o.put("locLabel", e.locationLabel == null ? "" : e.locationLabel);
+            o.put("devOn", e.customDeviceEnabled);
+            o.put("devBrand", e.deviceBrand == null ? "" : e.deviceBrand);
+            o.put("devModel", e.deviceModel == null ? "" : e.deviceModel);
+            JSONArray permissions = new JSONArray();
+            for (String permission : e.deniedPermissions) {
+                if (permission == null || permission.trim().isEmpty())
+                    throw new IllegalArgumentException("Denied permission is invalid");
+                permissions.put(permission);
+            }
+            o.put("denied", permissions);
+            arr.put(o);
+        }
+        return arr.toString();
+    }
+
+    private static boolean containsReservation(List<CloneReservation> reservations,
+                                               String packageName, int userId) {
+        String identity = identityKey(packageName, userId);
+        for (CloneReservation reservation : reservations) {
+            if (identity.equals(identityKey(reservation.packageName, reservation.userId))) return true;
+        }
+        return false;
+    }
+
+    static synchronized CloneReservation reserveNextUserId(Context c, String packageName) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        if (packageName == null || packageName.trim().isEmpty())
+            throw new IllegalArgumentException("Package name is required");
+        List<CloneEntry> clones = readAllStrict(c);
+        List<CloneReservation> reservations = readReservationsStrict(c);
+        for (CloneEntry clone : clones) {
+            if (containsReservation(reservations, clone.packageName, clone.userId))
+                throw new IllegalStateException("Reservation journal conflicts with the clone registry");
+        }
+        Set<Integer> used = new HashSet<Integer>();
+        for (CloneEntry entry : clones) if (packageName.equals(entry.packageName)) used.add(entry.userId);
+        for (CloneReservation reservation : reservations)
+            if (packageName.equals(reservation.packageName)) used.add(reservation.userId);
+        int candidate = 0;
+        while (used.contains(candidate)) {
+            if (candidate == Integer.MAX_VALUE) throw new IllegalStateException("No virtual user ID is available");
+            candidate++;
+        }
+        CloneReservation reservation = new CloneReservation(UUID.randomUUID().toString(), packageName, candidate);
+        reservations.add(reservation);
+        if (!prefs(c).edit().putString(KEY_PENDING_RESERVATIONS, serializeReservations(reservations)).commit())
+            throw new PersistenceException("Reservation journal commit failed");
+        return reservation;
+    }
+
+    static synchronized List<CloneReservation> readPendingReservationsStrict(Context c) throws Exception {
+        List<CloneEntry> clones = readAllStrict(c);
+        List<CloneReservation> reservations = readReservationsStrict(c);
+        for (CloneReservation reservation : reservations) {
+            for (CloneEntry clone : clones) {
+                if (clone.packageName.equals(reservation.packageName) && clone.userId == reservation.userId)
+                    throw new IllegalStateException("Reserved identity is already present in the clone registry");
+            }
+        }
+        return new ArrayList<CloneReservation>(reservations);
+    }
+
+    static synchronized boolean commitReservedClone(Context c, CloneEntry entry,
+                                                     CloneReservation supplied) throws Exception {
+        if (c == null || entry == null || supplied == null)
+            throw new IllegalArgumentException("Clone entry and reservation are required");
+        if (entry.packageName == null || !entry.packageName.equals(supplied.packageName)
+                || entry.userId != supplied.userId)
+            throw new IllegalArgumentException("Clone identity does not match its reservation");
+        List<CloneEntry> clones = readAllStrict(c);
+        List<CloneReservation> reservations = readPendingReservationsStrict(c);
+        CloneReservation owned = null;
+        for (CloneReservation reservation : reservations) {
+            if (reservation.token.equals(supplied.token)) { owned = reservation; break; }
+        }
+        if (owned == null || !owned.packageName.equals(supplied.packageName)
+                || owned.userId != supplied.userId)
+            throw new IllegalStateException("Reservation is missing or does not belong to this operation");
+        for (CloneEntry clone : clones) {
+            if (clone.packageName.equals(entry.packageName) && clone.userId == entry.userId)
+                throw new IllegalStateException("Reserved clone identity already exists");
+        }
+        clones.add(entry);
+        List<CloneReservation> remaining = new ArrayList<CloneReservation>();
+        for (CloneReservation reservation : reservations)
+            if (!reservation.token.equals(supplied.token)) remaining.add(reservation);
+        SharedPreferences.Editor editor = prefs(c).edit().putString(KEY_CLONES, serializeEntries(clones));
+        if (remaining.isEmpty()) editor.remove(KEY_PENDING_RESERVATIONS);
+        else editor.putString(KEY_PENDING_RESERVATIONS, serializeReservations(remaining));
+        // A single Editor commit makes clone insertion and reservation consumption one transaction.
+        return editor.commit();
+    }
+
+    static synchronized boolean releaseReservationAfterEngineAbsence(
+            Context c, CloneReservation supplied, boolean engineAbsenceConfirmed) throws Exception {
+        if (c == null || supplied == null) throw new IllegalArgumentException("Reservation is required");
+        if (!engineAbsenceConfirmed) return false;
+        List<CloneReservation> reservations = readPendingReservationsStrict(c);
+        boolean found = false;
+        List<CloneReservation> remaining = new ArrayList<CloneReservation>();
+        for (CloneReservation reservation : reservations) {
+            if (reservation.token.equals(supplied.token)
+                    && reservation.packageName.equals(supplied.packageName)
+                    && reservation.userId == supplied.userId) found = true;
+            else remaining.add(reservation);
+        }
+        if (!found) return false;
+        SharedPreferences.Editor editor = prefs(c).edit();
+        if (remaining.isEmpty()) editor.remove(KEY_PENDING_RESERVATIONS);
+        else editor.putString(KEY_PENDING_RESERVATIONS, serializeReservations(remaining));
+        return editor.commit();
+    }
+
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
 
-    public static List<CloneEntry> getAll(Context c) {
+    /**
+     * Strict registry reader for mutation paths. Unlike getAll(), this never converts
+     * malformed or ambiguous persisted data into an empty registry.
+     */
+    static List<CloneEntry> readAllStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        SharedPreferences store = prefs(c);
+        Map<String, ?> values = store.getAll();
+        Object rawValue = values.get(KEY_CLONES);
+        if (rawValue == null) {
+            if (values.containsKey(KEY_CLONES)) throw new IllegalStateException("Clone registry value is null");
+            return new ArrayList<CloneEntry>();
+        }
+        if (!(rawValue instanceof String)) throw new IllegalStateException("Clone registry is not a String");
+        JSONArray arr = new JSONArray((String) rawValue);
         List<CloneEntry> out = new ArrayList<CloneEntry>();
-        try {
-            String raw = prefs(c).getString(KEY_CLONES, "[]");
-            JSONArray arr = new JSONArray(raw);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                CloneEntry e = new CloneEntry();
-                e.packageName = o.optString("pkg");
-                e.userId = o.optInt("uid", 0);
-                e.displayName = o.optString("name", e.packageName);
-                e.mockGpsEnabled = o.optBoolean("gpsOn", false);
-                e.latitude = o.optDouble("lat", 0.0);
-                e.longitude = o.optDouble("lng", 0.0);
-                e.locationLabel = o.optString("locLabel", "");
-                e.customDeviceEnabled = o.optBoolean("devOn", false);
-                e.deviceBrand = o.optString("devBrand", "");
-                e.deviceModel = o.optString("devModel", "");
-                JSONArray pArr = o.optJSONArray("denied");
-                if (pArr != null) {
-                    for (int j = 0; j < pArr.length(); j++) e.deniedPermissions.add(pArr.optString(j));
-                }
-                out.add(e);
+        Set<String> identities = new HashSet<String>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) throw new IllegalStateException("Clone registry entry " + i + " is not an object");
+            CloneEntry e = new CloneEntry();
+            Object pkg = o.opt("pkg");
+            Object uid = o.opt("uid");
+            if (!(pkg instanceof String) || ((String) pkg).trim().isEmpty()) {
+                throw new IllegalStateException("Clone registry entry " + i + " has an invalid package name");
             }
-        } catch (Exception ignored) {}
+            if (!(uid instanceof Number) || ((Number) uid).intValue() < 0
+                    || ((Number) uid).doubleValue() != ((Number) uid).intValue()) {
+                throw new IllegalStateException("Clone registry entry " + i + " has an invalid virtual user ID");
+            }
+            e.packageName = (String) pkg;
+            e.userId = ((Number) uid).intValue();
+
+            e.displayName = readOptionalString(o, "name", e.packageName);
+            e.mockGpsEnabled = readOptionalBoolean(o, "gpsOn", false);
+            e.latitude = readOptionalDouble(o, "lat", 0.0d);
+            e.longitude = readOptionalDouble(o, "lng", 0.0d);
+            e.locationLabel = readOptionalString(o, "locLabel", "");
+            e.customDeviceEnabled = readOptionalBoolean(o, "devOn", false);
+            e.deviceBrand = readOptionalString(o, "devBrand", "");
+            e.deviceModel = readOptionalString(o, "devModel", "");
+
+            if (e.mockGpsEnabled && (Double.isNaN(e.latitude) || Double.isInfinite(e.latitude)
+                    || Double.isNaN(e.longitude) || Double.isInfinite(e.longitude)
+                    || e.latitude < -90.0d || e.latitude > 90.0d
+                    || e.longitude < -180.0d || e.longitude > 180.0d)) {
+                throw new IllegalStateException("Clone registry entry " + i + " has invalid enabled-location coordinates");
+            }
+
+            Object denied = o.opt("denied");
+            if (denied != null) {
+                if (!(denied instanceof JSONArray)) throw new IllegalStateException("Denied permissions are not an array");
+                JSONArray permissions = (JSONArray) denied;
+                for (int j = 0; j < permissions.length(); j++) {
+                    Object permission = permissions.get(j);
+                    if (!(permission instanceof String) || ((String) permission).trim().isEmpty()) {
+                        throw new IllegalStateException("Denied permission at entry " + i + " is invalid");
+                    }
+                    e.deniedPermissions.add((String) permission);
+                }
+            }
+
+            String identity = e.packageName + "\\u0000" + e.userId;
+            if (!identities.add(identity)) throw new IllegalStateException("Duplicate clone identity");
+            out.add(e);
+        }
         Collections.sort(out, new Comparator<CloneEntry>() {
-            @Override
-            public int compare(CloneEntry a, CloneEntry b) {
+            @Override public int compare(CloneEntry a, CloneEntry b) {
                 if (a.userId != b.userId) return a.userId - b.userId;
                 return a.displayName.compareToIgnoreCase(b.displayName);
             }
@@ -89,72 +354,116 @@ public class CloneStore {
         return out;
     }
 
-    public static void saveAll(Context c, List<CloneEntry> list) {
-        try {
-            JSONArray arr = new JSONArray();
-            for (CloneEntry e : list) {
-                JSONObject o = new JSONObject();
-                o.put("pkg", e.packageName);
-                o.put("uid", e.userId);
-                o.put("name", e.displayName);
-                o.put("gpsOn", e.mockGpsEnabled);
-                o.put("lat", e.latitude);
-                o.put("lng", e.longitude);
-                o.put("locLabel", e.locationLabel);
-                o.put("devOn", e.customDeviceEnabled);
-                o.put("devBrand", e.deviceBrand);
-                o.put("devModel", e.deviceModel);
-                JSONArray pArr = new JSONArray();
-                for (String p : e.deniedPermissions) pArr.put(p);
-                o.put("denied", pArr);
-                arr.put(o);
-            }
-            prefs(c).edit().putString(KEY_CLONES, arr.toString()).commit();
-        } catch (Exception ignored) {}
+    private static String readOptionalString(JSONObject object, String key, String fallback) throws Exception {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof String)) throw new IllegalStateException("Field " + key + " is not a String");
+        return (String) value;
     }
 
-    public static CloneEntry getClone(Context c, String pkg, int userId) {
+    private static boolean readOptionalBoolean(JSONObject object, String key, boolean fallback) {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof Boolean)) throw new IllegalStateException("Field " + key + " is not a Boolean");
+        return (Boolean) value;
+    }
+
+    private static double readOptionalDouble(JSONObject object, String key, double fallback) {
+        Object value = object.opt(key);
+        if (value == null) return fallback;
+        if (!(value instanceof Number)) throw new IllegalStateException("Field " + key + " is not numeric");
+        return ((Number) value).doubleValue();
+    }
+
+    public static List<CloneEntry> getAll(Context c) {
+        try {
+            return readAllStrict(c);
+        } catch (Exception ignored) {
+            // Legacy UI callers retain their historical empty-list fallback.
+            // All mutation/allocation paths use readAllStrict and fail closed.
+            return new ArrayList<CloneEntry>();
+        }
+    }
+
+    public static synchronized boolean saveAll(Context c, List<CloneEntry> list) {
+        if (c == null || list == null) return false;
+        try {
+            List<CloneReservation> reservations = readReservationsStrict(c);
+            Set<String> reserved = new HashSet<String>();
+            for (CloneReservation reservation : reservations)
+                reserved.add(identityKey(reservation.packageName, reservation.userId));
+            for (CloneEntry entry : list) {
+                if (entry != null && reserved.contains(identityKey(entry.packageName, entry.userId))) return false;
+            }
+            return prefs(c).edit().putString(KEY_CLONES, serializeEntries(list)).commit();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+        public static CloneEntry getClone(Context c, String pkg, int userId) {
         for (CloneEntry e : getAll(c)) {
             if (e.packageName.equals(pkg) && e.userId == userId) return e;
         }
         return null;
     }
 
-    public static void upsertClone(Context c, CloneEntry entry) {
-        List<CloneEntry> all = getAll(c);
-        boolean found = false;
-        for (int i = 0; i < all.size(); i++) {
-            CloneEntry cur = all.get(i);
-            if (cur.packageName.equals(entry.packageName) && cur.userId == entry.userId) {
-                all.set(i, entry);
-                found = true;
-                break;
+    public static synchronized boolean upsertClone(Context c, CloneEntry entry) {
+        if (entry == null || entry.packageName == null || entry.packageName.trim().isEmpty()
+                || entry.userId < 0) return false;
+        try {
+            List<CloneEntry> all = readAllStrict(c);
+            boolean found = false;
+            for (int i = 0; i < all.size(); i++) {
+                CloneEntry current = all.get(i);
+                if (current.packageName.equals(entry.packageName) && current.userId == entry.userId) {
+                    all.set(i, entry);
+                    found = true;
+                    break;
+                }
             }
+            List<CloneReservation> reservations = readReservationsStrict(c);
+            if (!found && containsReservation(reservations, entry.packageName, entry.userId)) return false;
+            if (!found) all.add(entry);
+            return saveAll(c, all);
+        } catch (Exception ignored) {
+            return false;
         }
-        if (!found) all.add(entry);
-        saveAll(c, all);
     }
 
-    public static void removeClone(Context c, String pkg, int userId) {
-        List<CloneEntry> all = getAll(c);
-        List<CloneEntry> kept = new ArrayList<CloneEntry>();
-        for (CloneEntry e : all) {
-            if (!(e.packageName.equals(pkg) && e.userId == userId)) kept.add(e);
+        public static synchronized boolean removeClone(Context c, String pkg, int userId) {
+        if (c == null || pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
+        try {
+            List<CloneEntry> all = readAllStrict(c);
+            List<CloneEntry> kept = new ArrayList<CloneEntry>();
+            for (CloneEntry entry : all)
+                if (!(entry.packageName.equals(pkg) && entry.userId == userId)) kept.add(entry);
+            return saveAll(c, kept);
+        } catch (Exception ignored) {
+            return false;
         }
-        saveAll(c, kept);
     }
 
-    public static int nextFreeUserIdForPackage(Context c, String pkg) {
-        Set<Integer> used = new HashSet<Integer>();
-        for (CloneEntry e : getAll(c)) {
-            if (e.packageName.equals(pkg)) used.add(e.userId);
+        public static synchronized int nextFreeUserIdForPackage(Context c, String pkg) {
+        if (c == null || pkg == null || pkg.trim().isEmpty()) return -1;
+        try {
+            Set<Integer> used = new HashSet<Integer>();
+            for (CloneEntry entry : readAllStrict(c))
+                if (entry.packageName.equals(pkg)) used.add(entry.userId);
+            for (CloneReservation reservation : readReservationsStrict(c))
+                if (reservation.packageName.equals(pkg)) used.add(reservation.userId);
+            int uid = 0;
+            while (used.contains(uid)) {
+                if (uid == Integer.MAX_VALUE) return -1;
+                uid++;
+            }
+            return uid;
+        } catch (Exception ignored) {
+            return -1;
         }
-        int uid = 0;
-        while (used.contains(uid)) uid++;
-        return uid;
     }
 
-    public static Map<Integer, List<CloneEntry>> getGroupedBySpace(Context c) {
+        public static Map<Integer, List<CloneEntry>> getGroupedBySpace(Context c) {
         Map<Integer, List<CloneEntry>> map = new LinkedHashMap<Integer, List<CloneEntry>>();
         for (CloneEntry e : getAll(c)) {
             int spaceNum = e.getSpaceNumber();
@@ -167,46 +476,148 @@ public class CloneStore {
         return map;
     }
 
-    public static boolean isSpaceCollapsed(Context c, int spaceNum) {
-        return prefs(c).getStringSet(KEY_COLLAPSED, new HashSet<String>()).contains(String.valueOf(spaceNum));
+    static Set<Integer> readCollapsedSpaceNumbersStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_COLLAPSED)) return new HashSet<Integer>();
+        Object raw = values.get(KEY_COLLAPSED);
+        if (!(raw instanceof Set)) throw new IllegalStateException("Collapsed Spaces value is not a String set");
+        Set<Integer> result = new HashSet<Integer>();
+        for (Object item : (Set<?>) raw) {
+            if (!(item instanceof String)) throw new IllegalStateException("Collapsed Space key is not a String");
+            int number;
+            try { number = Integer.parseInt((String) item); }
+            catch (NumberFormatException invalid) { throw new IllegalStateException("Collapsed Space key is invalid"); }
+            if (number < 1 || !result.add(number)) throw new IllegalStateException("Collapsed Space key is out of range or duplicated");
+        }
+        return result;
     }
 
-    public static void setSpaceCollapsed(Context c, int spaceNum, boolean collapsed) {
-        Set<String> set = new HashSet<String>(prefs(c).getStringSet(KEY_COLLAPSED, new HashSet<String>()));
-        if (collapsed) set.add(String.valueOf(spaceNum));
-        else set.remove(String.valueOf(spaceNum));
-        prefs(c).edit().putStringSet(KEY_COLLAPSED, set).apply();
+    public static boolean isSpaceCollapsed(Context c, int spaceNum) {
+        if (spaceNum < 1) return false;
+        try { return readCollapsedSpaceNumbersStrict(c).contains(spaceNum); }
+        catch (Exception invalid) { return false; }
+    }
+
+    public static boolean setSpaceCollapsed(Context c, int spaceNum, boolean collapsed) {
+        if (c == null || spaceNum < 1) return false;
+        try {
+            Set<String> values = new HashSet<String>();
+            for (Integer number : readCollapsedSpaceNumbersStrict(c)) values.add(String.valueOf(number));
+            if (collapsed) values.add(String.valueOf(spaceNum));
+            else values.remove(String.valueOf(spaceNum));
+            return prefs(c).edit().putStringSet(KEY_COLLAPSED, values).commit();
+        } catch (Exception invalid) { return false; }
+    }
+
+    static boolean readMasterMockGpsEnabledStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_MASTER_GPS)) return true;
+        Object raw = values.get(KEY_MASTER_GPS);
+        if (!(raw instanceof Boolean)) throw new IllegalStateException("Master GPS value is not Boolean");
+        return (Boolean) raw;
     }
 
     public static boolean isMasterMockGpsEnabled(Context c) {
-        return prefs(c).getBoolean(KEY_MASTER_GPS, true);
+        try { return readMasterMockGpsEnabledStrict(c); }
+        catch (Exception invalid) { return true; }
     }
 
-    public static void setMasterMockGpsEnabled(Context c, boolean enabled) {
-        prefs(c).edit().putBoolean(KEY_MASTER_GPS, enabled).commit();
-    }
-
-    public static GlobalEnvConfig getGlobalEnv(Context c) {
-        GlobalEnvConfig cfg = new GlobalEnvConfig();
+    public static boolean setMasterMockGpsEnabled(Context c, boolean enabled) {
+        if (c == null) return false;
         try {
-            String raw = prefs(c).getString(KEY_GLOBAL_DEV, "");
-            if (!raw.isEmpty()) {
-                JSONObject o = new JSONObject(raw);
-                cfg.enabled = o.optBoolean("enabled", true);
-                cfg.brand = o.optString("brand", "samsung");
-                cfg.manufacturer = o.optString("manufacturer", "samsung");
-                cfg.model = o.optString("model", "SM-S928B");
-                cfg.device = o.optString("device", "e3q");
-                cfg.countryIso = o.optString("countryIso", "us");
-                cfg.simOperator = o.optString("simOperator", "310260");
-                cfg.simOperatorName = o.optString("simOperatorName", "T-Mobile");
-            }
-        } catch (Exception ignored) {}
+            readMasterMockGpsEnabledStrict(c);
+            return prefs(c).edit().putBoolean(KEY_MASTER_GPS, enabled).commit();
+        } catch (Exception invalid) { return false; }
+    }
+
+    static GlobalEnvConfig readGlobalEnvStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        GlobalEnvConfig cfg = new GlobalEnvConfig();
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_GLOBAL_DEV)) return cfg;
+        Object raw = values.get(KEY_GLOBAL_DEV);
+        if (!(raw instanceof String)) throw new IllegalStateException("Global device profile is not a String");
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return cfg;
+        JSONObject o = new JSONObject(json);
+        cfg.enabled = readOptionalBoolean(o, "enabled", cfg.enabled);
+        cfg.brand = readOptionalString(o, "brand", cfg.brand);
+        cfg.manufacturer = readOptionalString(o, "manufacturer", cfg.manufacturer);
+        cfg.model = readOptionalString(o, "model", cfg.model);
+        cfg.device = readOptionalString(o, "device", cfg.device);
+        cfg.countryIso = readOptionalString(o, "countryIso", cfg.countryIso);
+        cfg.simOperator = readOptionalString(o, "simOperator", cfg.simOperator);
+        cfg.simOperatorName = readOptionalString(o, "simOperatorName", cfg.simOperatorName);
         return cfg;
     }
 
-    public static void saveGlobalEnv(Context c, GlobalEnvConfig cfg) {
+    /**
+     * Read-only compatibility view of explicitly saved Global device metadata.
+     *
+     * The default GlobalEnvConfig values are deliberately NOT imported when the
+     * legacy key is absent. These values remain metadata-only; this method does
+     * not apply Build, SIM, network, or service-owned identity values.
+     */
+    static synchronized ProfileDocument readGlobalEnvironmentMetadataProfileStrict(Context c)
+            throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_GLOBAL_DEV)) return new ProfileDocument();
+
+        // Validate the complete legacy object before exposing any of its fields.
+        readGlobalEnvStrict(c);
+        Object raw = values.get(KEY_GLOBAL_DEV);
+        if (!(raw instanceof String)) {
+            throw new IllegalStateException("Global device profile is not a String");
+        }
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return new ProfileDocument();
+
+        JSONObject object = new JSONObject(json);
+        if (!readOptionalBoolean(object, "enabled", true)) return new ProfileDocument();
+
+        ProfileDocument metadata = new ProfileDocument();
+        String manufacturer = object.has("manufacturer")
+                ? readOptionalString(object, "manufacturer", null) : null;
+        if (manufacturer == null || manufacturer.trim().isEmpty()) {
+            manufacturer = object.has("brand")
+                    ? readOptionalString(object, "brand", null) : null;
+        }
+        if (manufacturer != null && !manufacturer.trim().isEmpty()) {
+            metadata.put("manufacturer", manufacturer.trim());
+        }
+
+        if (object.has("model")) {
+            String model = readOptionalString(object, "model", null);
+            if (model != null && !model.trim().isEmpty()) {
+                metadata.put("deviceModel", model.trim());
+            }
+        }
+        if (object.has("countryIso")) {
+            String country = readOptionalString(object, "countryIso", null);
+            if (country != null && !country.trim().isEmpty()) {
+                // Registry validation rejects non-ISO alpha-2 values field-by-field.
+                metadata.put("countryCode", country.trim());
+            }
+        }
+        // SIM operator, phone, account, and attestation fields are intentionally
+        // excluded: they are service/platform-owned, not editable profile inputs.
+        return metadata;
+    }
+
+    public static GlobalEnvConfig getGlobalEnv(Context c) {
+        try { return readGlobalEnvStrict(c); }
+        catch (Exception ignored) { return new GlobalEnvConfig(); }
+    }
+
+    public static boolean saveGlobalEnv(Context c, GlobalEnvConfig cfg) {
+        if (c == null || cfg == null || cfg.brand == null || cfg.manufacturer == null
+                || cfg.model == null || cfg.device == null || cfg.countryIso == null
+                || cfg.simOperator == null || cfg.simOperatorName == null) return false;
         try {
+            readGlobalEnvStrict(c);
             JSONObject o = new JSONObject();
             o.put("enabled", cfg.enabled);
             o.put("brand", cfg.brand);
@@ -216,38 +627,58 @@ public class CloneStore {
             o.put("countryIso", cfg.countryIso);
             o.put("simOperator", cfg.simOperator);
             o.put("simOperatorName", cfg.simOperatorName);
-            prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();
-        } catch (Exception ignored) {}
+            return prefs(c).edit().putString(KEY_GLOBAL_DEV, o.toString()).commit();
+        } catch (Exception ignored) { return false; }
     }
 
-    public static void recordActiveLaunch(Context c, CloneEntry entry) {
-        try {
-            JSONObject o = new JSONObject();
-            o.put("pkg", entry.packageName);
-            o.put("uid", entry.userId);
-            prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();
-        } catch (Exception ignored) {}
-    }
-
-    public static CloneEntry getLastActiveLaunch(Context c) {
-        try {
-            String raw = prefs(c).getString(KEY_ACTIVE_LAUNCH, "");
-            if (!raw.isEmpty()) {
-                JSONObject o = new JSONObject(raw);
-                return getClone(c, o.optString("pkg"), o.optInt("uid", 0));
-            }
-        } catch (Exception ignored) {}
+    static CloneEntry readLastActiveLaunchStrict(Context c) throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_ACTIVE_LAUNCH)) return null;
+        Object raw = values.get(KEY_ACTIVE_LAUNCH);
+        if (!(raw instanceof String)) throw new IllegalStateException("Active launch marker is not a String");
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return null;
+        JSONObject marker = new JSONObject(json);
+        Object pkg = marker.opt("pkg");
+        Object uid = marker.opt("uid");
+        if (!(pkg instanceof String) || ((String) pkg).trim().isEmpty()
+                || !(uid instanceof Number) || ((Number) uid).intValue() < 0
+                || ((Number) uid).doubleValue() != ((Number) uid).intValue())
+            throw new IllegalStateException("Active launch marker identity is invalid");
+        for (CloneEntry entry : readAllStrict(c)) {
+            if (entry.packageName.equals(pkg) && entry.userId == ((Number) uid).intValue()) return entry;
+        }
         return null;
     }
 
-    public static void syncAllHooks(Context c) {
-        GlobalEnvConfig g = getGlobalEnv(c);
-        if (g.enabled) {
-            VirtualHookManager.applyDeviceProperties(0, g.brand, g.manufacturer, g.model, g.device,
-                    g.countryIso, g.simOperator, g.simOperatorName);
-        }
-        for (CloneEntry e : getAll(c)) {
-            VirtualHookManager.syncCloneHooks(c, e);
-        }
+    public static boolean recordActiveLaunch(Context c, CloneEntry entry) {
+        if (c == null || entry == null || entry.packageName == null
+                || entry.packageName.trim().isEmpty() || entry.userId < 0) return false;
+        try {
+            boolean exists = false;
+            for (CloneEntry current : readAllStrict(c)) {
+                if (current.packageName.equals(entry.packageName) && current.userId == entry.userId) {
+                    exists = true; break;
+                }
+            }
+            if (!exists) return false;
+            JSONObject o = new JSONObject();
+            o.put("pkg", entry.packageName);
+            o.put("uid", entry.userId);
+            return prefs(c).edit().putString(KEY_ACTIVE_LAUNCH, o.toString()).commit();
+        } catch (Exception ignored) { return false; }
+    }
+
+    public static CloneEntry getLastActiveLaunch(Context c) {
+        try { return readLastActiveLaunchStrict(c); }
+        catch (Exception ignored) { return null; }
+    }
+
+    public static VirtualHookManager.SyncSummary syncAllHooks(Context c) {
+        // Location settings are applied through verified engine APIs scoped to each package/user.
+        // Strict registry reads prevent corrupt data from being reported as an empty successful sync.
+        // Device/SIM profile fields remain metadata until a supported scoped engine API exists.
+        return VirtualHookManager.syncAllClones(c);
     }
 }

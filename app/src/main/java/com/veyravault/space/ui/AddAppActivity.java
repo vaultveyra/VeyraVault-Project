@@ -22,9 +22,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.veyravault.space.R;
-import com.veyravault.space.core.CloneStore;
-import com.veyravault.space.core.Engine;
 import com.veyravault.space.core.LocaleHelper;
+import com.veyravault.space.core.AsyncCloneProvisionRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -47,26 +46,29 @@ public class AddAppActivity extends BaseActivity {
     private Button batchConfirmBtn;
     private boolean fa;
     private String currentQuery = "";
+    private AsyncCloneProvisionRepository provisionRepository;
+    private boolean cloneOperationRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fa = LocaleHelper.isPersian(this);
+        provisionRepository = AsyncCloneProvisionRepository.getInstance(getApplicationContext());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F3F5F9"));
+        root.setBackgroundColor(UiPalette.page(getApplicationContext()));
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(36, 32, 36, 20);
+        header.setPadding(dp(20), dp(22), dp(20), dp(12));
 
         final TextView batchBtn = new TextView(this);
         batchBtn.setText(getString(R.string.batch_clone));
-        batchBtn.setTextColor(Color.parseColor("#2563EB"));
+        batchBtn.setTextColor(UiPalette.accent(getApplicationContext()));
         batchBtn.setBackgroundResource(R.drawable.bg_pill_lightblue);
-        batchBtn.setPadding(32, 16, 32, 16);
+        batchBtn.setPadding(dp(16), dp(9), dp(16), dp(9));
         batchBtn.setTypeface(Typeface.DEFAULT_BOLD);
         batchBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -83,15 +85,15 @@ public class AddAppActivity extends BaseActivity {
         title.setText(getString(R.string.my_apps));
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView backBtn = new TextView(this);
         backBtn.setText("→");
         backBtn.setTextSize(24f);
-        backBtn.setTextColor(Color.parseColor("#111827"));
-        backBtn.setPadding(20, 0, 20, 0);
+        backBtn.setTextColor(UiPalette.textPrimary(getApplicationContext()));
+        backBtn.setPadding(dp(12), 0, dp(12), 0);
         backBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
         });
@@ -101,16 +103,18 @@ public class AddAppActivity extends BaseActivity {
         EditText searchEt = new EditText(this);
         searchEt.setHint("🔍  " + getString(R.string.search_apps));
         searchEt.setBackgroundResource(R.drawable.bg_card_rounded);
-        searchEt.setPadding(42, 28, 42, 28);
+        searchEt.setSingleLine(true);
+        searchEt.setTextSize(14f);
+        searchEt.setPadding(dp(18), dp(13), dp(18), dp(13));
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        slp.setMargins(36, 12, 36, 20);
+        slp.setMargins(dp(20), dp(8), dp(20), dp(16));
         root.addView(searchEt, slp);
 
         ScrollView sv = new ScrollView(this);
         grid = new GridLayout(this);
-        grid.setColumnCount(4);
-        grid.setPadding(24, 12, 24, 32);
+        grid.setColumnCount(3);
+        grid.setPadding(dp(14), dp(8), dp(14), dp(24));
         sv.addView(grid);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -121,16 +125,18 @@ public class AddAppActivity extends BaseActivity {
         batchConfirmBtn.setText(fa ? "کلون کردن برنامه‌های انتخابی" : "Clone Selected Apps");
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.setMargins(36, 12, 36, 28);
+        blp.setMargins(dp(20), dp(10), dp(20), dp(20));
         batchConfirmBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (cloneOperationRunning || batchSelected.isEmpty()) return;
+                List<InstalledApp> selected = new ArrayList<InstalledApp>();
                 for (InstalledApp app : allApps) {
-                    if (batchSelected.contains(app.pkg)) {
-                        cloneSingleApp(app);
-                    }
+                    if (batchSelected.contains(app.pkg)) selected.add(app);
                 }
-                finish();
+                cloneOperationRunning = true;
+                batchConfirmBtn.setEnabled(false);
+                cloneBatchAt(selected, 0, 0, 0);
             }
         });
         root.addView(batchConfirmBtn, blp);
@@ -147,6 +153,10 @@ public class AddAppActivity extends BaseActivity {
             }
             @Override public void afterTextChanged(Editable s) {}
         });
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void loadInstalledApps() {
@@ -177,7 +187,7 @@ public class AddAppActivity extends BaseActivity {
     private void renderGrid(final String query) {
         grid.removeAllViews();
         String q = query.trim().toLowerCase();
-        int cellW = (getResources().getDisplayMetrics().widthPixels - 96) / 4;
+        int cellW = (getResources().getDisplayMetrics().widthPixels - dp(48)) / 3;
         for (final InstalledApp app : allApps) {
             if (!q.isEmpty() && !app.label.toLowerCase().contains(q) && !app.pkg.toLowerCase().contains(q)) {
                 continue;
@@ -186,30 +196,30 @@ public class AddAppActivity extends BaseActivity {
             card.setOrientation(LinearLayout.VERTICAL);
             card.setGravity(Gravity.CENTER);
             card.setBackgroundResource(R.drawable.bg_card_rounded);
-            card.setPadding(16, 28, 16, 28);
+            card.setPadding(dp(12), dp(16), dp(12), dp(16));
             GridLayout.LayoutParams glp = new GridLayout.LayoutParams();
-            glp.width = cellW - 16;
-            glp.setMargins(8, 8, 8, 8);
+            glp.width = cellW - dp(12);
+            glp.setMargins(dp(6), dp(6), dp(6), dp(6));
             card.setLayoutParams(glp);
 
             if (batchMode && batchSelected.contains(app.pkg)) {
-                card.getBackground().setTint(Color.parseColor("#DBEAFE"));
+                card.getBackground().setTint(UiPalette.accentSurface(getApplicationContext()));
             } else {
-                card.getBackground().setTint(Color.WHITE);
+                card.getBackground().setTint(UiPalette.surface(getApplicationContext()));
             }
 
             ImageView iv = new ImageView(this);
             iv.setImageDrawable(app.icon);
-            card.addView(iv, new LinearLayout.LayoutParams(116, 116));
+            card.addView(iv, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
             TextView tv = new TextView(this);
             tv.setText(app.label);
             tv.setTextSize(12f);
-            tv.setTextColor(Color.parseColor("#1F2937"));
+            tv.setTextColor(UiPalette.textPrimary(getApplicationContext()));
             tv.setSingleLine(true);
             tv.setEllipsize(TextUtils.TruncateAt.END);
             tv.setGravity(Gravity.CENTER);
-            tv.setPadding(0, 14, 0, 0);
+            tv.setPadding(0, dp(10), 0, 0);
             card.addView(tv);
 
             card.setOnClickListener(new View.OnClickListener() {
@@ -221,8 +231,15 @@ public class AddAppActivity extends BaseActivity {
                         batchConfirmBtn.setText((fa ? "کلون کردن (" : "Clone (") + batchSelected.size() + ")");
                         renderGrid(query);
                     } else {
-                        cloneSingleApp(app);
-                        finish();
+                        if (!cloneOperationRunning) {
+                            cloneOperationRunning = true;
+                            cloneSingleApp(app, new CloneCallback() {
+                                @Override public void onComplete(boolean saved) {
+                                    cloneOperationRunning = false;
+                                    if (saved && !isFinishing() && !isDestroyed()) finish();
+                                }
+                            });
+                        }
                     }
                 }
             });
@@ -230,17 +247,60 @@ public class AddAppActivity extends BaseActivity {
         }
     }
 
-    private void cloneSingleApp(InstalledApp app) {
-        int nextUid = CloneStore.nextFreeUserIdForPackage(this, app.pkg);
-        CloneStore.CloneEntry e = new CloneStore.CloneEntry();
-        e.packageName = app.pkg;
-        e.userId = nextUid;
-        e.displayName = app.label;
-        Engine.installPackageAsUser(e.packageName, e.userId);
-        CloneStore.upsertClone(this, e);
-        Toast.makeText(this,
-                fa ? (app.label + " به فضای " + e.getSpaceNumber() + " اضافه شد")
-                   : (app.label + " cloned into Space " + e.getSpaceNumber()),
-                Toast.LENGTH_SHORT).show();
+    private interface CloneCallback {
+        void onComplete(boolean saved);
+    }
+
+    private void cloneBatchAt(final List<InstalledApp> selected, final int index,
+                              final int savedCount, final int failedCount) {
+        if (isFinishing() || isDestroyed()) return;
+        if (index >= selected.size()) {
+            cloneOperationRunning = false;
+            if (batchConfirmBtn != null) batchConfirmBtn.setEnabled(true);
+            Toast.makeText(this,
+                    fa ? ("پایان عملیات: " + savedCount + " موفق، " + failedCount + " ناموفق")
+                       : ("Batch complete: " + savedCount + " succeeded, " + failedCount + " failed"),
+                    Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        cloneSingleApp(selected.get(index), new CloneCallback() {
+            @Override public void onComplete(boolean saved) {
+                if (isFinishing() || isDestroyed()) return;
+                cloneBatchAt(selected, index + 1, savedCount + (saved ? 1 : 0),
+                        failedCount + (saved ? 0 : 1));
+            }
+        });
+    }
+
+    private void cloneSingleApp(final InstalledApp app, final CloneCallback callback) {
+        if (app == null || app.pkg == null || app.pkg.trim().isEmpty()) {
+            showCloneError(fa ? "برنامهٔ انتخاب‌شده معتبر نیست." : "The selected app is invalid.");
+            callback.onComplete(false);
+            return;
+        }
+        // The app-scoped coordinator owns install/commit/rollback beyond Activity lifetime.
+        provisionRepository.createClone(app.pkg, app.label, fa, outcome -> {
+            if (outcome == null || !outcome.success) {
+                showCloneError(outcome == null
+                        ? (fa ? "نتیجهٔ نصب مشخص نشد؛ رزروهای معلق را بررسی کنید."
+                              : "The install result is unknown; inspect pending reservations.")
+                        : outcome.message);
+                callback.onComplete(false);
+                return;
+            }
+            if (!batchMode && !isFinishing() && !isDestroyed()) {
+                Toast.makeText(AddAppActivity.this,
+                        fa ? (app.label + " به فضای " + outcome.clone.getSpaceNumber() + " اضافه شد")
+                           : (app.label + " cloned into Space " + outcome.clone.getSpaceNumber()),
+                        Toast.LENGTH_SHORT).show();
+            }
+            callback.onComplete(true);
+        });
+    }
+
+    private void showCloneError(String message) {
+        if (isFinishing() || isDestroyed()) return;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }

@@ -2,10 +2,28 @@ package com.veyravault.space.core;
 
 import android.app.Application;
 import android.content.Context;
+import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.TreeSet;
+import top.niunaijun.blackbox.core.env.BEnvironment;
+import top.niunaijun.blackbox.utils.FileUtils;
 
 public class Engine {
+
+    public enum CloneInstallState {
+        INSTALLED,
+        ABSENT,
+        UNKNOWN
+    }
+
+    static CloneInstallState classifyInstalledQueryResult(Boolean installed) {
+        if (installed == null) return CloneInstallState.UNKNOWN;
+        return installed ? CloneInstallState.INSTALLED : CloneInstallState.ABSENT;
+    }
 
     private static final String[] CORE_CLASSES = {
         "top.niunaijun.blackbox.BlackBoxCore",
@@ -13,6 +31,8 @@ public class Engine {
     };
 
     public static Object getCore() {
+        // Fail closed before resolving BlackBoxCore or its native initializers.
+        if (!HostCpuCompatibility.isEngineSupported()) return null;
         for (String cn : CORE_CLASSES) {
             try {
                 Class<?> cls = Class.forName(cn);
@@ -23,7 +43,106 @@ public class Engine {
         return null;
     }
 
+    /**
+     * Read-only inventory of virtual users persisted by the pinned Engine.
+     *
+     * This returns IDs only. It does not read AccountManager records, credentials, tokens,
+     * package data, or app sessions. A failure is explicit; callers must not interpret
+     * an unavailable Engine inventory as an empty set when making ID-allocation decisions.
+     */
+    public static List<Integer> getKnownVirtualUserIds() throws Exception {
+        Object core = getCore();
+        if (core == null) {
+            throw new IllegalStateException("Engine is unavailable; virtual-user inventory is unconfirmed");
+        }
+        // Call the Binder service directly instead of BlackBoxCore.getUsers(), whose
+        // BUserManager wrapper converts service failures into an empty list.
+        Class<?> managerClass = Class.forName(
+                "top.niunaijun.blackbox.fake.frameworks.BUserManager");
+        Object manager = managerClass.getMethod("get").invoke(null);
+        if (manager == null) {
+            throw new IllegalStateException("Engine UserManager facade is unavailable");
+        }
+        Object userService = managerClass.getMethod("getService").invoke(manager);
+        if (userService == null) {
+            throw new IllegalStateException("Engine UserManager Binder service is unavailable");
+        }
+        Class<?> serviceInterface = Class.forName(
+                "top.niunaijun.blackbox.core.system.user.IBUserManagerService");
+        if (!serviceInterface.isInstance(userService)) {
+            throw new IllegalStateException("Engine UserManager Binder has an unexpected interface");
+        }
+        Method getUsers = serviceInterface.getMethod("getUsers");
+        Object rawUsers = getUsers.invoke(userService);
+        if (!(rawUsers instanceof List)) {
+            throw new IllegalStateException("Engine returned an invalid virtual-user inventory");
+        }
+
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        for (Object user : (List<?>) rawUsers) {
+            if (user == null) {
+                throw new IllegalStateException("Engine virtual-user inventory contains a null entry");
+            }
+            Field idField = user.getClass().getField("id");
+            Object rawId = idField.get(user);
+            if (!(rawId instanceof Integer) || ((Integer) rawId) < 0) {
+                throw new IllegalStateException("Engine virtual-user inventory contains an invalid ID");
+            }
+            if (!ids.add((Integer) rawId)) {
+                throw new IllegalStateException("Engine virtual-user inventory contains a duplicate ID");
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<Integer>(ids));
+    }
+
+    /**
+     * Read-only inventory of numeric AccountManager user-bucket keys.
+     *
+     * The Binder API returns IDs only. It does not expose account names, passwords,
+     * user data, visibility records or auth tokens. Any service/load/shape error is
+     * propagated so callers cannot interpret an incomplete inventory as empty.
+     */
+    public static List<Integer> getKnownAccountUserIds() throws Exception {
+        Object core = getCore();
+        if (core == null) {
+            throw new IllegalStateException(
+                    "Engine is unavailable; AccountManager inventory is unconfirmed");
+        }
+        Class<?> managerClass = Class.forName(
+                "top.niunaijun.blackbox.fake.frameworks.BAccountManager");
+        Object manager = managerClass.getMethod("get").invoke(null);
+        if (manager == null) {
+            throw new IllegalStateException("Engine AccountManager facade is unavailable");
+        }
+        Object accountService = managerClass.getMethod("getService").invoke(manager);
+        if (accountService == null) {
+            throw new IllegalStateException("Engine AccountManager Binder service is unavailable");
+        }
+        Class<?> serviceInterface = Class.forName(
+                "top.niunaijun.blackbox.core.system.accounts.IBAccountManagerService");
+        if (!serviceInterface.isInstance(accountService)) {
+            throw new IllegalStateException(
+                    "Engine AccountManager Binder has an unexpected interface");
+        }
+        Object rawIds = serviceInterface.getMethod("getKnownAccountUserIds")
+                .invoke(accountService);
+        if (!(rawIds instanceof int[])) {
+            throw new IllegalStateException(
+                    "Engine returned an invalid AccountManager user-ID inventory");
+        }
+
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        for (int id : (int[]) rawIds) {
+            if (id < 0 || !ids.add(id)) {
+                throw new IllegalStateException(
+                        "AccountManager user-ID inventory contains an invalid or duplicate ID");
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<Integer>(ids));
+    }
+
     public static void doAttachBaseContext(Application app, final Context base) {
+        if (!HostCpuCompatibility.isEngineSupported()) return;
         try {
             Object core = getCore();
             if (core == null) return;
@@ -62,6 +181,7 @@ public class Engine {
     }
 
     public static void doOnCreate(Application app) {
+        if (!HostCpuCompatibility.isEngineSupported()) return;
         try {
             Object core = getCore();
             if (core == null) return;
@@ -75,65 +195,421 @@ public class Engine {
         } catch (Throwable ignored) {}
     }
 
-    public static boolean installPackageAsUser(String pkg, int userId) {
-        try {
-            Object core = getCore();
-            if (core == null) return false;
-            Method m = core.getClass().getMethod("installPackageAsUser", String.class, int.class);
-            Object res = m.invoke(core, pkg, userId);
-            if (res == null) return true;
-            Field f = res.getClass().getField("success");
-            return f.getBoolean(res);
-        } catch (Throwable t) {
+    private static volatile boolean profileLifecycleCallbackRegistered;
+    private static volatile String profileLifecycleDiagnostic = "NOT_REGISTERED";
+
+    /**
+     * Register a callback in each BlackBox host process. The pinned engine invokes
+     * beforeCreateApplication inside the package/user-scoped virtual process, before
+     * the target Application is instantiated.
+     */
+    private static void recordLifecycleCallbackRegistration(
+            Context context, CloneRuntimeTrace.Event event, String outcome) {
+        String hostPackage = null;
+        String processName = null;
+        if (context != null) {
+            hostPackage = context.getPackageName();
+            try {
+                processName = ProcessUtils.currentProcessName(context);
+            } catch (Throwable ignored) {
+                // Process identity is diagnostic-only; registration must not depend on it.
+            }
+        }
+        CloneRuntimeTrace.record(event, hostPackage, processName, -1, outcome);
+    }
+
+    public static boolean registerCloneProfileLifecycleCallback(Context context) {
+        if (context == null) {
+            profileLifecycleDiagnostic = "INVALID_CONTEXT";
+            recordLifecycleCallbackRegistration(null,
+                    CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                    "invalid_context");
+            return false;
+        }
+        if (profileLifecycleCallbackRegistered) {
+            recordLifecycleCallbackRegistration(context,
+                    CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                    "already_registered");
             return true;
+        }
+        synchronized (Engine.class) {
+            if (profileLifecycleCallbackRegistered) {
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                        "already_registered");
+                return true;
+            }
+            Object core = getCore();
+            if (core == null) {
+                profileLifecycleDiagnostic = "ENGINE_UNAVAILABLE";
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                        "engine_unavailable");
+                return false;
+            }
+            try {
+                Class<?> callbackBase = Class.forName(
+                        "top.niunaijun.blackbox.app.configuration.AppLifecycleCallback");
+                Class<?> callbackImpl = Class.forName(
+                        "com.veyravault.space.core.CloneProfileLifecycleCallback");
+                Object callback = callbackImpl.getConstructor(Context.class)
+                        .newInstance(context.getApplicationContext());
+                Method add = core.getClass().getMethod("addAppLifecycleCallback", callbackBase);
+                add.invoke(core, callback);
+                profileLifecycleCallbackRegistered = true;
+                profileLifecycleDiagnostic = "REGISTERED";
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTERED,
+                        "registered");
+                return true;
+            } catch (Throwable error) {
+                profileLifecycleDiagnostic = "REGISTRATION_FAILED: "
+                        + error.getClass().getSimpleName();
+                recordLifecycleCallbackRegistration(context,
+                        CloneRuntimeTrace.Event.ENGINE_LIFECYCLE_CALLBACK_REGISTRATION_FAILED,
+                        error.getClass().getSimpleName());
+                return false;
+            }
         }
     }
 
-    public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
-        CloneStore.recordActiveLaunch(ctx, entry);
-        VirtualHookManager.syncCloneHooks(ctx, entry);
-        installPackageAsUser(entry.packageName, entry.userId);
+    public static String getProfileLifecycleDiagnostic() {
+        return profileLifecycleDiagnostic;
+    }
+
+    private static volatile String lastInstallDiagnostic = "No install attempt has been made.";
+
+    /** A bounded, non-sensitive explanation of the most recent install failure. */
+    public static String getLastInstallDiagnostic() {
+        return lastInstallDiagnostic;
+    }
+
+    private static String safeEngineMessage(String message) {
+        if (message == null) return "";
+        StringBuilder safe = new StringBuilder();
+        for (int i = 0; i < message.length() && safe.length() < 180; i++) {
+            char c = message.charAt(i);
+            if (c >= 32 && c != 127) safe.append(c == '\t' ? ' ' : c);
+        }
+        return safe.toString().trim();
+    }
+
+    public static boolean installPackageAsUser(
+            Context context, String pkg, int userId, NativeAbiPreflight.Result preflight) {
+        if (context == null || pkg == null || pkg.trim().isEmpty() || userId < 0 || preflight == null) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_INVALID_INPUT";
+            return false;
+        }
+        if (!preflight.isAllowed()) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_BLOCKED:" + preflight.getDiagnosticCode();
+            return false;
+        }
+        if (!preflight.matchesInstalledPackage(context, pkg)) {
+            lastInstallDiagnostic = "NATIVE_ABI_PREFLIGHT_PACKAGE_CHANGED";
+            return false;
+        }
+
+        lastInstallDiagnostic = "INSTALL_STARTED";
         try {
             Object core = getCore();
-            if (core == null) return false;
-            Method m = core.getClass().getMethod("launchApk", String.class, int.class);
-            Object r = m.invoke(core, entry.packageName, entry.userId);
-            return r == null || Boolean.TRUE.equals(r);
-        } catch (Throwable t) {
+            if (core == null) {
+                lastInstallDiagnostic = "ENGINE_UNAVAILABLE: core could not be resolved";
+                return false;
+            }
+            Method m = core.getClass().getMethod("installPackageAsUser", String.class, int.class);
+            Object res = m.invoke(core, pkg, userId);
+            if (res == null) {
+                lastInstallDiagnostic = "ENGINE_INVALID_RESULT: install returned null";
+                return false;
+            }
+            Field success = res.getClass().getField("success");
+            boolean installed = success.getBoolean(res);
+            if (installed) {
+                lastInstallDiagnostic = "INSTALL_SUCCEEDED";
+                return true;
+            }
+            String detail = "";
+            try {
+                Field message = res.getClass().getField("msg");
+                Object value = message.get(res);
+                if (value instanceof String) detail = safeEngineMessage((String) value);
+            } catch (Throwable ignored) {
+                // Some engine versions do not expose a diagnostic message.
+            }
+            lastInstallDiagnostic = detail.isEmpty()
+                    ? "ENGINE_REJECTED_INSTALL: engine reported success=false"
+                    : "ENGINE_REJECTED_INSTALL: " + detail;
+            return false;
+        } catch (Throwable error) {
+            Throwable cause = error.getCause();
+            String type = error.getClass().getSimpleName();
+            if (cause != null) type += " (cause: " + cause.getClass().getSimpleName() + ")";
+            lastInstallDiagnostic = "ENGINE_INSTALL_EXCEPTION: " + type;
             return false;
         }
     }
 
-    public static void stopClone(String pkg, int userId) {
+    private static Boolean queryInstalledAsUser(String pkg, int userId) {
         try {
             Object core = getCore();
-            if (core == null) return;
-            for (Method m : core.getClass().getMethods()) {
-                if ((m.getName().equals("stopPackage") || m.getName().equals("killApplication"))
-                        && m.getParameterTypes().length == 2) {
-                    m.invoke(core, pkg, userId);
-                    return;
+            if (core == null) return null;
+            Method m = core.getClass().getMethod("isInstalled", String.class, int.class);
+            Object result = m.invoke(core, pkg, userId);
+            return result instanceof Boolean ? (Boolean) result : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Confirms one package/user data directory is absent beneath a readable virtual root.
+     * Canonical-path containment prevents traversal or symlink escape from the expected root.
+     */
+    private static boolean isDirectoryConfirmedAbsent(File root, File directory) {
+        if (root == null || directory == null) return false;
+        try {
+            // Reject a redirected root before using its canonical target as the trust boundary.
+            if (FileUtils.isSymlink(root)) return false;
+            File canonicalRoot = root.getCanonicalFile();
+            File canonicalDirectory = directory.getCanonicalFile();
+            if (!canonicalRoot.isDirectory() || !canonicalRoot.canRead()) return false;
+
+            String rootPrefix = canonicalRoot.getPath() + File.separator;
+            if (!canonicalDirectory.getPath().startsWith(rootPrefix)) return false;
+            if (FileUtils.isSymlink(directory)) return false;
+
+            File ancestor = directory.getParentFile();
+            boolean reachedRoot = false;
+            while (ancestor != null) {
+                File canonicalAncestor = ancestor.getCanonicalFile();
+                if (FileUtils.isSymlink(ancestor)) return false;
+                if (canonicalAncestor.exists()
+                        && (!canonicalAncestor.isDirectory() || !canonicalAncestor.canRead())) {
+                    return false;
+                }
+                if (canonicalAncestor.equals(canonicalRoot)) {
+                    reachedRoot = true;
+                    break;
+                }
+                ancestor = ancestor.getParentFile();
+            }
+            return reachedRoot && !canonicalDirectory.exists();
+        } catch (Throwable ignored) {
+            // Permission, canonicalization, and storage errors are UNKNOWN, never ABSENT.
+            return false;
+        }
+    }
+
+    /**
+     * Checks only package/user-scoped app data. The shared APK directory is excluded because
+     * another Clone user for the same package may legitimately retain the package binary.
+     */
+    private static boolean areCloneDataDirectoriesAbsent(String pkg, int userId) {
+        try {
+            File internalRoot = BEnvironment.getVirtualRoot();
+            File externalRoot = BEnvironment.getExternalVirtualRoot();
+            return isDirectoryConfirmedAbsent(internalRoot,
+                            BEnvironment.getDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(internalRoot,
+                            BEnvironment.getDeDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(externalRoot,
+                            BEnvironment.getExternalDataDir(pkg, userId))
+                    && isDirectoryConfirmedAbsent(externalRoot,
+                            BEnvironment.getExternalObbDir(pkg, userId));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** A queried ABSENT result is final only when all scoped data directories are absent. */
+    static CloneInstallState classifyInstallStateWithDataCheck(
+            CloneInstallState installState, boolean dataDirectoriesAbsent) {
+        if (installState == null || installState == CloneInstallState.UNKNOWN)
+            return CloneInstallState.UNKNOWN;
+        if (installState != CloneInstallState.ABSENT) return installState;
+        return dataDirectoriesAbsent ? CloneInstallState.ABSENT : CloneInstallState.UNKNOWN;
+    }
+
+    /** Returns UNKNOWN when Engine state or any package/user data path is indeterminate. */
+    public static CloneInstallState getCloneInstallState(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0)
+            return CloneInstallState.UNKNOWN;
+        CloneInstallState state = classifyInstalledQueryResult(queryInstalledAsUser(pkg, userId));
+        if (state != CloneInstallState.ABSENT) return state;
+        return classifyInstallStateWithDataCheck(
+                state, areCloneDataDirectoriesAbsent(pkg, userId));
+    }
+
+    /** True only when the engine explicitly reports that this virtual package is absent. */
+    public static boolean isCloneConfirmedAbsent(String pkg, int userId) {
+        return getCloneInstallState(pkg, userId) == CloneInstallState.ABSENT;
+    }
+
+    public static final class CloneLaunchResult {
+        public final boolean launched;
+        public final String failure;
+        public final VirtualHookManager.LocationApplyResult locationResult;
+
+        private CloneLaunchResult(boolean launched, String failure,
+                VirtualHookManager.LocationApplyResult locationResult) {
+            this.launched = launched;
+            this.failure = failure;
+            this.locationResult = locationResult;
+        }
+    }
+
+    /**
+     * Performs the complete launch sequence. Call from a worker thread: installation checks,
+     * profile/engine hook IPC, launch reflection and active-launch persistence are synchronous.
+     * Hook outcome is reported separately and does not change the historical launch policy.
+     */
+    public static CloneLaunchResult launchCloneDetailed(Context ctx, CloneStore.CloneEntry entry) {
+        if (ctx == null || entry == null || entry.packageName == null
+                || entry.packageName.trim().isEmpty() || entry.userId < 0) {
+            return new CloneLaunchResult(false, "INVALID_CLONE_IDENTITY", null);
+        }
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REQUEST,
+                entry.packageName, null, entry.userId, "requested");
+
+        // A failed/indeterminate Engine query is not proof that the package is absent.
+        // Never start a second installation attempt unless absence is explicitly confirmed.
+        CloneInstallState installState = getCloneInstallState(entry.packageName, entry.userId);
+        if (installState == null || installState == CloneInstallState.UNKNOWN) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_STATE_UNKNOWN,
+                    entry.packageName, null, entry.userId, "query_unknown");
+            return new CloneLaunchResult(false, "ENGINE_INSTALL_STATE_UNKNOWN", null);
+        }
+        if (installState == CloneInstallState.ABSENT) {
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_REQUIRED,
+                    entry.packageName, null, entry.userId, "confirmed_absent");
+        }
+        if (installState == CloneInstallState.ABSENT) {
+            NativeAbiPreflight.Result preflight =
+                    NativeAbiPreflight.inspectInstalledPackage(ctx, entry.packageName);
+            if (!preflight.isAllowed()) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                        entry.packageName, null, entry.userId, preflight.getDiagnosticCode());
+                return new CloneLaunchResult(false,
+                        "NATIVE_ABI_PREFLIGHT_BLOCKED:" + preflight.getDiagnosticCode(), null);
+            }
+            if (!installPackageAsUser(ctx, entry.packageName, entry.userId, preflight)) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_INSTALL_FAILED,
+                        entry.packageName, null, entry.userId, "install_returned_false");
+                return new CloneLaunchResult(false, "ENGINE_INSTALL_FAILED", null);
+            }
+        }
+
+        // Preserve hook-before-launch ordering and make hook preparation failures observable.
+        CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_BEGIN,
+                entry.packageName, null, entry.userId, "begin");
+        final VirtualHookManager.LocationApplyResult hookResult;
+        try {
+            hookResult = VirtualHookManager.syncCloneHooks(ctx, entry);
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_COMPLETE,
+                    entry.packageName, null, entry.userId, "returned");
+        } catch (Throwable failure) {
+            String type = failure.getClass().getSimpleName();
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_HOOK_SYNC_FAILED,
+                    entry.packageName, null, entry.userId, type);
+            return new CloneLaunchResult(false, "ENGINE_HOOK_SYNC_EXCEPTION:" + type, null);
+        }
+
+        try {
+            Object core = getCore();
+            if (core == null) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REJECTED,
+                        entry.packageName, null, entry.userId, "engine_unavailable");
+                return new CloneLaunchResult(false, "ENGINE_UNAVAILABLE", hookResult);
+            }
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_CALL,
+                    entry.packageName, null, entry.userId, "calling_engine");
+            Method m = core.getClass().getMethod("launchApk", String.class, int.class);
+            Object value = m.invoke(core, entry.packageName, entry.userId);
+            if (!Boolean.TRUE.equals(value)) {
+                CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_REJECTED,
+                        entry.packageName, null, entry.userId, "engine_returned_false");
+                return new CloneLaunchResult(false, "ENGINE_REJECTED_LAUNCH", hookResult);
+            }
+
+            // Engine acceptance confirms only the launch request, not Application startup.
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_ACCEPTED,
+                    entry.packageName, null, entry.userId, "engine_returned_true");
+            // Persist only a confirmed successful launch; failed attempts must not replace
+            // the last-known successful clone in the host-side active-launch marker.
+            CloneStore.recordActiveLaunch(ctx, entry);
+            return new CloneLaunchResult(true, null, hookResult);
+        } catch (Throwable failure) {
+            String type = failure.getClass().getSimpleName();
+            CloneRuntimeTrace.record(CloneRuntimeTrace.Event.ENGINE_LAUNCH_EXCEPTION,
+                    entry.packageName, null, entry.userId, type);
+            String detail = type;
+            if (failure.getCause() != null) detail += ":" + failure.getCause().getClass().getSimpleName();
+            return new CloneLaunchResult(false, "ENGINE_LAUNCH_EXCEPTION:" + detail, hookResult);
+        }
+    }
+
+    /** Synchronous compatibility wrapper. UI callers should use AsyncCloneLaunchRepository. */
+    public static boolean launchClone(Context ctx, CloneStore.CloneEntry entry) {
+        return launchCloneDetailed(ctx, entry).launched;
+    }
+
+    /**
+     * Returns true only when a supported stop method was invoked without a reflection error.
+     * The pinned Engine API does not expose a verified process-termination result.
+     */
+    public static boolean stopClone(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
+        try {
+            Object core = getCore();
+            if (core == null) return false;
+            for (Method method : core.getClass().getMethods()) {
+                if ((method.getName().equals("stopPackage") || method.getName().equals("killApplication"))
+                        && method.getParameterTypes().length == 2
+                        && method.getParameterTypes()[0] == String.class
+                        && method.getParameterTypes()[1] == int.class) {
+                    method.invoke(core, pkg, userId);
+                    return true;
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            return false;
+        }
+        return false;
     }
 
-    public static void clearCloneData(String pkg, int userId) {
+    /**
+     * Returns true only when the pinned Engine clearPackage call returns normally.
+     * The build workspace hardens the pinned package manager to throw when targeted data
+     * directories remain or required reset directories cannot be recreated. A false result
+     * may still mean partial deletion occurred; true is not a forensic secure-erasure guarantee.
+     */
+    public static boolean clearCloneData(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
         try {
             Object core = getCore();
-            if (core == null) return;
-            Method m = core.getClass().getMethod("clearPackage", String.class, int.class);
-            m.invoke(core, pkg, userId);
-        } catch (Throwable ignored) {}
+            if (core == null) return false;
+            Method method = core.getClass().getMethod("clearPackage", String.class, int.class);
+            method.invoke(core, pkg, userId);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
-    public static void uninstallClone(String pkg, int userId) {
+    public static boolean uninstallClone(String pkg, int userId) {
+        if (pkg == null || pkg.trim().isEmpty() || userId < 0) return false;
         try {
             Object core = getCore();
-            if (core == null) return;
+            if (core == null) return false;
             Method m = core.getClass().getMethod("uninstallPackageAsUser", String.class, int.class);
             m.invoke(core, pkg, userId);
-        } catch (Throwable ignored) {}
+            // A successful reflection call is not enough: confirm the engine reports
+            // the virtual package absent. Unknown/error state is never success.
+            return Boolean.FALSE.equals(queryInstalledAsUser(pkg, userId))
+                    && areCloneDataDirectoriesAbsent(pkg, userId);
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public static boolean isGmsInstalled(int userId) {

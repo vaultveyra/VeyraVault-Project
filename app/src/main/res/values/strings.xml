@@ -27,7 +27,8 @@
     <string name="nav_global_env">مدل گوشی و گوگل</string>
     <string name="nav_security">امنیت و قفل</string>
     <string name="nav_about">درباره ما</string>
-    <string name="anti_uninstall_title">جلوگیری از حذف برنامه (Anti-Uninstall)</string>
-    <string name="anti_uninstall_desc">با فعال بودن این گزینه، هیچ کاربری یا برنامه‌ای قادر به حذف VeyraVault نخواهد بود تا زمانی که خودتان این کلید را خاموش کنید.</string>
+    <string name="anti_uninstall_title">دسترسی مدیر دستگاه اندروید</string>
+    <string name="anti_uninstall_desc">این دسترسی، وضعیت مدیر دستگاه را فعال می‌کند. برای حذف برنامه باید ابتدا دسترسی مدیر دستگاه را از تنظیمات اندروید لغو کنید. این قابلیت برنامه را غیرقابل‌حذف نمی‌کند و قابل لغو است.</string>
+    <string name="permission_policy_notice">این صفحه فقط مجوزهای درخواستی برنامه و وضعیت ذخیره‌شدهٔ محلی را نمایش می‌دهد. گزینه‌های مسدودسازی هنوز در موتور اجرای کلون اعمال نمی‌شوند و مجوزهای اندروید را لغو نمی‌کنند.</string>
     <string name="lang_switch">EN / فارسی</string>
 </resources>

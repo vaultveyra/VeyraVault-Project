@@ -6,10 +6,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import com.veyravault.space.R;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
 
@@ -31,9 +31,17 @@ public class PermissionsActivity extends BaseActivity {
         TextView title = new TextView(this);
         title.setTextSize(19f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.parseColor("#111827"));
-        title.setText((fa ? "مدیریت مجوزهای کلون: " : "Permissions: ") + (entry != null ? entry.displayName : pkg));
+        title.setTextColor(UiPalette.textPrimary(getApplicationContext()));
+        title.setText((fa ? "مدیریت مجوزهای کلون: " : "Permissions: ")
+                + (entry != null ? entry.displayName : pkg));
         root.addView(title);
+
+        TextView notice = new TextView(this);
+        notice.setText(getString(R.string.permission_policy_notice));
+        notice.setTextSize(13f);
+        notice.setTextColor(UiPalette.warning(getApplicationContext()));
+        notice.setPadding(0, 16, 0, 20);
+        root.addView(notice);
 
         if (entry != null) {
             try {
@@ -42,19 +50,19 @@ public class PermissionsActivity extends BaseActivity {
                     for (final String perm : pi.requestedPermissions) {
                         CheckBox cb = new CheckBox(this);
                         cb.setText(perm.replace("android.permission.", ""));
+                        // Preserve and display existing local flags, but do not imply
+                        // they revoke Android permissions or affect the clone runtime.
                         cb.setChecked(!entry.deniedPermissions.contains(perm));
-                        cb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                            @Override
-                            public void onCheckedChanged(CompoundButton b, boolean granted) {
-                                if (granted) entry.deniedPermissions.remove(perm);
-                                else entry.deniedPermissions.add(perm);
-                                CloneStore.upsertClone(PermissionsActivity.this, entry);
-                            }
-                        });
+                        cb.setEnabled(false);
                         root.addView(cb);
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                TextView unavailable = new TextView(this);
+                unavailable.setText(fa ? "فهرست مجوزهای این برنامه در دسترس نیست."
+                        : "The requested-permission list is unavailable.");
+                root.addView(unavailable);
+            }
         }
         setContentView(sv);
     }
