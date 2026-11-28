@@ -68,6 +68,10 @@ public class SettingsHubActivity extends BaseActivity {
                 fa ? "بررسی وضعیت موتور و آزادسازی دستی شناسه‌های امن"
                    : "Inspect Engine state and manually release only confirmed-absent reservations",
                 PendingReservationsActivity.class);
+        addRow(root, fa ? "گزارش هم‌پوشانی شناسه Clone" : "Clone Identity Overlap Audit",
+                fa ? "گزارش فقط‌خواندنی شناسه‌های مجازی مشترک بین بسته‌ها"
+                   : "Read-only report of virtual user IDs shared across package Clones",
+                CloneIdentityDiagnosticsActivity.class);
         addFutureBackupSection(root, fa);
         setContentView(scroll);
     }
