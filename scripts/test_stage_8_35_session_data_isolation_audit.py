@@ -72,7 +72,7 @@ assert "CloneStore.removeClone(context, packageName, 0)" in clone_id_instrumenta
 # 3. AccountManager persistence is keyed only by virtual userId, not packageName.
 assert "private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>();" in account_service
 assert "BEnvironment.getAccountsConf()" in account_service
-assert "HashMap<Integer, BUserAccounts> accountsMap" in account_service
+assert "HashMap<?, ?> accountsMap" in account_service
 get_accounts_start = account_service.index("public BUserAccounts getUserAccounts(int userId)")
 get_accounts_end = account_service.index("\n    private boolean isAccountPresentForCaller", get_accounts_start)
 get_accounts_body = account_service[get_accounts_start:get_accounts_end]
@@ -111,7 +111,9 @@ assert "if (!userInfoConf.exists())" in load_body
 assert "mAccountsLoadSucceeded = true;" in load_body
 assert "if (!userInfoConf.isFile() || !userInfoConf.canRead())" in load_body
 assert "HashMap<?, ?> accountsMap" in load_body
-assert "verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);" in load_body
+assert "VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY" in load_body
+assert "userAccounts.userId = key.intValue();" in load_body
+assert "verifiedAccountsMap.put(key, userAccounts);" in load_body
 assert "mUserAccountsMap.putAll(verifiedAccountsMap);" in load_body
 assert "mAccountsLoadSucceeded = true;" in load_body[load_body.index("mUserAccountsMap.putAll(verifiedAccountsMap);"):]
 
