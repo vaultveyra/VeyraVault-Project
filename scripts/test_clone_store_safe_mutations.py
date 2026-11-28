@@ -45,10 +45,7 @@ assert "readAllStrict(c)" in upsert and "return false;" in upsert
 assert "readAllStrict(c)" in remove and "return false;" in remove
 assert "readAllStrict(c)" in next_id and "readReservationsStrict(c)" in next_id and "return -1;" in next_id
 reserve = body(store, "static synchronized CloneReservation reserveNextUserId(")
-assert "KEY_PENDING_RESERVATIONS" in reserve and "KEY_GLOBAL_HIGH_WATER_MARK" in reserve
-assert "engineUserIds" in reserve and "accountUserIds" in reserve
-assert "putInt(KEY_GLOBAL_HIGH_WATER_MARK, candidate)" in reserve
-assert "maxKnownId + 1" in reserve and ".commit()" in reserve
+assert "KEY_PENDING_RESERVATIONS" in reserve and ".commit()" in reserve
 assert "public static List<CloneEntry> getAll(Context c)" in store
 
 assert "CloneStore.nextFreeUserIdForPackage(" not in add_ui
@@ -69,13 +66,10 @@ assert "Engine.uninstallClone(" not in duplicate
 assert "repository.allocateNextUserId" not in main_ui
 
 assert "persistence.inspectNativeAbi(packageName" in provision
-assert "persistence.reserveNextUserId(packageName, inventories.virtualUserIds" in provision
-assert "Engine.getKnownVirtualUserIds()" in provision
-assert "Engine.getKnownAccountUserIds()" in provision
+assert "persistence.reserveNextUserId(packageName" in provision
 assert "Engine.installPackageAsUser(" in provision
 assert "persistence.commitReservedClone(entry, reservation" in provision
-assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("EngineOperationQueue.submit(")
-assert provision.index("EngineOperationQueue.submit(") < provision.index("persistence.reserveNextUserId(packageName")
+assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("persistence.reserveNextUserId(packageName")
 assert provision.index("persistence.reserveNextUserId(packageName") < provision.index("Engine.installPackageAsUser(")
 assert provision.index("Engine.installPackageAsUser(") < provision.index("persistence.commitReservedClone(entry, reservation")
 assert "Engine.CloneInstallState.ABSENT" in provision

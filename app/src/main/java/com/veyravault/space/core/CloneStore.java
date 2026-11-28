@@ -22,7 +22,6 @@ public class CloneStore {
     private static final String KEY_GLOBAL_DEV = "global_device_json";
     private static final String KEY_ACTIVE_LAUNCH = "active_launch_json";
     private static final String KEY_PENDING_RESERVATIONS = "pending_clone_reservations_json";
-    private static final String KEY_GLOBAL_HIGH_WATER_MARK = "last_reserved_global_user_id";
     private static final int RESERVATION_SCHEMA_VERSION = 1;
 
     /** Checked signal that SharedPreferences declined a durable commit. */
@@ -187,68 +186,29 @@ public class CloneStore {
         return false;
     }
 
-    private static Set<Integer> validateIdInventory(List<Integer> ids, String source) {
-        if (ids == null) throw new IllegalArgumentException(source + " ID inventory is required");
-        Set<Integer> validated = new HashSet<Integer>();
-        for (Integer id : ids) {
-            if (id == null || id < 0)
-                throw new IllegalStateException(source + " ID inventory contains an invalid ID");
-            if (!validated.add(id))
-                throw new IllegalStateException(source + " ID inventory contains a duplicate ID");
-        }
-        return validated;
-    }
-
-    /**
-     * Reserves a globally unique, monotonically increasing Engine user ID.
-     * Every Engine inventory must be confirmed before this method is called.
-     */
-    static synchronized CloneReservation reserveNextUserId(Context c, String packageName,
-            List<Integer> engineUserIds, List<Integer> accountUserIds) throws Exception {
+    static synchronized CloneReservation reserveNextUserId(Context c, String packageName) throws Exception {
         if (c == null) throw new IllegalArgumentException("Context is required");
         if (packageName == null || packageName.trim().isEmpty())
             throw new IllegalArgumentException("Package name is required");
-
-        Set<Integer> engineIds = validateIdInventory(engineUserIds, "Engine virtual-user");
-        Set<Integer> accountIds = validateIdInventory(accountUserIds, "AccountManager");
         List<CloneEntry> clones = readAllStrict(c);
         List<CloneReservation> reservations = readReservationsStrict(c);
         for (CloneEntry clone : clones) {
-            if (clone.userId < 0)
-                throw new IllegalStateException("Clone registry contains an invalid user ID");
             if (containsReservation(reservations, clone.packageName, clone.userId))
                 throw new IllegalStateException("Reservation journal conflicts with the clone registry");
         }
-
-        int maxKnownId = -1;
-        for (CloneEntry entry : clones) maxKnownId = Math.max(maxKnownId, entry.userId);
-        for (CloneReservation reservation : reservations) {
-            if (reservation.userId < 0)
-                throw new IllegalStateException("Reservation journal contains an invalid user ID");
-            maxKnownId = Math.max(maxKnownId, reservation.userId);
+        Set<Integer> used = new HashSet<Integer>();
+        for (CloneEntry entry : clones) if (packageName.equals(entry.packageName)) used.add(entry.userId);
+        for (CloneReservation reservation : reservations)
+            if (packageName.equals(reservation.packageName)) used.add(reservation.userId);
+        int candidate = 0;
+        while (used.contains(candidate)) {
+            if (candidate == Integer.MAX_VALUE) throw new IllegalStateException("No virtual user ID is available");
+            candidate++;
         }
-        for (Integer id : engineIds) maxKnownId = Math.max(maxKnownId, id);
-        for (Integer id : accountIds) maxKnownId = Math.max(maxKnownId, id);
-
-        Map<String, ?> storedValues = prefs(c).getAll();
-        if (storedValues.containsKey(KEY_GLOBAL_HIGH_WATER_MARK)) {
-            Object rawHighWater = storedValues.get(KEY_GLOBAL_HIGH_WATER_MARK);
-            if (!(rawHighWater instanceof Integer) || ((Integer) rawHighWater) < 0)
-                throw new IllegalStateException("Global user-ID high-water mark is malformed");
-            maxKnownId = Math.max(maxKnownId, (Integer) rawHighWater);
-        }
-        if (maxKnownId == Integer.MAX_VALUE)
-            throw new IllegalStateException("Global virtual user-ID space is exhausted");
-        int candidate = maxKnownId + 1;
-
-        CloneReservation reservation = new CloneReservation(
-                UUID.randomUUID().toString(), packageName, candidate);
+        CloneReservation reservation = new CloneReservation(UUID.randomUUID().toString(), packageName, candidate);
         reservations.add(reservation);
-        SharedPreferences.Editor editor = prefs(c).edit()
-                .putString(KEY_PENDING_RESERVATIONS, serializeReservations(reservations))
-                .putInt(KEY_GLOBAL_HIGH_WATER_MARK, candidate);
-        if (!editor.commit())
-            throw new PersistenceException("Global ID high-water and reservation commit failed");
+        if (!prefs(c).edit().putString(KEY_PENDING_RESERVATIONS, serializeReservations(reservations)).commit())
+            throw new PersistenceException("Reservation journal commit failed");
         return reservation;
     }
 
@@ -309,26 +269,7 @@ public class CloneStore {
             else remaining.add(reservation);
         }
         if (!found) return false;
-
-        // Legacy reservations may predate the global ledger. Seed the high-water mark
-        // before consuming the journal entry so a confirmed rollback cannot erase its ID.
-        int maxKnownId = -1;
-        for (CloneEntry clone : readAllStrict(c))
-            maxKnownId = Math.max(maxKnownId, clone.userId);
-        for (CloneReservation reservation : reservations)
-            maxKnownId = Math.max(maxKnownId, reservation.userId);
-        Map<String, ?> storedValues = prefs(c).getAll();
-        if (storedValues.containsKey(KEY_GLOBAL_HIGH_WATER_MARK)) {
-            Object rawHighWater = storedValues.get(KEY_GLOBAL_HIGH_WATER_MARK);
-            if (!(rawHighWater instanceof Integer) || ((Integer) rawHighWater) < 0)
-                throw new IllegalStateException("Global user-ID high-water mark is malformed");
-            maxKnownId = Math.max(maxKnownId, (Integer) rawHighWater);
-        }
-        if (maxKnownId < 0)
-            throw new IllegalStateException("Released reservation has no valid user ID");
-
-        SharedPreferences.Editor editor = prefs(c).edit()
-                .putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId);
+        SharedPreferences.Editor editor = prefs(c).edit();
         if (remaining.isEmpty()) editor.remove(KEY_PENDING_RESERVATIONS);
         else editor.putString(KEY_PENDING_RESERVATIONS, serializeReservations(remaining));
         return editor.commit();
@@ -447,35 +388,14 @@ public class CloneStore {
     public static synchronized boolean saveAll(Context c, List<CloneEntry> list) {
         if (c == null || list == null) return false;
         try {
-            // Preserve the maximum ID from both sides of a registry update. This is
-            // important when a legacy Clone row is removed before the first new reservation.
-            List<CloneEntry> existing = readAllStrict(c);
             List<CloneReservation> reservations = readReservationsStrict(c);
             Set<String> reserved = new HashSet<String>();
             for (CloneReservation reservation : reservations)
                 reserved.add(identityKey(reservation.packageName, reservation.userId));
-            int maxKnownId = -1;
-            for (CloneEntry entry : existing) {
-                if (entry.userId < 0) throw new IllegalStateException("Existing Clone ID is invalid");
-                maxKnownId = Math.max(maxKnownId, entry.userId);
-            }
             for (CloneEntry entry : list) {
-                if (entry == null || entry.userId < 0)
-                    throw new IllegalStateException("New Clone registry contains an invalid entry");
-                if (reserved.contains(identityKey(entry.packageName, entry.userId))) return false;
-                maxKnownId = Math.max(maxKnownId, entry.userId);
+                if (entry != null && reserved.contains(identityKey(entry.packageName, entry.userId))) return false;
             }
-            Map<String, ?> storedValues = prefs(c).getAll();
-            if (storedValues.containsKey(KEY_GLOBAL_HIGH_WATER_MARK)) {
-                Object rawHighWater = storedValues.get(KEY_GLOBAL_HIGH_WATER_MARK);
-                if (!(rawHighWater instanceof Integer) || ((Integer) rawHighWater) < 0)
-                    throw new IllegalStateException("Global user-ID high-water mark is malformed");
-                maxKnownId = Math.max(maxKnownId, (Integer) rawHighWater);
-            }
-            SharedPreferences.Editor editor = prefs(c).edit()
-                    .putString(KEY_CLONES, serializeEntries(list));
-            if (maxKnownId >= 0) editor.putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId);
-            return editor.commit();
+            return prefs(c).edit().putString(KEY_CLONES, serializeEntries(list)).commit();
         } catch (Exception ignored) {
             return false;
         }
@@ -524,8 +444,6 @@ public class CloneStore {
         }
     }
 
-        /** Legacy package-scoped preview only; never use this value to install a Clone. */
-        @Deprecated
         public static synchronized int nextFreeUserIdForPackage(Context c, String pkg) {
         if (c == null || pkg == null || pkg.trim().isEmpty()) return -1;
         try {

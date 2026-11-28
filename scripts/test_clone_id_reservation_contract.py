@@ -39,9 +39,9 @@ reserve = method_body(STORE, "static synchronized CloneReservation reserveNextUs
 assert "readAllStrict(c)" in reserve
 assert "readReservationsStrict(c)" in reserve
 assert "Reservation journal conflicts with the clone registry" in reserve
-assert "prefs(c).edit()" in reserve and "putString(KEY_PENDING_RESERVATIONS" in reserve
+assert "prefs(c).edit().putString(KEY_PENDING_RESERVATIONS" in reserve
 assert ".commit()" in reserve
-assert "throw new PersistenceException(\"Global ID high-water and reservation commit failed\")" in reserve
+assert "throw new PersistenceException(\"Reservation journal commit failed\")" in reserve
 assert "CloneStore.PersistenceException) return Failure.PERSISTENCE_FAILURE" in REPO
 assert "reservationJournalCommitFailureIsClassifiedAsPersistenceFailure" in TEST
 
@@ -85,11 +85,7 @@ for ui in (ADD, MAIN):
     assert "provisionRepository.createClone(" in ui
     assert "Engine.installPackageAsUser(" not in ui
 assert "persistence.inspectNativeAbi(packageName" in PROVISION
-assert "persistence.reserveNextUserId(packageName, inventories.virtualUserIds" in PROVISION
-assert "Engine.getKnownVirtualUserIds()" in PROVISION
-assert "Engine.getKnownAccountUserIds()" in PROVISION
-assert PROVISION.index("EngineOperationQueue.submit(") < PROVISION.index("Engine.getKnownVirtualUserIds()")
-assert PROVISION.index("Engine.getKnownAccountUserIds()") < PROVISION.index("persistence.reserveNextUserId(packageName")
+assert "persistence.reserveNextUserId(packageName" in PROVISION
 assert "Engine.installPackageAsUser(" in PROVISION
 assert "persistence.commitReservedClone(entry, reservation" in PROVISION
 assert PROVISION.index("persistence.inspectNativeAbi(packageName") < PROVISION.index("persistence.reserveNextUserId(packageName")
@@ -106,11 +102,7 @@ assert "EngineOperationQueue.submit(" in PROVISION
 for test_name in (
     "independentRepositoriesCannotReserveSamePackageUserId",
     "reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken",
-    "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",
-    "releasingLegacyPendingReservationSeedsGlobalHighWaterMark",
-    "globalAllocatorUsesCloneEngineAndAccountManagerInventories",
-    "missingOrInvalidEngineInventoriesBlockReservationWithoutChangingLedger",
-    "globalAllocatorRejectsIntegerOverflowWithoutWrapping",
+    "reservationReleaseRequiresExplicitEngineAbsenceAndAllowsSafeReuse",
     "reservationReleaseRefusesRegistryConflictAndPreservesJournal",
     "pendingReservationCannotBeStolenByOrdinaryCloneUpsert",
     "malformedReservationJournalBlocksAllocationWithoutOverwritingIt",

@@ -4,10 +4,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 /**
  * Coordinates safe Clone creation without running synchronous Engine work on the UI thread.
  * Activity callbacks are presentation-only: closing an Activity does not cancel a reserved
@@ -45,20 +41,6 @@ public final class AsyncCloneProvisionRepository {
             this.confirmedAbsent = confirmedAbsent;
             this.diagnostic = diagnostic;
             this.state = state;
-        }
-    }
-
-    private static final class EngineIdInventory {
-        final List<Integer> virtualUserIds;
-        final List<Integer> accountManagerUserIds;
-
-        EngineIdInventory(List<Integer> virtualUserIds, List<Integer> accountManagerUserIds) {
-            if (virtualUserIds == null || accountManagerUserIds == null)
-                throw new IllegalStateException("Engine ID inventory is unavailable");
-            this.virtualUserIds = Collections.unmodifiableList(
-                    new ArrayList<Integer>(virtualUserIds));
-            this.accountManagerUserIds = Collections.unmodifiableList(
-                    new ArrayList<Integer>(accountManagerUserIds));
         }
     }
 
@@ -107,23 +89,8 @@ public final class AsyncCloneProvisionRepository {
                 return;
             }
 
-            // Both ID-only inventories are read on the serialized Engine queue.
-            // If either source is unavailable, fail before reserving an ID or installing a package.
-            EngineOperationQueue.submit(
-                    () -> new EngineIdInventory(
-                            Engine.getKnownVirtualUserIds(), Engine.getKnownAccountUserIds()),
-                    (inventories, inventoryFailure) -> {
-                if (inventoryFailure != null || inventories == null) {
-                    deliver(callback, failure((persian
-                            ? "فهرست شناسه‌های Engine یا AccountManager تأیید نشد؛ رزروی انجام نشد و نصب آغاز نشد. "
-                            : "Engine or AccountManager ID inventory could not be verified; no ID was reserved and installation did not start. ")
-                            + safeError(inventoryFailure), false));
-                    return;
-                }
-
-                // The global high-water mark and exact reservation are committed atomically.
-                persistence.reserveNextUserId(packageName, inventories.virtualUserIds,
-                        inventories.accountManagerUserIds, allocation -> {
+            // The reservation is durable and token-bound before Engine installation begins.
+            persistence.reserveNextUserId(packageName, allocation -> {
                 if (!allocation.isSuccess() || allocation.getValue() == null) {
                     deliver(callback, failure((persian
                             ? "رزرو امن شناسه انجام نشد؛ نصب آغاز نشد. "
@@ -214,8 +181,7 @@ public final class AsyncCloneProvisionRepository {
                             : "The Engine operation queue is unavailable; the ID reservation remains blocked. ")
                             + safeError(rejected), true));
                 }
-                        });
-                    });
+            });
         });
     }
 

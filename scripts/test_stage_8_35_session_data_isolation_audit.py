@@ -39,41 +39,35 @@ assert 'String.format(Locale.CHINA, "Android/data/%s", packageName)' in environm
 assert 'String.format(Locale.CHINA, "Android/obb/%s", packageName)' in environment
 assert 'new File(getSystemDir(), "accounts.conf")' in environment
 
-# 2. CloneStore identity remains composite, but active reservations are global and
-# monotonic. Both independent Engine ID-only inventories are mandatory.
+# 2. CloneStore identity is composite, and the allocator deliberately reuses the
+# numeric user-ID sequence independently for each package.
 assert 'return packageName + "\\\\u0000" + userId;' in clone_store
 reserve_start = clone_store.index("static synchronized CloneReservation reserveNextUserId")
 reserve_end = clone_store.index("static synchronized List<CloneReservation>", reserve_start)
 reserve_body = clone_store[reserve_start:reserve_end]
-assert "List<Integer> engineUserIds" in reserve_body
-assert "List<Integer> accountUserIds" in reserve_body
-assert "maxKnownId + 1" in reserve_body
-assert "KEY_GLOBAL_HIGH_WATER_MARK" in reserve_body
-assert "putInt(KEY_GLOBAL_HIGH_WATER_MARK, candidate)" in reserve_body
-assert "editor.commit()" in reserve_body
-assert "validateIdInventory" in reserve_body
+assert "packageName.equals(entry.packageName)" in reserve_body
+assert "packageName.equals(reservation.packageName)" in reserve_body
+assert "int candidate = 0;" in reserve_body
+assert "while (used.contains(candidate))" in reserve_body
 
-# The old package-scoped helper is retained only as a deprecated preview API.
 next_start = clone_store.index("public static synchronized int nextFreeUserIdForPackage")
 next_end = clone_store.index("\n        public static", next_start)
 next_body = clone_store[next_start:next_end]
 assert "entry.packageName.equals(pkg)" in next_body
 assert "reservation.packageName.equals(pkg)" in next_body
-assert "@Deprecated" in clone_store[max(0, next_start - 250):next_start]
-provision = read("app/src/main/java/com/veyravault/space/core/AsyncCloneProvisionRepository.java")
-assert "Engine.getKnownVirtualUserIds()" in provision
-assert "Engine.getKnownAccountUserIds()" in provision
-assert "EngineOperationQueue.submit(" in provision
-assert provision.index("Engine.getKnownAccountUserIds()") < provision.index("persistence.reserveNextUserId(packageName")
-assert provision.index("persistence.reserveNextUserId(packageName") < provision.index("Engine.installPackageAsUser(")
+assert "int uid = 0;" in next_body
 
-# Removal never lowers the ledger; synthetic tests exercise only disposable registry data.
+# Removing a Clone registry row does not create a retired-ID tombstone; the package
+# allocator is therefore allowed to reuse the numeric ID. Instrumentation proves this
+# against the production CloneStore methods using only synthetic registry entries.
 remove_start = clone_store.index("public static synchronized boolean removeClone")
 remove_end = clone_store.index("\n        public static", remove_start)
 remove_body = clone_store[remove_start:remove_end]
 assert "return saveAll(c, kept);" in remove_body
-assert "globalAllocatorNeverReservesSameNumericUserIdForDifferentPackages" in clone_id_instrumentation
-assert "removedCloneRegistryEntryDoesNotLowerGlobalHighWaterMark" in clone_id_instrumentation
+assert "KEY_PENDING_RESERVATIONS" not in remove_body
+assert "allocatorCanReserveSameNumericUserIdForDifferentPackages" in clone_id_instrumentation
+assert "removedCloneRegistryEntryMakesItsNumericIdAvailableAgain" in clone_id_instrumentation
+assert "CloneStore.removeClone(context, packageName, 0)" in clone_id_instrumentation
 
 # 3. AccountManager persistence is keyed only by virtual userId, not packageName.
 assert "private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>();" in account_service
@@ -192,7 +186,7 @@ for field in (
     assert field in registry, "Unverified isolation field was promoted or removed: " + field
 
 print("PASS: ordinary Clone app-data paths use packageName + userId.")
-print("PASS: global monotonic Clone ID allocation uses validated Engine and AccountManager inventories.")
+print("PASS: VeyraVault package-scoped ID allocation was identified.")
 print("PASS: pinned Engine AccountManager persistence is keyed by userId only.")
 print("PASS: TokenCache userId is reconstructed from the authoritative AccountManager map key.")
 print("PASS: per-package uninstall does not purge the virtual-user account collection.")
