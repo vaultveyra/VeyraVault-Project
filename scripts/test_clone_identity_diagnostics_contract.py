@@ -36,9 +36,22 @@ assert 'Class.forName(\n                "top.niunaijun.blackbox.core.system.user
 assert 'serviceInterface.getMethod("getUsers")' in engine
 assert 'getField("id")' in engine
 assert "Collections.unmodifiableList(new ArrayList<Integer>(ids))" in engine
-inventory_method = engine[engine.index("public static List<Integer> getKnownVirtualUserIds()"):engine.index("\n    public static void doAttachBaseContext")]
+user_inventory_start = engine.index("public static List<Integer> getKnownVirtualUserIds()")
+user_inventory_end = engine.index("\n    public static List<Integer> getKnownAccountUserIds()", user_inventory_start)
+user_inventory_method = engine[user_inventory_start:user_inventory_end]
 for forbidden in ("BAccountManager", "getAuthToken", "accounts.conf", "AccountManager.get", "deleteUser", "clearPackage"):
-    assert forbidden not in inventory_method, "Engine ID inventory must not read or mutate account/session data: " + forbidden
+    assert forbidden not in user_inventory_method, "Engine virtual-user inventory must not read or mutate account/session data: " + forbidden
+
+# AccountManager inventory is a separate ID-only API. Its own method may resolve
+# BAccountManager, but must not expose or mutate credentials, account payloads or sessions.
+account_inventory_start = engine.index("public static List<Integer> getKnownAccountUserIds()")
+account_inventory_end = engine.index("\n    public static void doAttachBaseContext", account_inventory_start)
+account_inventory_method = engine[account_inventory_start:account_inventory_end]
+assert 'Class.forName(\n                "top.niunaijun.blackbox.fake.frameworks.BAccountManager")' in account_inventory_method
+assert 'getMethod("getKnownAccountUserIds")' in account_inventory_method
+assert "Collections.unmodifiableList" in account_inventory_method
+for forbidden in ("getPassword(", "getUserData(", "getAuthToken(", "setAuthToken(", "saveAllAccounts", "deleteUser", "clearPackage"):
+    assert forbidden not in account_inventory_method, "AccountManager inventory must remain ID-only and read-only: " + forbidden
 for forbidden in ("SharedPreferences", "ContentResolver", "AccountManager", "Engine.", "FileInputStream"):
     assert forbidden not in audit, "Identity grouping must not access external/runtime state: " + forbidden
 
