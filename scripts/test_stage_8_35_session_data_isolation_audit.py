@@ -50,8 +50,8 @@ assert "while (used.contains(candidate))" in reserve_body
 next_start = clone_store.index("public static synchronized int nextFreeUserIdForPackage")
 next_end = clone_store.index("\n        public static", next_start)
 next_body = clone_store[next_start:next_end]
-assert "packageName.equals(entry.packageName)" in next_body
-assert "packageName.equals(reservation.packageName)" in next_body
+assert "entry.packageName.equals(pkg)" in next_body
+assert "reservation.packageName.equals(pkg)" in next_body
 assert "int uid = 0;" in next_body
 
 # 3. AccountManager persistence is keyed only by virtual userId, not packageName.
