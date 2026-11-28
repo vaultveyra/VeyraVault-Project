@@ -32,9 +32,9 @@ public class BAccountManagerService {
         HashMap<Integer, BUserAccounts> accountsMap = readPersistedAccounts();
         synchronized (mUserAccountsMap) {
             mUserAccountsMap.clear();
-            for (Integer key : accountsMap.keySet()) {
-                mUserAccountsMap.put(key, accountsMap.get(key));
-            }
+                for (Integer key : accountsMap.keySet()) {
+                    mUserAccountsMap.put(key, accountsMap.get(key));
+                }
         }
     }
 
