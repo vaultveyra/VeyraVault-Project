@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
@@ -49,12 +48,12 @@ public class CloneUserIdScopeInstrumentationTest {
         CloneStore.CloneReservation alphaSecond =
                 CloneStore.reserveNextUserId(context, "com.example.synthetic.alpha");
 
-        assertNotEquals(alpha.getPackageName(), beta.getPackageName());
+        assertTrue(!alpha.getPackageName().equals(beta.getPackageName()));
         assertEquals(0, alpha.getUserId());
         assertEquals(0, beta.getUserId());
         assertEquals(1, alphaSecond.getUserId());
 
-        // The journal is restored byte-for-byte to its pre-test key/value snapshot in @After.
+        // The journal is restored to its pre-test key/value snapshot in @After.
         assertEquals(3, CloneStore.readPendingReservationsStrict(context).size());
     }
 
