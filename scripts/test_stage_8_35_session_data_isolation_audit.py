@@ -81,6 +81,13 @@ assert "mUserAccountsMap.put(userId, bUserAccounts)" in get_accounts_body
 assert "getAccountUserData" in user_accounts
 assert "getAuthToken" in user_accounts
 
+# TokenCache relies on the value's internal userId, which must be restored from the
+# authoritative outer Map key both on load and on every user-bucket lookup.
+assert "userAccounts.userId = key.intValue();" in account_service
+assert "bUserAccounts.userId = userId;" in account_service
+assert "new TokenCache(accounts.userId," in account_service
+assert "next.userId == accounts.userId" in account_service
+
 # Listing APIs do have package visibility filtering, but direct credential,
 # user-data and token operations are routed by virtual userId + account handle.
 assert "account.visibility.get(packageName)" in account_service
@@ -144,6 +151,7 @@ for field in (
 print("PASS: ordinary Clone app-data paths use packageName + userId.")
 print("PASS: VeyraVault package-scoped ID allocation was identified.")
 print("PASS: pinned Engine AccountManager persistence is keyed by userId only.")
+print("PASS: TokenCache userId is reconstructed from the authoritative AccountManager map key.")
 print("PASS: per-package uninstall does not purge the virtual-user account collection.")
 print("PASS: user-wide deletion is distinguished from package-scoped Clone uninstall.")
 print("PASS: WebView uses the pinned package/user/process suffix before target Application binding.")
