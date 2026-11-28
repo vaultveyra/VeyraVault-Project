@@ -1,6 +1,6 @@
 # Stage 8.43 — Read-only legacy environment metadata bridge
 
-Status: implementation added on the feature branch; CI and Android instrumentation validation pending.
+Status: implementation and CI validation passed on 2026-11-28. Android emulator instrumentation is included in the successful CI run; physical-device validation remains open.
 
 ## Problem found in the current profile flow
 
@@ -48,3 +48,15 @@ These remain `NOT_IMPLEMENTED` or `LOCAL_PREFERENCE_ONLY` metadata and are repor
 - A CI source-contract test guards Provider/repository wiring and the read-only boundary.
 
 A green CI run is required before calling this stage validated. Physical-device testing is still required to determine what third-party apps actually observe. This stage does not claim that manufacturer/model/country metadata changes the Android Build API, SIM/carrier, network IP, or service behavior.
+
+
+## CI validation result — 2026-11-28
+
+- Workflow run: `46149179470`
+- Build/audit job: `success`
+- Steps in build/audit job: 91; failed steps: 0
+- Android instrumentation stage: included in the successful job
+- APK signing job: `skipped`; this run produced no signed APK
+- Physical device verification: pending
+
+This validates the branch build, source contracts and configured Android test job. It does not prove that a third-party app observes the metadata as Android Build identity, nor does it replace physical-device verification.
