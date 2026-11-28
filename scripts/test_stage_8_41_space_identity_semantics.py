@@ -12,7 +12,7 @@ start = STORE.index("public int getSpaceNumber()")
 end = STORE.index("}", start)
 assert "return userId + 1;" in STORE[start:end]
 assert "int spaceNum = e.getSpaceNumber();" in STORE
-assert "grouped.get(spaceNum).add(clone);" in MAIN
+assert "grouped.get(spaceNumber).add(clone);" in MAIN
 assert "final int uid = spaceNum - 1;" in MAIN
 assert "outcome.clone.getSpaceNumber()" in ADD
 
