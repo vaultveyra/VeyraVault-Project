@@ -9,10 +9,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Pure, read-only analysis of current Clone registry identities.
+ * Pure, read-only analysis of Clone, Engine virtual-user and AccountManager bucket IDs.
  *
- * It reports different package names that currently share one numeric virtual user ID.
- * It does not read Engine account data, credentials, tokens, app-private storage or sessions.
+ * AccountManager data is represented only by numeric userId map keys. A numeric key is not
+ * a package identity and is never attributed to a specific Clone by this helper.
  */
 public final class CloneIdentityAudit {
     public static final class CloneIdentity {
@@ -42,9 +42,15 @@ public final class CloneIdentityAudit {
         public final List<Integer> engineUserIdsWithoutRegisteredClone;
         public final List<Integer> registeredCloneUserIdsMissingFromEngine;
         public final List<Integer> knownEngineUserIds;
+        public final List<Integer> knownAccountManagerUserIds;
+        public final List<Integer> accountManagerUserIdsWithoutCurrentEngineUser;
+        public final List<Integer> accountManagerUserIdsWithoutRegisteredClone;
+        public final List<Integer> accountManagerUserIdsSharedAcrossPackages;
 
         private InventoryReport(List<CollisionGroup> collisions, List<Integer> engineOnly,
-                                List<Integer> cloneOnly, List<Integer> engineIds) {
+                                List<Integer> cloneOnly, List<Integer> engineIds,
+                                List<Integer> accountIds, List<Integer> accountWithoutEngine,
+                                List<Integer> accountWithoutClone, List<Integer> sharedAccountIds) {
             this.crossPackageCollisions = Collections.unmodifiableList(
                     new ArrayList<CollisionGroup>(collisions));
             this.engineUserIdsWithoutRegisteredClone = Collections.unmodifiableList(
@@ -53,31 +59,29 @@ public final class CloneIdentityAudit {
                     new ArrayList<Integer>(cloneOnly));
             this.knownEngineUserIds = Collections.unmodifiableList(
                     new ArrayList<Integer>(engineIds));
+            this.knownAccountManagerUserIds = Collections.unmodifiableList(
+                    new ArrayList<Integer>(accountIds));
+            this.accountManagerUserIdsWithoutCurrentEngineUser = Collections.unmodifiableList(
+                    new ArrayList<Integer>(accountWithoutEngine));
+            this.accountManagerUserIdsWithoutRegisteredClone = Collections.unmodifiableList(
+                    new ArrayList<Integer>(accountWithoutClone));
+            this.accountManagerUserIdsSharedAcrossPackages = Collections.unmodifiableList(
+                    new ArrayList<Integer>(sharedAccountIds));
         }
     }
 
     private CloneIdentityAudit() { }
 
     /**
-     * Compares a strict Clone registry snapshot with IDs exposed by the Engine's read-only
-     * virtual-user inventory. The Engine list contains IDs only, never account/session data.
+     * Compares strict Clone registry data with two independent, ID-only Engine inventories.
+     * AccountManager bucket IDs are never mapped to package names or account records.
      */
     public static InventoryReport auditInventory(List<CloneStore.CloneEntry> entries,
-                                                 List<Integer> engineUserIds) {
+                                                 List<Integer> engineUserIds,
+                                                 List<Integer> accountManagerUserIds) {
         List<CollisionGroup> collisions = findCrossPackageCollisions(entries);
-        if (engineUserIds == null) {
-            throw new IllegalArgumentException("Engine virtual-user inventory is required");
-        }
-
-        TreeSet<Integer> engineIds = new TreeSet<Integer>();
-        for (Integer id : engineUserIds) {
-            if (id == null || id < 0) {
-                throw new IllegalArgumentException("Engine inventory contains an invalid virtual user ID");
-            }
-            if (!engineIds.add(id)) {
-                throw new IllegalArgumentException("Engine inventory contains a duplicate virtual user ID");
-            }
-        }
+        TreeSet<Integer> engineIds = validateIds(engineUserIds, "Engine");
+        TreeSet<Integer> accountIds = validateIds(accountManagerUserIds, "AccountManager");
 
         TreeSet<Integer> cloneIds = new TreeSet<Integer>();
         for (CloneStore.CloneEntry entry : entries) cloneIds.add(entry.userId);
@@ -88,8 +92,36 @@ public final class CloneIdentityAudit {
         List<Integer> cloneOnly = new ArrayList<Integer>();
         for (Integer id : cloneIds) if (!engineIds.contains(id)) cloneOnly.add(id);
 
+        List<Integer> accountWithoutEngine = new ArrayList<Integer>();
+        for (Integer id : accountIds) if (!engineIds.contains(id)) accountWithoutEngine.add(id);
+
+        List<Integer> accountWithoutClone = new ArrayList<Integer>();
+        for (Integer id : accountIds) if (!cloneIds.contains(id)) accountWithoutClone.add(id);
+
+        List<Integer> sharedAccountIds = new ArrayList<Integer>();
+        for (CollisionGroup collision : collisions) {
+            if (accountIds.contains(collision.userId)) sharedAccountIds.add(collision.userId);
+        }
+
         return new InventoryReport(collisions, engineOnly, cloneOnly,
-                new ArrayList<Integer>(engineIds));
+                new ArrayList<Integer>(engineIds), new ArrayList<Integer>(accountIds),
+                accountWithoutEngine, accountWithoutClone, sharedAccountIds);
+    }
+
+    private static TreeSet<Integer> validateIds(List<Integer> values, String source) {
+        if (values == null) {
+            throw new IllegalArgumentException(source + " numeric user-ID inventory is required");
+        }
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        for (Integer id : values) {
+            if (id == null || id < 0) {
+                throw new IllegalArgumentException(source + " inventory contains an invalid user ID");
+            }
+            if (!ids.add(id)) {
+                throw new IllegalArgumentException(source + " inventory contains a duplicate user ID");
+            }
+        }
+        return ids;
     }
 
     /**

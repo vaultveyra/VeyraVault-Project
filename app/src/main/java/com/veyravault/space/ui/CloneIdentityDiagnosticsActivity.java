@@ -27,6 +27,21 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
     private boolean fa;
     private int refreshGeneration;
 
+    private static final class EngineInventorySnapshot {
+        final List<Integer> engineUserIds;
+        final List<Integer> accountManagerUserIds;
+        final Throwable engineFailure;
+        final Throwable accountManagerFailure;
+
+        EngineInventorySnapshot(List<Integer> engineIds, List<Integer> accountIds,
+                                Throwable engineError, Throwable accountError) {
+            this.engineUserIds = engineIds;
+            this.accountManagerUserIds = accountIds;
+            this.engineFailure = engineError;
+            this.accountManagerFailure = accountError;
+        }
+    }
+
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         fa = LocaleHelper.isPersian(this);
@@ -52,8 +67,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         TextView intro = new TextView(this);
         intro.setText(fa
-                ? "این گزارش فقط رجیستری Cloneها و فهرست شناسه‌های کاربر مجازی موتور را می‌خواند. هم‌پوشانی بسته‌ها و شناسه‌های بدون رکورد متناظر را نشان می‌دهد؛ هیچ حساب، رمز، Token، Cookie، فایل خصوصی یا نشست خوانده نمی‌شود و هیچ شناسه یا داده‌ای تغییر نمی‌کند."
-                : "This report reads the current Clone registry and the Engine virtual-user ID list only. It lists cross-package numeric overlaps and unmatched Engine IDs. It does not read accounts, passwords, tokens, cookies, private files or sessions, and never changes an ID or stored record.");
+                ? "این گزارش فقط رجیستری Cloneها و دو فهرست عددی Engine را می‌خواند: شناسه کاربران مجازی و کلیدهای عددی AccountManager. هیچ نام حساب، رمز، userData، Token، Cookie، فایل خصوصی یا محتوای نشست خوانده نمی‌شود و هیچ شناسه یا داده‌ای تغییر نمی‌کند."
+                : "This report reads the Clone registry and two numeric-only Engine inventories: virtual-user IDs and AccountManager bucket keys. It never reads account names, passwords, userData, tokens, cookies, private files or session content, and never changes an ID or stored record.");
         intro.setTextSize(13f);
         intro.setTextColor(UiPalette.textSecondary(this));
         intro.setPadding(0, dp(10), 0, dp(14));
@@ -61,8 +76,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         TextView limitation = new TextView(this);
         limitation.setText(fa
-                ? "محدودیت: فهرست موتور فقط کاربران مجازی فعلی را نشان می‌دهد، نه محتوای AccountManager را. کاربری که در پاکسازی قدیمی حذف شده ممکن است دیگر در این فهرست نباشد، حتی اگر رکورد حساب آن در accounts.conf باقی مانده باشد. شناسه غایب را آزاد فرض نکنید. هم‌پوشانی نشانه اشتراک محدوده کاربر مجازی است، نه اثبات دسترسی قطعی همه برنامه‌ها به همه حساب‌ها."
-                : "Limit: the Engine list shows current virtual users, not AccountManager contents. A user explicitly deleted by an older cleanup may no longer appear even if an account bucket remains in accounts.conf. Missing IDs must not be assumed safe to reuse. An overlap indicates a shared virtual-user scope; it does not prove every app can see every account.");
+                ? "محدودیت مهم: کلید AccountManager فقط userId عددی است، نه شناسه ترکیبی بسته و کاربر. اگر چند بسته Clone یک userId مشترک داشته باشند، در سطح عددی به یک bucket اشاره می‌کنند؛ این گزارش bucket را به هیچ بسته‌ای نسبت نمی‌دهد و دسترسی قطعی به حساب‌ها یا Tokenها را اثبات نمی‌کند. کلیدهای باقی‌مانده پس از حذف کاربر قدیمی ممکن است دیگر در فهرست Engine دیده نشوند. این گزارش ثابت نمی‌کند bucketهای حسابِ کاربران حذف‌شده تاریخی خالی‌اند. شناسه غایب را آزاد فرض نکنید."
+                : "Important limit: AccountManager keys use a numeric userId, not a package-and-user composite identity. Different Clone packages sharing one userId point at the same numeric bucket scope; this report never attributes that bucket to a package and does not prove account or token visibility. Keys left after an older user deletion may no longer appear in the Engine list. This does not prove historical deleted-user account buckets are empty. Missing IDs must not be assumed safe to reuse.");
         limitation.setTextSize(12f);
         limitation.setTextColor(UiPalette.warning(this));
         limitation.setPadding(dp(12), dp(12), dp(12), dp(12));
@@ -112,21 +127,31 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
                     : "Reading Engine virtual-user IDs only; no account data...");
             try {
                 EngineOperationQueue.submit(
-                        () -> Engine.getKnownVirtualUserIds(),
-                        (engineIds, failure) -> {
+                        () -> readEngineInventories(),
+                        (inventories, failure) -> {
                             if (!isCurrent(generation)) return;
-                            if (failure != null || engineIds == null) {
+                            if (failure != null || inventories == null) {
                                 renderRegistryOnly(snapshot, failure);
+                                return;
+                            }
+                            if (inventories.engineFailure != null
+                                    || inventories.accountManagerFailure != null
+                                    || inventories.engineUserIds == null
+                                    || inventories.accountManagerUserIds == null) {
+                                renderPartialInventory(snapshot, inventories);
                                 return;
                             }
                             try {
                                 CloneIdentityAudit.InventoryReport report =
-                                        CloneIdentityAudit.auditInventory(snapshot, engineIds);
+                                        CloneIdentityAudit.auditInventory(
+                                                snapshot,
+                                                inventories.engineUserIds,
+                                                inventories.accountManagerUserIds);
                                 renderInventoryReport(snapshot.size(), report);
                             } catch (RuntimeException invalid) {
                                 status.setText(fa
-                                        ? "گزارش متوقف شد؛ فهرست شناسه‌های موتور یا رجیستری معتبر نیست."
-                                        : "Audit stopped because the Engine inventory or Clone registry is invalid.");
+                                        ? "گزارش متوقف شد؛ یکی از فهرست‌های عددی یا رجیستری معتبر نیست."
+                                        : "Audit stopped because a numeric inventory or the Clone registry is invalid.");
                             }
                         });
             } catch (RuntimeException rejected) {
@@ -146,8 +171,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
             return;
         }
         status.setText(fa
-                ? "فهرست Cloneها خوانده شد، اما فهرست شناسه‌های موتور تأیید نشد. نبود هم‌پوشانی قابل اعلام نیست."
-                : "Clone registry read, but the Engine user inventory could not be confirmed. No all-clear result is reported.");
+                ? "فهرست Cloneها خوانده شد، اما فهرست شناسه‌های Engine و/یا AccountManager تأیید نشد. گزارش ناقص است و نتیجه بدون هم‌پوشانی قابل اعلام نیست."
+                : "Clone registry read, but the Engine and/or AccountManager numeric inventory could not be confirmed. The report is incomplete; no all-clear result is reported.");
         if (failure != null) {
             TextView reason = new TextView(this);
             reason.setText((fa ? "علت: " : "Reason: ") + failure.getClass().getSimpleName());
@@ -158,12 +183,83 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
         for (CloneIdentityAudit.CollisionGroup group : collisions) addCollisionRow(group);
     }
 
+    private EngineInventorySnapshot readEngineInventories() {
+        List<Integer> engineIds = null;
+        List<Integer> accountIds = null;
+        Throwable engineError = null;
+        Throwable accountError = null;
+        try {
+            engineIds = Engine.getKnownVirtualUserIds();
+        } catch (Exception failure) {
+            engineError = failure;
+        }
+        try {
+            accountIds = Engine.getKnownAccountUserIds();
+        } catch (Exception failure) {
+            accountError = failure;
+        }
+        return new EngineInventorySnapshot(engineIds, accountIds, engineError, accountError);
+    }
+
+    private void renderPartialInventory(List<CloneStore.CloneEntry> snapshot,
+                                        EngineInventorySnapshot inventories) {
+        final List<CloneIdentityAudit.CollisionGroup> collisions;
+        try {
+            collisions = CloneIdentityAudit.findCrossPackageCollisions(snapshot);
+        } catch (RuntimeException invalid) {
+            status.setText(fa
+                    ? "گزارش متوقف شد؛ ساختار هویت‌های رجیستری معتبر نیست."
+                    : "Audit stopped because the registry identity structure is invalid.");
+            return;
+        }
+
+        status.setText(fa
+                ? "گزارش ناقص است: دست‌کم یکی از دو فهرست Engine یا AccountManager تأیید نشد. هیچ نتیجه سالم یا بدون هم‌پوشانی اعلام نمی‌شود."
+                : "Incomplete report: at least one Engine inventory could not be confirmed. No clean or all-clear result is reported.");
+
+        for (CloneIdentityAudit.CollisionGroup group : collisions) addCollisionRow(group);
+
+        if (inventories.engineUserIds != null) {
+            addUserIdListRow(
+                    fa ? "شناسه‌های کاربر مجازی تأییدشده Engine" : "Verified Engine virtual-user IDs",
+                    inventories.engineUserIds,
+                    fa ? "این فهرست به‌تنهایی محتوای حساب‌ها یا وضعیت داده‌های قدیمی را نشان نمی‌دهد."
+                            : "This list alone does not show account contents or historical data state.");
+        } else {
+            addInventoryFailure(fa ? "فهرست کاربران مجازی Engine تأیید نشد" :
+                    "Engine virtual-user inventory unavailable", inventories.engineFailure);
+        }
+
+        if (inventories.accountManagerUserIds != null) {
+            addUserIdListRow(
+                    fa ? "کلیدهای عددی AccountManager (فقط شناسه)" : "AccountManager numeric bucket keys (IDs only)",
+                    inventories.accountManagerUserIds,
+                    fa ? "این کلیدها به بسته مشخصی نسبت داده نمی‌شوند؛ تا تکمیل هر سه فهرست، هیچ شناسه‌ای آزاد فرض نشود."
+                            : "These keys are not attributed to a package. Do not treat any ID as free while the three inventories are incomplete.");
+        } else {
+            addInventoryFailure(fa ? "فهرست عددی AccountManager تأیید نشد" :
+                    "AccountManager numeric inventory unavailable", inventories.accountManagerFailure);
+        }
+    }
+
+    private void addInventoryFailure(String label, Throwable failure) {
+        TextView reason = new TextView(this);
+        reason.setText(label + (failure == null ? "" :
+                (fa ? "؛ علت: " : "; reason: ") + failure.getClass().getSimpleName()));
+        reason.setTextSize(12f);
+        reason.setTextColor(UiPalette.warning(this));
+        reason.setPadding(0, dp(8), 0, dp(8));
+        rows.addView(reason);
+    }
+
     private void renderInventoryReport(int cloneCount,
                                        CloneIdentityAudit.InventoryReport report) {
         status.setText((fa ? "Cloneهای ثبت‌شده: " : "Registered Clones: ")
                 + cloneCount
-                + (fa ? "\nشناسه‌های ثبت‌شده در موتور: " : "\nEngine virtual user IDs: ")
+                + (fa ? "\nشناسه‌های کاربران مجازی Engine: " : "\nEngine virtual-user IDs: ")
                 + report.knownEngineUserIds.size()
+                + (fa ? "\nکلیدهای عددی AccountManager: " : "\nAccountManager numeric bucket keys: ")
+                + report.knownAccountManagerUserIds.size()
                 + (fa ? "\nگروه‌های هم‌پوشانی بین بسته‌ها: " : "\nCross-package overlap groups: ")
                 + report.crossPackageCollisions.size());
 
@@ -185,9 +281,42 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
                         ? "رجیستری به این شناسه‌ها اشاره می‌کند، اما موتور آن‌ها را در فهرست فعلی نشان نمی‌دهد. هیچ نصب، ترمیم یا حذف خودکاری انجام نشده است."
                         : "The Clone registry references these IDs, but the Engine does not list them now. No install, repair or removal was attempted.");
 
+        addUserIdListRow(
+                fa ? "کلیدهای AccountManager بدون کاربر مجازی فعلی" : "AccountManager IDs without a current Engine user",
+                report.accountManagerUserIdsWithoutCurrentEngineUser,
+                fa
+                        ? "این شناسه‌ها در Map حساب‌ها وجود دارند اما در فهرست فعلی کاربران موتور نیستند؛ نامزد رکورد تاریخی‌اند، نه شناسه آزاد."
+                        : "These IDs exist as account-map keys but not in the current Engine user list. They are historical-record candidates, not free IDs.");
+
+        addUserIdListRow(
+                fa ? "کلیدهای AccountManager بدون Clone ثبت‌شده" : "AccountManager IDs without a registered Clone",
+                report.accountManagerUserIdsWithoutRegisteredClone,
+                fa
+                        ? "هیچ Clone فعلی با این userId عددی در رجیستری پیدا نشد. این نتیجه فقط عددی است و به package خاصی نسبت داده نمی‌شود."
+                        : "No current Clone uses this numeric userId in the registry. This is a numeric comparison only and is not attributed to a package.");
+
+        addUserIdListRow(
+                fa ? "کلیدهای AccountManager در محدوده چند بسته Clone" : "AccountManager IDs in a cross-package Clone overlap",
+                report.accountManagerUserIdsSharedAcrossPackages,
+                fa
+                        ? "چند بسته Clone همین userId عددی را دارند و AccountManager نیز بر اساس همین عدد کلیدگذاری شده است. این هم‌محدوده بودن، دسترسی قطعی به همه حساب‌ها را ثابت نمی‌کند."
+                        : "Multiple Clone packages use this numeric userId and AccountManager is keyed by that number. This shared scope does not prove that every app can access every account.");
+
+        TextView scopeNote = new TextView(this);
+        scopeNote.setText(fa
+                ? "این گزارش فقط شناسه‌های عددی را مقایسه می‌کند. هیچ کلید AccountManager به یک package یا Clone مشخص منتسب نمی‌شود و هیچ رمز، نام حساب، userData یا Token خوانده نمی‌شود."
+                : "No AccountManager key is attributed to a package or specific Clone. This report compares numeric IDs only and does not read account names, passwords, userData or tokens.");
+        scopeNote.setTextSize(11f);
+        scopeNote.setTextColor(UiPalette.textSecondary(this));
+        scopeNote.setPadding(0, dp(10), 0, dp(10));
+        rows.addView(scopeNote);
+
         if (report.crossPackageCollisions.isEmpty()
                 && report.engineUserIdsWithoutRegisteredClone.isEmpty()
-                && report.registeredCloneUserIdsMissingFromEngine.isEmpty()) {
+                && report.registeredCloneUserIdsMissingFromEngine.isEmpty()
+                && report.accountManagerUserIdsWithoutCurrentEngineUser.isEmpty()
+                && report.accountManagerUserIdsWithoutRegisteredClone.isEmpty()
+                && report.accountManagerUserIdsSharedAcrossPackages.isEmpty()) {
             TextView note = new TextView(this);
             note.setText(fa
                     ? "در رجیستری و فهرست فعلی شناسه‌های موتور، ناسازگاری عددی پیدا نشد. این نتیجه پاک‌بودن حساب‌های حذف‌شده در گذشته یا جداسازی کامل نشست‌ها را ثابت نمی‌کند."
@@ -219,9 +348,15 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         TextView values = new TextView(this);
         StringBuilder joined = new StringBuilder();
-        for (Integer id : ids) {
+        int visibleCount = Math.min(ids.size(), 100);
+        for (int i = 0; i < visibleCount; i++) {
             if (joined.length() > 0) joined.append(", ");
-            joined.append(id);
+            joined.append(ids.get(i));
+        }
+        if (ids.size() > visibleCount) {
+            joined.append(fa ? "، ... و " : ", ... plus ");
+            joined.append(ids.size() - visibleCount);
+            joined.append(fa ? " مورد دیگر" : " more");
         }
         values.setText(joined.toString());
         values.setTextSize(13f);

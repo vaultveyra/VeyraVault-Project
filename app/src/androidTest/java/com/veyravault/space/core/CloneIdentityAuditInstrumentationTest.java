@@ -81,13 +81,17 @@ public class CloneIdentityAuditInstrumentationTest {
                 entry("com.example.alpha", 1, "Alpha Space 2"));
 
         CloneIdentityAudit.InventoryReport report =
-                CloneIdentityAudit.auditInventory(entries, Arrays.asList(2, 0));
+                CloneIdentityAudit.auditInventory(entries, Arrays.asList(2, 0), Arrays.asList(0, 2, 7));
 
         assertEquals(1, report.crossPackageCollisions.size());
         assertEquals(0, report.crossPackageCollisions.get(0).userId);
         assertEquals(Arrays.asList(2), report.engineUserIdsWithoutRegisteredClone);
         assertEquals(Arrays.asList(1), report.registeredCloneUserIdsMissingFromEngine);
         assertEquals(Arrays.asList(0, 2), report.knownEngineUserIds);
+        assertEquals(Arrays.asList(0, 2, 7), report.knownAccountManagerUserIds);
+        assertEquals(Arrays.asList(7), report.accountManagerUserIdsWithoutCurrentEngineUser);
+        assertEquals(Arrays.asList(2, 7), report.accountManagerUserIdsWithoutRegisteredClone);
+        assertEquals(Arrays.asList(0), report.accountManagerUserIdsSharedAcrossPackages);
     }
 
     @Test public void engineInventoryRejectsDuplicateOrInvalidIds() {
@@ -98,7 +102,7 @@ public class CloneIdentityAuditInstrumentationTest {
                 Arrays.asList(-1),
                 Arrays.asList((Integer) null))) {
             try {
-                CloneIdentityAudit.auditInventory(entries, ids);
+                CloneIdentityAudit.auditInventory(entries, ids, Arrays.asList(0));
                 fail("Invalid Engine virtual-user inventory must fail closed");
             } catch (IllegalArgumentException expected) {
                 assertTrue(expected.getMessage().contains("Engine"));
@@ -109,7 +113,7 @@ public class CloneIdentityAuditInstrumentationTest {
     @Test public void inventoryReportCollectionsAreImmutable() {
         CloneIdentityAudit.InventoryReport report = CloneIdentityAudit.auditInventory(
                 Arrays.asList(entry("com.example.alpha", 0, "Alpha")),
-                Arrays.asList(0, 4));
+                Arrays.asList(0, 4), Arrays.asList(0, 4));
         try {
             report.knownEngineUserIds.clear();
             fail("Engine ID inventory must be immutable");
@@ -121,6 +125,72 @@ public class CloneIdentityAuditInstrumentationTest {
             fail("Unlinked Engine ID inventory must be immutable");
         } catch (UnsupportedOperationException expected) {
             assertEquals(Arrays.asList(4), report.engineUserIdsWithoutRegisteredClone);
+        }
+    }
+
+    @Test public void accountManagerInventoryClassifiesHistoricalBucketsAndSharedNumericScope() {
+        List<CloneStore.CloneEntry> entries = Arrays.asList(
+                entry("com.example.alpha", 0, "Alpha"),
+                entry("com.example.beta", 0, "Beta"),
+                entry("com.example.alpha", 1, "Alpha Space 2"));
+
+        CloneIdentityAudit.InventoryReport report = CloneIdentityAudit.auditInventory(
+                entries, Arrays.asList(0, 1, 2), Arrays.asList(0, 2, 3, 5));
+
+        assertEquals(Arrays.asList(0, 2, 3, 5), report.knownAccountManagerUserIds);
+        assertEquals(Arrays.asList(3, 5), report.accountManagerUserIdsWithoutCurrentEngineUser);
+        assertEquals(Arrays.asList(2, 3, 5), report.accountManagerUserIdsWithoutRegisteredClone);
+        assertEquals(Arrays.asList(0), report.accountManagerUserIdsSharedAcrossPackages);
+        assertEquals(1, report.crossPackageCollisions.size());
+        assertEquals(2, report.crossPackageCollisions.get(0).clones.size());
+    }
+
+    @Test public void accountManagerInventoryRejectsDuplicateOrInvalidIds() {
+        List<CloneStore.CloneEntry> entries =
+                Arrays.asList(entry("com.example.alpha", 0, "Alpha"));
+        for (List<Integer> ids : Arrays.asList(
+                Arrays.asList(0, 0),
+                Arrays.asList(-1),
+                Arrays.asList((Integer) null))) {
+            try {
+                CloneIdentityAudit.auditInventory(entries, Arrays.asList(0), ids);
+                fail("Invalid AccountManager inventory must fail closed");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("AccountManager"));
+            }
+        }
+        try {
+            CloneIdentityAudit.auditInventory(entries, Arrays.asList(0), null);
+            fail("Missing AccountManager inventory must fail closed");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("AccountManager"));
+        }
+    }
+
+    @Test public void accountManagerInventoryCollectionsAreImmutable() {
+        CloneIdentityAudit.InventoryReport report = CloneIdentityAudit.auditInventory(
+                Arrays.asList(
+                        entry("com.example.alpha", 0, "Alpha"),
+                        entry("com.example.beta", 0, "Beta")),
+                Arrays.asList(0), Arrays.asList(0, 8));
+
+        try {
+            report.knownAccountManagerUserIds.clear();
+            fail("AccountManager ID inventory must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            assertEquals(Arrays.asList(0, 8), report.knownAccountManagerUserIds);
+        }
+        try {
+            report.accountManagerUserIdsSharedAcrossPackages.clear();
+            fail("Shared-scope ID inventory must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            assertEquals(Arrays.asList(0), report.accountManagerUserIdsSharedAcrossPackages);
+        }
+        try {
+            report.accountManagerUserIdsWithoutCurrentEngineUser.clear();
+            fail("Unlinked AccountManager ID inventory must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            assertEquals(Arrays.asList(8), report.accountManagerUserIdsWithoutCurrentEngineUser);
         }
     }
 

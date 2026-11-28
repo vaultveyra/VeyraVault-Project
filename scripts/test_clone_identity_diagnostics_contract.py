@@ -27,6 +27,11 @@ assert "Collections.unmodifiableList(new ArrayList<>(clones))" in audit
 assert "auditInventory(" in audit
 assert "engineUserIdsWithoutRegisteredClone" in audit
 assert "registeredCloneUserIdsMissingFromEngine" in audit
+assert "knownAccountManagerUserIds" in audit
+assert "accountManagerUserIdsWithoutCurrentEngineUser" in audit
+assert "accountManagerUserIdsWithoutRegisteredClone" in audit
+assert "accountManagerUserIdsSharedAcrossPackages" in audit
+assert "AccountManager data is represented only by numeric userId map keys" in audit
 
 # Engine inventory returns only sorted IDs and fails closed if the Engine is unavailable.
 assert "getKnownVirtualUserIds()" in engine
@@ -52,14 +57,20 @@ assert 'getMethod("getKnownAccountUserIds")' in account_inventory_method
 assert "Collections.unmodifiableList" in account_inventory_method
 for forbidden in ("getPassword(", "getUserData(", "getAuthToken(", "setAuthToken(", "saveAllAccounts", "deleteUser", "clearPackage"):
     assert forbidden not in account_inventory_method, "AccountManager inventory must remain ID-only and read-only: " + forbidden
-for forbidden in ("SharedPreferences", "ContentResolver", "AccountManager", "Engine.", "FileInputStream"):
-    assert forbidden not in audit, "Identity grouping must not access external/runtime state: " + forbidden
+for forbidden in ("SharedPreferences", "ContentResolver", "Engine.", "FileInputStream",
+                  "getPassword(", "getUserData(", "getAuthToken(", "setAuthToken("):
+    assert forbidden not in audit, "Identity grouping must not access account data or external runtime state: " + forbidden
 
 # The UI reads the strict Clone registry asynchronously and delegates only to the pure audit.
 assert "repository.loadClones(result ->" in activity
 assert "EngineOperationQueue.submit(" in activity
 assert "Engine.getKnownVirtualUserIds()" in activity
-assert "CloneIdentityAudit.auditInventory(snapshot, engineIds)" in activity
+assert "Engine.getKnownAccountUserIds()" in activity
+assert "CloneIdentityAudit.auditInventory(" in activity
+assert "inventories.accountManagerUserIds" in activity
+assert "renderPartialInventory(snapshot, inventories)" in activity
+assert "AccountManager numeric bucket keys" in activity
+assert "No AccountManager key is attributed to a package or specific Clone" in activity
 assert "renderRegistryOnly(snapshot, failure)" in activity
 assert "No all-clear result is reported." in activity
 assert "if (!result.isSuccess() || result.getValue() == null)" in activity
@@ -92,13 +103,16 @@ for test_name in (
     "engineInventoryReportsUnlinkedAndMissingCloneUserIds",
     "engineInventoryRejectsDuplicateOrInvalidIds",
     "inventoryReportCollectionsAreImmutable",
+    "accountManagerInventoryClassifiesHistoricalBucketsAndSharedNumericScope",
+    "accountManagerInventoryRejectsDuplicateOrInvalidIds",
+    "accountManagerInventoryCollectionsAreImmutable",
 ):
     assert test_name in tests
 
 print("PASS: duplicate userId groups are computed from a strict Clone registry snapshot.")
 print("PASS: Engine inventory exposes IDs only and fails closed when unavailable.")
-print("PASS: diagnostics classifies Engine-only IDs and Clone-only IDs without reading accounts.")
+print("PASS: diagnostics compares AccountManager numeric keys with Engine and Clone IDs without reading account records.")
 print("PASS: diagnostics reads the Clone registry asynchronously and fails closed on invalid data.")
 print("PASS: the Settings entry and non-exported Activity are registered.")
-print("PASS: synthetic tests cover overlap, no-overlap, invalid identity and immutable output.")
+print("PASS: synthetic tests cover Clone overlaps, AccountManager historical candidates, shared numeric scope, invalid IDs and immutable output.")
 print("PASS: no Engine account/session, package files, SharedPreferences or mutation API is accessed.")
