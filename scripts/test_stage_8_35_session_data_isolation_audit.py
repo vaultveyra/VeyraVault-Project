@@ -55,7 +55,7 @@ assert "validateIdInventory" in reserve_body
 
 # The old package-scoped helper is retained only as a deprecated preview API.
 next_start = clone_store.index("public static synchronized int nextFreeUserIdForPackage")
-next_end = clone_store.index("\\n        public static", next_start)
+next_end = clone_store.index("\n        public static", next_start)
 next_body = clone_store[next_start:next_end]
 assert "entry.packageName.equals(pkg)" in next_body
 assert "reservation.packageName.equals(pkg)" in next_body
@@ -69,7 +69,7 @@ assert provision.index("persistence.reserveNextUserId(packageName") < provision.
 
 # Removal never lowers the ledger; synthetic tests exercise only disposable registry data.
 remove_start = clone_store.index("public static synchronized boolean removeClone")
-remove_end = clone_store.index("\\n        public static", remove_start)
+remove_end = clone_store.index("\n        public static", remove_start)
 remove_body = clone_store[remove_start:remove_end]
 assert "return saveAll(c, kept);" in remove_body
 assert "globalAllocatorNeverReservesSameNumericUserIdForDifferentPackages" in clone_id_instrumentation
