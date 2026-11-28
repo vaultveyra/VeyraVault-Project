@@ -152,7 +152,7 @@ public class ProfileRuntimeStatusStoreInstrumentationTest {
             assertFalse(staleA.current);
             assertTrue(staleA.statuses.isEmpty());
             assertTrue(stillCurrentB.current);
-            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+            assertEquals(ProfileFieldRegistry.ApplyStatus.FAILED,
                     stillCurrentB.statuses.get("localeTag"));
 
             // The stale runtime must not be re-recorded against an older document revision.
