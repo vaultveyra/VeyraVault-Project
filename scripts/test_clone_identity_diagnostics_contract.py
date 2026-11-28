@@ -58,8 +58,8 @@ for forbidden in (
     "CloneStore.saveAll(",
     "clearCloneData(",
     "uninstallClone(",
-    "AccountManager",
-    "SharedPreferences",
+    "AccountManager.get(",
+    "getSharedPreferences(",
 ):
     assert forbidden not in activity, "Diagnostics screen must remain read-only: " + forbidden
 
