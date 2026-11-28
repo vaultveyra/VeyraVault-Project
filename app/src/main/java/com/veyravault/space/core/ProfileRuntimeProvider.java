@@ -63,6 +63,12 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                     response.putString("error", "CLONE_NOT_REGISTERED");
                     return response;
                 }
+                String profileFingerprint = extras.getString("profileFingerprint");
+                if (!ProfileRuntimeFingerprint.isValid(profileFingerprint)) {
+                    response.putBoolean("ok", false);
+                    response.putString("error", "INVALID_PROFILE_FINGERPRINT");
+                    return response;
+                }
                 Bundle statusBundle = extras.getBundle("statuses");
                 if (statusBundle == null) {
                     response.putBoolean("ok", false);
@@ -77,7 +83,8 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                     statuses.put(key, ProfileFieldRegistry.ApplyStatus.valueOf(raw));
                 }
                 boolean saved = ProfileRuntimeStatusStore.record(context, packageName, userId,
-                        extras.getLong("revision", -1L), extras.getString("processName"), statuses);
+                        extras.getLong("revision", -1L), profileFingerprint,
+                        extras.getString("processName"), statuses);
                 response.putBoolean("ok", saved);
                 if (!saved) response.putString("error", "STALE_OR_INVALID_STATUS");
                 else response.putLong("revision", ProfileDocumentStore.readRevisionStrict(context));

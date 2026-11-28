@@ -84,7 +84,8 @@ public final class CloneProfileLifecycleCallback extends AppLifecycleCallback {
                     ProfileRuntimeApplier.applyAndVerify(packageContext, packageName, resolved);
             document = document.withRuntimeVerification(verification);
             boolean statusPersisted = ProfileRuntimeClient.recordRuntimeVerification(
-                    appContext, packageName, userId, document.revision, processName, verification);
+                    appContext, packageName, userId, document.revision,
+                    document.runtimeFingerprint, processName, verification);
             CloneRuntimeTrace.record(CloneRuntimeTrace.Event.PROFILE_DOCUMENT_RESOLVED,
                     packageName, processName, userId,
                     statusSummary(document) + "_status_persisted_" + statusPersisted);

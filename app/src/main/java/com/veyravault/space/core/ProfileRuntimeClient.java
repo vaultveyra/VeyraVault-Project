@@ -73,6 +73,8 @@ public final class ProfileRuntimeClient {
         public final String packageName;
         public final int userId;
         public final long revision;
+        /** SHA-256 of the effective Locale/Time Zone values resolved in this same snapshot. */
+        public final String runtimeFingerprint;
         private final Map<String, ResolvedField> fields;
 
         private ResolvedDocument(String packageName, int userId, long revision,
@@ -81,6 +83,11 @@ public final class ProfileRuntimeClient {
             this.userId = userId;
             this.revision = revision;
             this.fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));
+            ResolvedField locale = this.fields.get("localeTag");
+            ResolvedField zone = this.fields.get("timeZoneId");
+            this.runtimeFingerprint = ProfileRuntimeFingerprint.compute(
+                    locale != null && locale.value instanceof String ? (String) locale.value : null,
+                    zone != null && zone.value instanceof String ? (String) zone.value : null);
         }
 
         public Map<String, ResolvedField> fields() { return fields; }
@@ -206,16 +213,19 @@ public final class ProfileRuntimeClient {
 
     /** Persists only readback outcomes from the package/user-matched runtime applier. */
     public static boolean recordRuntimeVerification(Context context, String packageName, int userId,
-                                                    long revision, String processName,
+                                                    long revision, String profileFingerprint,
+                                                    String processName,
                                                     ProfileRuntimeApplier.RuntimeApplyResult result) {
         if (context == null || packageName == null || packageName.trim().isEmpty()
-                || userId < 0 || revision < 0 || processName == null || result == null
-                || !result.targetIdentityMatches || !packageName.equals(result.targetPackageName)) return false;
+                || userId < 0 || revision < 0 || !ProfileRuntimeFingerprint.isValid(profileFingerprint)
+                || processName == null || result == null || !result.targetIdentityMatches
+                || !packageName.equals(result.targetPackageName)) return false;
         try {
             Bundle request = new Bundle();
             request.putString("packageName", packageName);
             request.putInt("userId", userId);
             request.putLong("revision", revision);
+            request.putString("profileFingerprint", profileFingerprint);
             request.putString("processName", processName);
             Bundle statuses = new Bundle();
             statuses.putString("localeTag", result.localeStatus.name());

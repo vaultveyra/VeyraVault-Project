@@ -10,10 +10,15 @@ callback = (root / "core/CloneProfileLifecycleCallback.java").read_text(encoding
 applier = (root / "core/ProfileRuntimeApplier.java").read_text(encoding="utf-8")
 client = (root / "core/ProfileRuntimeClient.java").read_text(encoding="utf-8")
 provider = (root / "core/ProfileRuntimeProvider.java").read_text(encoding="utf-8")
+status_store = (root / "core/ProfileRuntimeStatusStore.java").read_text(encoding="utf-8")
+fingerprint = (root / "core/ProfileRuntimeFingerprint.java").read_text(encoding="utf-8")
 process = (root / "core/ProcessUtils.java").read_text(encoding="utf-8")
 manifest = Path("app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
 instrumentation = Path(
     "app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeApplierInstrumentationTest.java"
+).read_text(encoding="utf-8")
+status_instrumentation = Path(
+    "app/src/androidTest/java/com/veyravault/space/core/ProfileRuntimeStatusStoreInstrumentationTest.java"
 ).read_text(encoding="utf-8")
 
 assert "registerCloneProfileLifecycleCallback(this)" in vault
@@ -62,8 +67,20 @@ assert "matchesCloneIdentity(packageName, userId, callerPackage, callerUserId" i
 assert "CALLER_CLONE_IDENTITY_MISMATCH" in provider
 assert "expectedProcessName.equals(callerProcessName)" in provider
 assert provider.index("isAuthorizedCaller(context, packageName, userId, null)") < provider.index("ProfileStore.readCloneOverrideStrict")
+assert "profileFingerprint" in provider
+assert "ProfileRuntimeFingerprint.isValid(profileFingerprint)" in provider
+assert "ProfileRuntimeFingerprint" in status_store
+assert "currentRuntimeFingerprint" in status_store
+assert 'profile.put("profileFingerprint", profileFingerprint)' in status_store
+assert "ProfileRuntimeFingerprint.compute(profile)" in fingerprint
+assert "document.runtimeFingerprint" in callback
+assert "profileFingerprint" in client
 assert "runtimeProviderCallerIdentityRejectsCrossCloneAndUserAndProcess" in instrumentation
 assert "matchesCloneIdentity(" in instrumentation
+assert "legacyProfileEditsInvalidateReadbackWithoutTypedRevisionChange" in status_instrumentation
+assert "cloneReadbacksRemainScopedAndTypedRevisionChangesInvalidate" in status_instrumentation
+assert "ProfileRuntimeStatusStore.record" in status_instrumentation
+assert "ProfileRuntimeStatusStore.read" in status_instrumentation
 assert "ProcessUtils.isMainProcess(this)" in vault
 assert "ProfileStore.migrateLegacyLocationSettings(this)" in vault
 assert "Application.getProcessName()" in process
@@ -99,4 +116,6 @@ print("Clone lifecycle callback registration contract: PASS")
 print("Safe isolated defaults before profile IPC contract: PASS")
 print("Pre-Application package/user profile resolution contract: PASS")
 print("Runtime Provider authenticates virtual callers by Engine PID, package, user and process identity: PASS")
+print("Readback status is fingerprinted against effective Typed+Legacy Locale/Time Zone: PASS")
+print("Legacy-only edits invalidate stale runtime readback metadata: PASS")
 print("Process-scoped locale/time-zone application contract: PASS")

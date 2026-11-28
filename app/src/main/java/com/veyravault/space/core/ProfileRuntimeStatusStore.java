@@ -47,14 +47,20 @@ public final class ProfileRuntimeStatusStore {
     private ProfileRuntimeStatusStore() { }
 
     public static synchronized boolean record(Context context, String packageName, int userId,
-                                              long profileRevision, String processName,
+                                              long profileRevision, String profileFingerprint,
+                                              String processName,
                                               Map<String, ProfileFieldRegistry.ApplyStatus> statuses) {
         if (context == null || !validIdentity(packageName, userId) || profileRevision < 0
+                || !ProfileRuntimeFingerprint.isValid(profileFingerprint)
                 || processName == null || processName.trim().isEmpty()
                 || processName.length() > 255 || statuses == null || statuses.isEmpty()) return false;
         try {
             long currentRevision = ProfileDocumentStore.readRevisionStrict(context);
             if (currentRevision != profileRevision) return false;
+            String currentFingerprint = currentRuntimeFingerprint(context, packageName, userId);
+            long verifiedRevision = ProfileDocumentStore.readRevisionStrict(context);
+            if (verifiedRevision != currentRevision
+                    || !ProfileRuntimeFingerprint.matches(profileFingerprint, currentFingerprint)) return false;
             JSONObject root = readRoot(context);
             if (root == null) return false;
             JSONObject profiles = root.optJSONObject("profiles");
@@ -77,6 +83,8 @@ public final class ProfileRuntimeStatusStore {
             profile.put("packageName", packageName);
             profile.put("userId", userId);
             profile.put("profileRevision", profileRevision);
+            // Persist only a digest of effective Locale/Time Zone, never the raw values.
+            profile.put("profileFingerprint", profileFingerprint);
             profile.put("updatedAt", System.currentTimeMillis());
             profile.put("processName", processName);
             profile.put("fields", fields);
@@ -108,11 +116,19 @@ public final class ProfileRuntimeStatusStore {
             long revision = profile.optLong("profileRevision", -1L);
             long updatedAt = profile.optLong("updatedAt", 0L);
             String processName = profile.optString("processName", null);
+            String storedFingerprint = profile.optString("profileFingerprint", null);
             JSONObject fields = profile.optJSONObject("fields");
             if (revision < 0 || updatedAt <= 0 || processName == null || fields == null) {
                 return Snapshot.empty(currentRevision);
             }
-            if (revision != currentRevision) {
+            if (revision != currentRevision || !ProfileRuntimeFingerprint.isValid(storedFingerprint)) {
+                return new Snapshot(true, false, revision, updatedAt, processName,
+                        Collections.<String, ProfileFieldRegistry.ApplyStatus>emptyMap());
+            }
+            String currentFingerprint = currentRuntimeFingerprint(context, packageName, userId);
+            long verifiedRevision = ProfileDocumentStore.readRevisionStrict(context);
+            if (verifiedRevision != currentRevision
+                    || !ProfileRuntimeFingerprint.matches(storedFingerprint, currentFingerprint)) {
                 return new Snapshot(true, false, revision, updatedAt, processName,
                         Collections.<String, ProfileFieldRegistry.ApplyStatus>emptyMap());
             }
@@ -144,6 +160,13 @@ public final class ProfileRuntimeStatusStore {
         } catch (Exception invalid) {
             return Snapshot.empty(-1L);
         }
+    }
+
+    private static String currentRuntimeFingerprint(Context context, String packageName, int userId)
+            throws Exception {
+        ProfileResolver.ResolvedProfile current = ProfileRuntimeProvider.resolveMergedProfile(
+                context, packageName, userId, null);
+        return ProfileRuntimeFingerprint.compute(current);
     }
 
     private static JSONObject readRoot(Context context) throws JSONException {

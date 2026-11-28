@@ -28,6 +28,10 @@ assert "ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument)" in ed
 assert "effective.source" in editor and "effective.status" in editor
 assert "repository.loadGlobalProfileDocument" in editor
 assert "repository.loadCloneProfileDocument" in editor
+assert "repository.loadCloneRuntimeStatus" in editor
+assert "runtimeStatus.current" in editor
+assert "Last verified readback:" in editor
+assert "not proof that the process is still alive" in editor
 assert "repository.saveGlobalProfileField" in editor
 assert "repository.saveCloneProfileField" in editor
 assert "repository.clearGlobalProfileDocumentField" in editor
@@ -54,6 +58,7 @@ for field in ("altitude", "ipv6LeakStatus", "cameraPolicy", "webViewLocalStorage
 print("PASS: Global and per-Clone editor is generated from the canonical registry.")
 print("PASS: Effective source, capability, validation and status are displayed per field.")
 print("PASS: Adapter mapping, API support, privacy class and readback method are visible for every registry-generated field.")
+print("PASS: Clone editor displays only profile-fresh last-readback metadata and labels it as historical, not live-process proof.")
 print("PASS: Restricted and observed-only fields are read-only; editable writes are validated and asynchronous.")
 print("PASS: Reset-to-Global and explicit Clone Safe Default use field-scoped persistence.")
 print("PASS: Settings and Clone profile entry points open the complete editor.")

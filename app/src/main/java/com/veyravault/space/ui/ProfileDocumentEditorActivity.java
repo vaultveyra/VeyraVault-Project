@@ -18,7 +18,10 @@ import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileDocument;
 import com.veyravault.space.core.ProfileDocumentResolver;
 import com.veyravault.space.core.ProfileFieldRegistry;
+import com.veyravault.space.core.ProfileRuntimeStatusStore;
 
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -36,7 +39,10 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private boolean cloneLoaded;
     private boolean globalLoaded;
     private boolean registryLoaded;
+    private boolean runtimeStatusLoaded;
+    private boolean runtimeStatusUnavailable;
     private boolean loadFailed;
+    private ProfileRuntimeStatusStore.Snapshot runtimeStatus;
     private ProfileDocument cloneDocument;
     private ProfileDocument globalDocument;
     private LinearLayout root;
@@ -90,6 +96,9 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         cloneLoaded = !cloneMode;
         globalLoaded = false;
         registryLoaded = !cloneMode;
+        runtimeStatusLoaded = !cloneMode;
+        runtimeStatusUnavailable = false;
+        runtimeStatus = null;
         loadFailed = false;
         if (cloneMode) {
             repository.loadClones(result -> {
@@ -125,6 +134,16 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                 cloneLoaded = true;
                 finishLoadIfReady();
             });
+            repository.loadCloneRuntimeStatus(packageName, userId, result -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (!result.isSuccess() || result.getValue() == null) {
+                    runtimeStatusUnavailable = true;
+                } else {
+                    runtimeStatus = result.getValue();
+                }
+                runtimeStatusLoaded = true;
+                finishLoadIfReady();
+            });
         } else {
             cloneDocument = new ProfileDocument();
         }
@@ -142,7 +161,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void finishLoadIfReady() {
-        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded) return;
+        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded || !runtimeStatusLoaded) return;
         buildEditor();
     }
 
@@ -171,10 +190,12 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         explanation.setTextColor(UiPalette.textSecondary(this));
         explanation.setPadding(0, 0, 0, dp(16));
         root.addView(explanation);
+        if (cloneMode) root.addView(runtimeStatusSummary());
 
         Map<String, ProfileDocumentResolver.FieldResult> resolved =
                 ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument);
-        addSummary(resolved);
+        Map<String, ProfileFieldRegistry.ApplyStatus> displayStatuses = displayStatuses(resolved);
+        addSummary(resolved, displayStatuses);
         String lastCategory = null;
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
             if (!field.category.equals(lastCategory)) {
@@ -187,16 +208,63 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                 category.setPadding(0, dp(22), 0, dp(10));
                 root.addView(category);
             }
-            root.addView(buildFieldCard(field, resolved.get(field.key)));
+            root.addView(buildFieldCard(field, resolved.get(field.key), displayStatuses.get(field.key)));
         }
         scroll.addView(root);
         setContentView(scroll);
     }
 
-    private void addSummary(Map<String, ProfileDocumentResolver.FieldResult> resolved) {
+    private Map<String, ProfileFieldRegistry.ApplyStatus> displayStatuses(
+            Map<String, ProfileDocumentResolver.FieldResult> resolved) {
+        Map<String, ProfileFieldRegistry.ApplyStatus> statuses = new LinkedHashMap<>();
+        for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
+            ProfileFieldRegistry.ApplyStatus status = field.status;
+            if (cloneMode && runtimeStatus != null && runtimeStatus.current) {
+                ProfileFieldRegistry.ApplyStatus verified = runtimeStatus.statuses.get(field.key);
+                if (verified != null) status = verified;
+            }
+            statuses.put(field.key, status);
+        }
+        return statuses;
+    }
+
+    private TextView runtimeStatusSummary() {
+        TextView info = new TextView(this);
+        info.setTextSize(11f);
+        info.setTextColor(UiPalette.textSecondary(this));
+        info.setPadding(dp(12), dp(10), dp(12), dp(10));
+        info.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+
+        String message;
+        if (runtimeStatusUnavailable) {
+            message = fa
+                    ? "وضعیت Readback در دسترس نیست؛ هیچ فیلدی به‌عنوان اعمال‌شده نمایش داده نمی‌شود."
+                    : "Runtime readback status is unavailable; no field is presented as applied.";
+        } else if (runtimeStatus == null || !runtimeStatus.exists) {
+            message = fa
+                    ? "هنوز Readback معتبر برای این کلون ثبت نشده است. پس از اجرای کلون و تأیید واقعی Locale/Time Zone وضعیت ثبت می‌شود."
+                    : "No runtime readback has been recorded for this Clone yet. A result is stored only after the Clone runs and Locale/Time Zone are read back.";
+        } else if (!runtimeStatus.current) {
+            message = fa
+                    ? "Readback قبلی با پروفایل مؤثر فعلی تطابق ندارد؛ وضعیت فیلدهای Runtime اکنون NOT_TESTED است."
+                    : "The previous readback no longer matches the effective profile; Runtime fields are now NOT_TESTED.";
+        } else {
+            String when = DateFormat.getDateTimeInstance(
+                    DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(runtimeStatus.updatedAt));
+            message = (fa ? "آخرین Readback تأییدشده: " : "Last verified readback: ")
+                    + when + " · " + (fa ? "پردازه: " : "Process: ") + runtimeStatus.processName
+                    + (fa ? " · این سابقه، زنده‌بودن فعلی پردازه را ثابت نمی‌کند."
+                            : " · This is historical evidence, not proof that the process is still alive.");
+        }
+        info.setText(message);
+        return info;
+    }
+
+    private void addSummary(Map<String, ProfileDocumentResolver.FieldResult> resolved,
+                            Map<String, ProfileFieldRegistry.ApplyStatus> displayStatuses) {
         int applied = 0, stored = 0, unsupported = 0, notTested = 0, failed = 0, notApplicable = 0;
         for (ProfileDocumentResolver.FieldResult field : resolved.values()) {
-            switch (field.status) {
+            switch (displayStatuses.get(field.key)) {
                 case APPLIED: applied++; break;
                 case STORED_ONLY: stored++; break;
                 case UNSUPPORTED: unsupported++; break;
@@ -222,7 +290,8 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private View buildFieldCard(ProfileFieldRegistry.Field field,
-                                ProfileDocumentResolver.FieldResult effective) {
+                                ProfileDocumentResolver.FieldResult effective,
+                                ProfileFieldRegistry.ApplyStatus displayStatus) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -246,7 +315,8 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         TextView effectiveText = new TextView(this);
         effectiveText.setText((fa ? "مقدار مؤثر: " : "Effective: ")
                 + valueText(effective.value) + "  |  Source: " + effective.source
-                + "  |  Status: " + effective.status);
+                + "  |  " + (cloneMode && field.capability == ProfileFieldRegistry.Capability.PROCESS_SCOPED
+                        ? "Last readback: " : "Status: ") + displayStatus);
         effectiveText.setTextSize(12f);
         effectiveText.setTextColor(UiPalette.textSecondary(this));
         effectiveText.setPadding(0, dp(7), 0, dp(7));
