@@ -55,8 +55,20 @@ public class Engine {
         if (core == null) {
             throw new IllegalStateException("Engine is unavailable; virtual-user inventory is unconfirmed");
         }
-        Method getUsers = core.getClass().getMethod("getUsers");
-        Object rawUsers = getUsers.invoke(core);
+        // Call the Binder service directly instead of BlackBoxCore.getUsers(), whose
+        // BUserManager wrapper converts service failures into an empty list.
+        Class<?> managerClass = Class.forName(
+                "top.niunaijun.blackbox.fake.frameworks.BUserManager");
+        Object manager = managerClass.getMethod("get").invoke(null);
+        if (manager == null) {
+            throw new IllegalStateException("Engine UserManager facade is unavailable");
+        }
+        Object userService = managerClass.getMethod("getService").invoke(manager);
+        if (userService == null) {
+            throw new IllegalStateException("Engine UserManager Binder service is unavailable");
+        }
+        Method getUsers = userService.getClass().getMethod("getUsers");
+        Object rawUsers = getUsers.invoke(userService);
         if (!(rawUsers instanceof List)) {
             throw new IllegalStateException("Engine returned an invalid virtual-user inventory");
         }
