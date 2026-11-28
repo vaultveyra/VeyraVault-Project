@@ -473,6 +473,7 @@ def harden_account_manager_id_inventory(workspace):
         "VEYRAVAULT_TRACK_ACCOUNT_MANAGER_ID_INVENTORY_LOAD_STATUS",
         r"    private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>\(\);",
         """    private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>();
+    // VEYRAVAULT_TRACK_ACCOUNT_MANAGER_ID_INVENTORY_LOAD_STATUS
     // True only after the persisted AccountManager map was fully loaded and validated.
     // A missing initial accounts.conf is a valid empty store; parse/I/O/shape failures are not.
     private volatile boolean mAccountsLoadSucceeded;""",
