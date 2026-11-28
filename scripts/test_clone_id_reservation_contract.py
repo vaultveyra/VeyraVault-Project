@@ -85,7 +85,11 @@ for ui in (ADD, MAIN):
     assert "provisionRepository.createClone(" in ui
     assert "Engine.installPackageAsUser(" not in ui
 assert "persistence.inspectNativeAbi(packageName" in PROVISION
-assert "persistence.reserveNextUserId(packageName" in PROVISION
+assert "persistence.reserveNextUserId(packageName, inventories.virtualUserIds" in PROVISION
+assert "Engine.getKnownVirtualUserIds()" in PROVISION
+assert "Engine.getKnownAccountUserIds()" in PROVISION
+assert PROVISION.index("EngineOperationQueue.submit(") < PROVISION.index("Engine.getKnownVirtualUserIds()")
+assert PROVISION.index("Engine.getKnownAccountUserIds()") < PROVISION.index("persistence.reserveNextUserId(packageName")
 assert "Engine.installPackageAsUser(" in PROVISION
 assert "persistence.commitReservedClone(entry, reservation" in PROVISION
 assert PROVISION.index("persistence.inspectNativeAbi(packageName") < PROVISION.index("persistence.reserveNextUserId(packageName")
@@ -102,7 +106,10 @@ assert "EngineOperationQueue.submit(" in PROVISION
 for test_name in (
     "independentRepositoriesCannotReserveSamePackageUserId",
     "reservationSurvivesRepositoryRecreationAndCommitConsumesOnlyItsToken",
-    "reservationReleaseRequiresExplicitEngineAbsenceAndAllowsSafeReuse",
+    "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",
+    "globalAllocatorUsesCloneEngineAndAccountManagerInventories",
+    "missingOrInvalidEngineInventoriesBlockReservationWithoutChangingLedger",
+    "globalAllocatorRejectsIntegerOverflowWithoutWrapping",
     "reservationReleaseRefusesRegistryConflictAndPreservesJournal",
     "pendingReservationCannotBeStolenByOrdinaryCloneUpsert",
     "malformedReservationJournalBlocksAllocationWithoutOverwritingIt",

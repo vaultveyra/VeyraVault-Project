@@ -24,8 +24,12 @@ assert "Executors.newSingleThreadExecutor" not in launch
 assert "Executors.newSingleThreadExecutor" not in location
 
 # Preflight -> durable reservation -> install -> atomic Registry commit.
-assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("persistence.reserveNextUserId(packageName")
+assert provision.index("persistence.inspectNativeAbi(packageName") < provision.index("EngineOperationQueue.submit(")
+assert provision.index("EngineOperationQueue.submit(") < provision.index("Engine.getKnownVirtualUserIds()")
+assert provision.index("Engine.getKnownAccountUserIds()") < provision.index("persistence.reserveNextUserId(packageName")
 assert provision.index("persistence.reserveNextUserId(packageName") < provision.index("Engine.installPackageAsUser(")
+assert "inventories could not be verified" in provision
+assert "no ID was reserved and installation did not start" in provision
 assert provision.index("Engine.installPackageAsUser(") < provision.index("persistence.commitReservedClone(entry, reservation")
 assert "EngineOperationQueue.submit" in provision
 

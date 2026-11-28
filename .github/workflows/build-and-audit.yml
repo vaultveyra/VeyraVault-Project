@@ -237,6 +237,9 @@ jobs:
       - name: Test Stage 8.40 AccountManager direct API package-scope gate
         run: python3 scripts/test_stage_8_40_account_manager_package_scope_gate.py
 
+      - name: Test Stage 8.41 global monotonic Clone ID allocator
+        run: python3 scripts/test_stage_8_41_global_clone_id_allocator.py
+
       - name: Test read-only Clone identity diagnostics contract
         run: python3 scripts/test_clone_identity_diagnostics_contract.py
 
