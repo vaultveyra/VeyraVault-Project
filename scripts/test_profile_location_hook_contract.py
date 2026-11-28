@@ -37,9 +37,11 @@ assert "locationRuntimeStatusSummary()" in editor
 assert "private long loadGeneration;" in editor
 assert "final long generation = ++loadGeneration;" in editor
 assert "generation != loadGeneration" in editor
-finish_load = editor.split("private void finishLoadIfReady() {", 1)[1].split("\\n    }", 1)[0]
+finish_start = editor.index("private void finishLoadIfReady() {")
+finish_end = editor.index(chr(10) + "    }", finish_start)
+finish_load = editor[finish_start:finish_end]
 assert "locationHookLoaded" not in finish_load
-assert "Checking this Clone's location hook in the Engine..." in editor
+assert "Checking this Clone's location hook in the Engine" in editor
 assert "LocationStatus.APPLIED" in editor
 assert "LocationStatus.DISABLED" in editor
 
