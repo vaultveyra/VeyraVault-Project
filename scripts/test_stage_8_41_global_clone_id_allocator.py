@@ -21,8 +21,12 @@ def body(source, signature):
             if depth == 0: return source[brace + 1:index]
     raise AssertionError("Unclosed method: " + signature)
 
+reserve_signature_start = STORE.index("static synchronized CloneReservation reserveNextUserId(")
+reserve_signature_end = STORE.index("{", reserve_signature_start)
+reserve_signature = STORE[reserve_signature_start:reserve_signature_end]
+assert "List<Integer> engineUserIds" in reserve_signature
+assert "List<Integer> accountUserIds" in reserve_signature
 reserve = body(STORE, "static synchronized CloneReservation reserveNextUserId(")
-assert "List<Integer> engineUserIds" in reserve and "List<Integer> accountUserIds" in reserve
 assert "validateIdInventory(engineUserIds" in reserve and "validateIdInventory(accountUserIds" in reserve
 assert "readAllStrict(c)" in reserve and "readReservationsStrict(c)" in reserve
 assert "maxKnownId = Math.max(maxKnownId, entry.userId)" in reserve
