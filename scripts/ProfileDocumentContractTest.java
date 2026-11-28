@@ -167,7 +167,9 @@ public final class ProfileDocumentContractTest {
         check(immutable, "resolveAll snapshot must be immutable");
 
         check(ProfileFieldRegistry.all().size() >= 100, "registry must cover the complete researched field inventory");
+        java.util.Set<String> uniqueFieldKeys = new java.util.HashSet<>();
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
+            check(uniqueFieldKeys.add(field.key), "registry field keys must be unique: " + field.key);
             check(field.id != null && !field.id.isEmpty() && field.id.equals(field.key),
                     "every field must have a stable ID: " + field.key);
             check(field.label != null && !field.label.isEmpty(),
