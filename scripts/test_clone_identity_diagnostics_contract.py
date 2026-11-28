@@ -62,8 +62,7 @@ for forbidden in ("SharedPreferences", "ContentResolver", "FileInputStream",
                   "getPassword(", "getUserData(", "getAuthToken(", "setAuthToken("):
     assert forbidden not in audit, "Identity grouping must not access account data or external runtime state: " + forbidden
 # Reject an actual static Engine method call, not a field name ending in "Engine".
-assert re.search(r"\\bEngine\\s*\\.\\s*[A-Za-z_$][A-Za-z0-9_$]*\\s*\\(", audit) is None, \
-    "Identity grouping must not invoke Engine APIs"
+assert re.search(r"\bEngine\s*\.\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\(", audit) is None, "Identity grouping must not invoke Engine APIs"
 
 # The UI reads the strict Clone registry asynchronously and delegates only to the pure audit.
 assert "repository.loadClones(result ->" in activity
