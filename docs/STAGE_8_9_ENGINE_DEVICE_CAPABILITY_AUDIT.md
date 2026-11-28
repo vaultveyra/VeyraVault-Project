@@ -83,7 +83,7 @@ Brand, manufacturer, model, country/SIM and similar values elsewhere in legacy/g
 
 ### Dated update — 2026-11-27
 
-The feature branch now contains the 97-field inventory and complete typed IPC snapshot described above. This update does not change the pinned Engine revision or claim new device/network identity capabilities. The original Engine findings and restrictions in the matrix above remain in force.
+The feature branch now contains a 104-field typed inventory and complete typed IPC snapshot. This inventory is a configuration/diagnostic model, not 104 runtime adapters. This update does not change the pinned Engine revision or claim new device/network identity capabilities. The original Engine findings and restrictions in the matrix above remain in force.
 
 VeyraVault source references:
 - ProfileSettings.java: https://github.com/vaultveyra/VeyraVault-Project/blob/bbef9fd41f98ee52959bac7915ec0b79c292415f/app/src/main/java/com/veyravault/space/core/ProfileSettings.java#L10-L40
@@ -106,3 +106,22 @@ VeyraVault source references:
 - No CloneStore records, Clone package data, account/session data or app-private target data were read for mutation or modified.
 - SharedPreferences remains the active profile source. Room remains inactive; no import, dual-write or persistence cutover.
 - PR #4 remains open and Draft; main is not modified.
+
+
+## Current 104-field capability count
+
+The current registry is checked by `ProfileDocumentContractTest` and has these capability totals:
+
+| Capability | Fields |
+|---|---:|
+| PROCESS_SCOPED | 2 |
+| ENGINE_SCOPED | 3 |
+| LOCAL_PREFERENCE_ONLY | 14 |
+| NOT_IMPLEMENTED | 40 |
+| NETWORK_PROVIDER_REQUIRED | 3 |
+| OBSERVED_ONLY | 21 |
+| PLATFORM_RESTRICTED | 11 |
+| SERVICE_OWNED | 10 |
+| **Total** | **104** |
+
+Only Locale and Time Zone have the current process-scoped runtime applier. Location enablement/coordinates use the package/user-scoped Engine hook. Device manufacturer/model/country values remain metadata-only and must not be presented as applied. The 3 network-provider fields still require real per-Clone routing and external leak verification.
