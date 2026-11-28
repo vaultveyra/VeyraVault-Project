@@ -428,14 +428,35 @@ public class CloneStore {
     public static synchronized boolean saveAll(Context c, List<CloneEntry> list) {
         if (c == null || list == null) return false;
         try {
+            // Preserve the maximum ID from both sides of a registry update. This is
+            // important when a legacy Clone row is removed before the first new reservation.
+            List<CloneEntry> existing = readAllStrict(c);
             List<CloneReservation> reservations = readReservationsStrict(c);
             Set<String> reserved = new HashSet<String>();
             for (CloneReservation reservation : reservations)
                 reserved.add(identityKey(reservation.packageName, reservation.userId));
-            for (CloneEntry entry : list) {
-                if (entry != null && reserved.contains(identityKey(entry.packageName, entry.userId))) return false;
+            int maxKnownId = -1;
+            for (CloneEntry entry : existing) {
+                if (entry.userId < 0) throw new IllegalStateException("Existing Clone ID is invalid");
+                maxKnownId = Math.max(maxKnownId, entry.userId);
             }
-            return prefs(c).edit().putString(KEY_CLONES, serializeEntries(list)).commit();
+            for (CloneEntry entry : list) {
+                if (entry == null || entry.userId < 0)
+                    throw new IllegalStateException("New Clone registry contains an invalid entry");
+                if (reserved.contains(identityKey(entry.packageName, entry.userId))) return false;
+                maxKnownId = Math.max(maxKnownId, entry.userId);
+            }
+            Map<String, ?> storedValues = prefs(c).getAll();
+            if (storedValues.containsKey(KEY_GLOBAL_HIGH_WATER_MARK)) {
+                Object rawHighWater = storedValues.get(KEY_GLOBAL_HIGH_WATER_MARK);
+                if (!(rawHighWater instanceof Integer) || ((Integer) rawHighWater) < 0)
+                    throw new IllegalStateException("Global user-ID high-water mark is malformed");
+                maxKnownId = Math.max(maxKnownId, (Integer) rawHighWater);
+            }
+            SharedPreferences.Editor editor = prefs(c).edit()
+                    .putString(KEY_CLONES, serializeEntries(list));
+            if (maxKnownId >= 0) editor.putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId);
+            return editor.commit();
         } catch (Exception ignored) {
             return false;
         }

@@ -47,6 +47,11 @@ assert "no ID was reserved and installation did not start" in PROVISION
 assert "private static final ExecutorService ENGINE" in QUEUE
 assert "getKnownVirtualUserIds() throws Exception" in ENGINE
 assert "getKnownAccountUserIds() throws Exception" in ENGINE
+save_all = body(STORE, "public static synchronized boolean saveAll(")
+assert "readAllStrict(c)" in save_all
+assert "maxKnownId = Math.max(maxKnownId, entry.userId)" in save_all
+assert "putInt(KEY_GLOBAL_HIGH_WATER_MARK, maxKnownId)" in save_all
+assert "return editor.commit();" in save_all
 release = body(STORE, "static synchronized boolean releaseReservationAfterEngineAbsence(")
 remove = body(STORE, "public static synchronized boolean removeClone(")
 assert "KEY_GLOBAL_HIGH_WATER_MARK" not in release and "KEY_GLOBAL_HIGH_WATER_MARK" not in remove

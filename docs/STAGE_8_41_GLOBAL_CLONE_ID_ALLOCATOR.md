@@ -16,7 +16,7 @@ CloneStore computes the maximum across current Clone registry IDs, pending reser
 
 - Commit consumes only the exact token-bound reservation; the high-water mark is not reduced.
 - Confirmed failure may remove the pending reservation, but never lowers the high-water mark.
-- Removing a Clone registry row never lowers the high-water mark.
+- Every Clone registry save carries forward the maximum ID from both the old and new registry snapshots; removing a Clone row never lowers the high-water mark.
 - New allocations cannot reuse any ID represented in verified inventories or durably reserved after ledger initialization.
 - The old package-scoped nextFreeUserIdForPackage helper is deprecated and is not used by production provisioning.
 

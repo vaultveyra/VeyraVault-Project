@@ -70,17 +70,17 @@ public class CloneUserIdScopeInstrumentationTest {
         entry.displayName = "Synthetic Clone";
 
         assertTrue(CloneStore.upsertClone(context, entry));
-        CloneStore.CloneReservation first = CloneStore.reserveNextUserId(context, packageName,
-                Collections.singletonList(0), Collections.<Integer>emptyList());
-        assertEquals(1, first.getUserId());
+        assertEquals(0, prefs.getInt("last_reserved_global_user_id", -1));
 
-        // This removes only the synthetic registry entry. It does not call Engine or
-        // delete any app/account data; the high-water mark must remain advanced.
+        // Remove the highest legacy row before any new reservation exists.
+        // saveAll must persist its old maximum in the high-water mark atomically.
         assertTrue(CloneStore.removeClone(context, packageName, 0));
+        assertEquals(0, prefs.getInt("last_reserved_global_user_id", -1));
+
         CloneStore.CloneReservation next = CloneStore.reserveNextUserId(context, packageName,
-                Collections.singletonList(0), Collections.<Integer>emptyList());
-        assertEquals(2, next.getUserId());
-        assertEquals(2, prefs.getInt("last_reserved_global_user_id", -1));
+                Collections.<Integer>emptyList(), Collections.<Integer>emptyList());
+        assertEquals(1, next.getUserId());
+        assertEquals(1, prefs.getInt("last_reserved_global_user_id", -1));
     }
 
     private static Map<String, ?> copySnapshot(Map<String, ?> source) {
