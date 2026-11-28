@@ -65,7 +65,8 @@ assert "@Deprecated" in STORE[STORE.index("public static synchronized int nextFr
 for name in ("globalAllocatorUsesCloneEngineAndAccountManagerInventories",
              "missingOrInvalidEngineInventoriesBlockReservationWithoutChangingLedger",
              "globalAllocatorRejectsIntegerOverflowWithoutWrapping",
-             "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",\n             "releasingLegacyPendingReservationSeedsGlobalHighWaterMark"):
+             "reservationReleaseRequiresEngineAbsenceButNeverReusesTheGlobalId",
+             "releasingLegacyPendingReservationSeedsGlobalHighWaterMark"):
     assert name in TEST
 for name in ("globalAllocatorNeverReservesSameNumericUserIdForDifferentPackages",
              "removedCloneRegistryEntryDoesNotLowerGlobalHighWaterMark"):
