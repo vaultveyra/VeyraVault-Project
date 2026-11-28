@@ -20,7 +20,7 @@ This is distinct from the already documented cross-package numeric ID collision:
 
 After prepare_workspace.py verifies the exact clean pinned Engine commit, it applies the idempotent harden_account_manager_token_user_scope() patch only to the ephemeral build workspace:
 
-1. While loading the persisted map, the outer integer key is validated and copied into BUserAccounts.userId before the value is inserted into mUserAccountsMap.
+1. While loading the persisted map, a non-null outer integer key is copied into a non-null BUserAccounts.userId before the value is inserted into mUserAccountsMap. Existing handling of malformed legacy entries is otherwise unchanged.
 2. Every getUserAccounts(userId) lookup reassigns bUserAccounts.userId = userId from the requested map key before returning the value. This also repairs older in-memory Parcelable values when first accessed.
 3. TokenCache continues using the existing accounts.userId field, but that field is now normalized from the actual bucket key.
 4. The patch does not clear mTokenCaches, account records, auth-token maps, passwords, user data or visibility settings.
