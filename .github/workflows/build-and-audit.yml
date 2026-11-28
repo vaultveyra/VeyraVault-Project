@@ -226,6 +226,9 @@ jobs:
       - name: Test Stage 8.13 pinned Engine ABI and split APK source contract
         run: python3 scripts/test_stage_8_13_engine_abi_contract.py
 
+      - name: Test Stage 8.35 Clone session and account data isolation audit
+        run: python3 scripts/test_stage_8_35_session_data_isolation_audit.py
+
       - name: Enable KVM for Android Emulator
         run: |
           set -euo pipefail
