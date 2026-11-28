@@ -19,16 +19,47 @@ public final class VirtualHookManager {
         public final ProfileResolver.Source enabledSource;
         public final ProfileResolver.Source latitudeSource;
         public final ProfileResolver.Source longitudeSource;
+        /** Exact Clone identity for which this Engine readback was produced. */
+        public final String targetPackageName;
+        public final int targetUserId;
+        public final long verifiedAt;
+
+        LocationApplyResult(LocationStatus status, String detail,
+                            ProfileResolver.Source enabledSource,
+                            ProfileResolver.Source latitudeSource,
+                            ProfileResolver.Source longitudeSource) {
+            this(status, detail, enabledSource, latitudeSource, longitudeSource,
+                    null, -1, 0L);
+        }
 
         private LocationApplyResult(LocationStatus status, String detail,
                                     ProfileResolver.Source enabledSource,
                                     ProfileResolver.Source latitudeSource,
-                                    ProfileResolver.Source longitudeSource) {
+                                    ProfileResolver.Source longitudeSource,
+                                    String targetPackageName, int targetUserId, long verifiedAt) {
             this.status = status;
             this.detail = detail;
             this.enabledSource = enabledSource;
             this.latitudeSource = latitudeSource;
             this.longitudeSource = longitudeSource;
+            this.targetPackageName = targetPackageName;
+            this.targetUserId = targetUserId;
+            this.verifiedAt = verifiedAt;
+        }
+
+        static LocationApplyResult bindToClone(String packageName, int userId,
+                                               LocationApplyResult result) {
+            if (packageName == null || packageName.trim().isEmpty() || userId < 0 || result == null) {
+                throw new IllegalArgumentException("Clone identity and hook result are required");
+            }
+            return new LocationApplyResult(result.status, result.detail,
+                    result.enabledSource, result.latitudeSource, result.longitudeSource,
+                    packageName, userId, System.currentTimeMillis());
+        }
+
+        public boolean belongsTo(String packageName, int userId) {
+            return packageName != null && packageName.equals(targetPackageName)
+                    && userId == targetUserId && verifiedAt > 0L;
         }
 
         public boolean isApplied() { return status == LocationStatus.APPLIED; }
@@ -54,14 +85,7 @@ public final class VirtualHookManager {
         }
     }
 
-    private static volatile LocationApplyResult lastResult =
-            new LocationApplyResult(LocationStatus.UNSUPPORTED, "NOT_ATTEMPTED",
-                    ProfileResolver.Source.UNSET, ProfileResolver.Source.UNSET,
-                    ProfileResolver.Source.UNSET);
-
     private VirtualHookManager() { }
-
-    public static LocationApplyResult getLastLocationResult() { return lastResult; }
 
     /** Strictly reads the clone registry and returns every per-clone hook outcome. */
     public static SyncSummary syncAllClones(Context context) {
@@ -102,7 +126,7 @@ public final class VirtualHookManager {
     public static LocationApplyResult syncCloneHooks(Context context, CloneStore.CloneEntry entry) {
         if (context == null || entry == null || entry.packageName == null
                 || entry.packageName.trim().isEmpty() || entry.userId < 0) {
-            return remember(result(LocationStatus.FAILED, "INVALID_CLONE_IDENTITY", null));
+            return result(LocationStatus.FAILED, "INVALID_CLONE_IDENTITY", null);
         }
 
         final boolean masterEnabled;
@@ -116,30 +140,30 @@ public final class VirtualHookManager {
                     null, null, null);
             String detail = "PROFILE_RESOLUTION_FAILED:" + error.getClass().getSimpleName()
                     + "; fail-closed disable=" + disabled.status;
-            return remember(result(LocationStatus.FAILED, detail, null));
+            return remember(entry, result(LocationStatus.FAILED, detail, null));
         }
 
         if (!masterEnabled) {
             LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
                     resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
-            return remember(withReason(closed, "MASTER_MOCK_GPS_KILL_SWITCH_DISABLED"));
+            return remember(entry, withReason(closed, "MASTER_MOCK_GPS_KILL_SWITCH_DISABLED"));
         }
         if (!Boolean.TRUE.equals(resolved.locationEnabled)) {
             LocationApplyResult closed = disableEngineLocationHook(entry.packageName, entry.userId,
                     resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
-            return remember(withReason(closed, "RESOLVED_LOCATION_PROFILE_DISABLED"));
+            return remember(entry, withReason(closed, "RESOLVED_LOCATION_PROFILE_DISABLED"));
         }
         if (resolved.latitude == null || resolved.longitude == null) {
             LocationApplyResult disabled = disableEngineLocationHook(entry.packageName, entry.userId,
                     resolved.locationEnabledSource, resolved.latitudeSource, resolved.longitudeSource);
             if (disabled.status == LocationStatus.DISABLED) {
-                return remember(result(LocationStatus.FAILED,
+                return remember(entry, result(LocationStatus.FAILED,
                         "LOCATION_ENABLED_BUT_COORDINATES_MISSING; hook disabled", resolved));
             }
-            return remember(disabled);
+            return remember(entry, disabled);
         }
 
-        return remember(applyEngineLocationHook(entry.packageName, entry.userId,
+        return remember(entry, applyEngineLocationHook(entry.packageName, entry.userId,
                 resolved.latitude, resolved.longitude, resolved));
     }
 
@@ -283,8 +307,13 @@ public final class VirtualHookManager {
                 longitude == null ? ProfileResolver.Source.UNSET : longitude);
     }
 
-    private static LocationApplyResult remember(LocationApplyResult result) {
-        lastResult = result;
-        return result;
+    private static LocationApplyResult remember(CloneStore.CloneEntry entry,
+                                                   LocationApplyResult result) {
+        if (entry == null) return result;
+        try {
+            return LocationApplyResult.bindToClone(entry.packageName, entry.userId, result);
+        } catch (IllegalArgumentException invalidIdentity) {
+            return result;
+        }
     }
 }
