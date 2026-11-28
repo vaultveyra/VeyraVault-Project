@@ -74,6 +74,56 @@ public class CloneIdentityAuditInstrumentationTest {
         }
     }
 
+    @Test public void engineInventoryReportsUnlinkedAndMissingCloneUserIds() {
+        List<CloneStore.CloneEntry> entries = Arrays.asList(
+                entry("com.example.alpha", 0, "Alpha"),
+                entry("com.example.beta", 0, "Beta"),
+                entry("com.example.alpha", 1, "Alpha Space 2"));
+
+        CloneIdentityAudit.InventoryReport report =
+                CloneIdentityAudit.auditInventory(entries, Arrays.asList(2, 0));
+
+        assertEquals(1, report.crossPackageCollisions.size());
+        assertEquals(0, report.crossPackageCollisions.get(0).userId);
+        assertEquals(Arrays.asList(2), report.engineUserIdsWithoutRegisteredClone);
+        assertEquals(Arrays.asList(1), report.registeredCloneUserIdsMissingFromEngine);
+        assertEquals(Arrays.asList(0, 2), report.knownEngineUserIds);
+    }
+
+    @Test public void engineInventoryRejectsDuplicateOrInvalidIds() {
+        List<CloneStore.CloneEntry> entries =
+                Arrays.asList(entry("com.example.alpha", 0, "Alpha"));
+        for (List<Integer> ids : Arrays.asList(
+                Arrays.asList(0, 0),
+                Arrays.asList(-1),
+                Arrays.asList((Integer) null))) {
+            try {
+                CloneIdentityAudit.auditInventory(entries, ids);
+                fail("Invalid Engine virtual-user inventory must fail closed");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("Engine"));
+            }
+        }
+    }
+
+    @Test public void inventoryReportCollectionsAreImmutable() {
+        CloneIdentityAudit.InventoryReport report = CloneIdentityAudit.auditInventory(
+                Arrays.asList(entry("com.example.alpha", 0, "Alpha")),
+                Arrays.asList(0, 4));
+        try {
+            report.knownEngineUserIds.clear();
+            fail("Engine ID inventory must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            assertEquals(Arrays.asList(0, 4), report.knownEngineUserIds);
+        }
+        try {
+            report.engineUserIdsWithoutRegisteredClone.clear();
+            fail("Unlinked Engine ID inventory must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            assertEquals(Arrays.asList(4), report.engineUserIdsWithoutRegisteredClone);
+        }
+    }
+
     private static CloneStore.CloneEntry entry(String packageName, int userId, String displayName) {
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
