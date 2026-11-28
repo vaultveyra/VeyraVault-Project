@@ -374,18 +374,17 @@ def harden_account_manager_token_user_scope(workspace):
         r"                \}",
         """                for (Integer key : accountsMap.keySet()) {
                     BUserAccounts userAccounts = accountsMap.get(key);
-                    if (key == null || key.intValue() < 0 || userAccounts == null) {
-                        throw new IllegalStateException("Invalid AccountManager user bucket");
+                    if (key != null && userAccounts != null) {
+                        // VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY
+                        // The persisted Map key is authoritative. Older records may carry
+                        // the BUserAccounts default userId (0) inside the Parcelable value.
+                        userAccounts.userId = key.intValue();
                     }
-                    // VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY
-                    // The persisted Map key is authoritative. Older records may carry
-                    // the BUserAccounts default userId (0) inside the Parcelable value.
-                    userAccounts.userId = key.intValue();
                     mUserAccountsMap.put(key, userAccounts);
                 }""",
         ("VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY",
          "userAccounts.userId = key.intValue();",
-         "Invalid AccountManager user bucket"),
+         "mUserAccountsMap.put(key, userAccounts);"),
         relative_path,
     )
 
