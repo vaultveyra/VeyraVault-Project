@@ -20,7 +20,7 @@ tests = read("app/src/androidTest/java/com/veyravault/space/core/CloneIdentityAu
 # The helper must be a pure transformation of the already-read registry snapshot.
 assert "findCrossPackageCollisions(" in audit
 assert "new TreeMap<Integer, Map<String, CloneIdentity>>()" in audit
-assert "packages.size() <= 1" in audit
+assert "group.getValue().size() <= 1" in audit
 assert "Collections.unmodifiableList" in audit
 assert "Collections.unmodifiableList(new ArrayList<>(clones))" in audit
 for forbidden in ("SharedPreferences", "ContentResolver", "AccountManager", "Engine.", "FileInputStream"):
