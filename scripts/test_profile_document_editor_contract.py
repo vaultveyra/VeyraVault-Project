@@ -15,6 +15,14 @@ assert "field.label" in editor
 assert "field.validationRule" in editor
 assert "field.capability" in editor
 assert "field.unsupportedReason" in editor
+assert "field.adapterId" in editor
+assert "field.apiSupport" in editor
+assert "field.privacyClass" in editor
+assert "field.readbackMethod" in editor
+assert "Adapter:" in editor
+assert "API support:" in editor
+assert "Privacy class:" in editor
+assert "Readback method:" in editor
 assert "if (!field.editable)" in editor
 assert "ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument)" in editor
 assert "effective.source" in editor and "effective.status" in editor
@@ -45,6 +53,7 @@ for field in ("altitude", "ipv6LeakStatus", "cameraPolicy", "webViewLocalStorage
 
 print("PASS: Global and per-Clone editor is generated from the canonical registry.")
 print("PASS: Effective source, capability, validation and status are displayed per field.")
+print("PASS: Adapter mapping, API support, privacy class and readback method are visible for every registry-generated field.")
 print("PASS: Restricted and observed-only fields are read-only; editable writes are validated and asynchronous.")
 print("PASS: Reset-to-Global and explicit Clone Safe Default use field-scoped persistence.")
 print("PASS: Settings and Clone profile entry points open the complete editor.")
