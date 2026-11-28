@@ -23,6 +23,19 @@ assert "entry.mockGpsEnabled" not in source
 assert "entry.latitude" not in source
 assert "entry.longitude" not in source
 assert "catch (Throwable ignored)" not in source
+assert "targetPackageName" in source
+assert "targetUserId" in source
+assert "bindToClone(String packageName, int userId" in source
+assert "remember(entry, " in source
+assert "lastResult" not in source
+assert "getLastLocationResult()" not in source
+
+editor = Path("app/src/main/java/com/veyravault/space/ui/ProfileDocumentEditorActivity.java").read_text(encoding="utf-8")
+assert "syncCloneLocationHook(packageName, userId" in editor
+assert "result.belongsTo(packageName, userId)" in editor
+assert "locationRuntimeStatusSummary()" in editor
+assert "LocationStatus.APPLIED" in editor
+assert "LocationStatus.DISABLED" in editor
 
 store = Path("app/src/main/java/com/veyravault/space/core/ProfileStore.java").read_text(encoding="utf-8")
 assert "clearCloneLocationOverrides(" in store
