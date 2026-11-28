@@ -95,6 +95,52 @@ public class Engine {
         return Collections.unmodifiableList(new ArrayList<Integer>(ids));
     }
 
+    /**
+     * Read-only inventory of numeric AccountManager user-bucket keys.
+     *
+     * The Binder API returns IDs only. It does not expose account names, passwords,
+     * user data, visibility records or auth tokens. Any service/load/shape error is
+     * propagated so callers cannot interpret an incomplete inventory as empty.
+     */
+    public static List<Integer> getKnownAccountUserIds() throws Exception {
+        Object core = getCore();
+        if (core == null) {
+            throw new IllegalStateException(
+                    "Engine is unavailable; AccountManager inventory is unconfirmed");
+        }
+        Class<?> managerClass = Class.forName(
+                "top.niunaijun.blackbox.fake.frameworks.BAccountManager");
+        Object manager = managerClass.getMethod("get").invoke(null);
+        if (manager == null) {
+            throw new IllegalStateException("Engine AccountManager facade is unavailable");
+        }
+        Object accountService = managerClass.getMethod("getService").invoke(manager);
+        if (accountService == null) {
+            throw new IllegalStateException("Engine AccountManager Binder service is unavailable");
+        }
+        Class<?> serviceInterface = Class.forName(
+                "top.niunaijun.blackbox.core.system.accounts.IBAccountManagerService");
+        if (!serviceInterface.isInstance(accountService)) {
+            throw new IllegalStateException(
+                    "Engine AccountManager Binder has an unexpected interface");
+        }
+        Object rawIds = serviceInterface.getMethod("getKnownAccountUserIds")
+                .invoke(accountService);
+        if (!(rawIds instanceof int[])) {
+            throw new IllegalStateException(
+                    "Engine returned an invalid AccountManager user-ID inventory");
+        }
+
+        TreeSet<Integer> ids = new TreeSet<Integer>();
+        for (int id : (int[]) rawIds) {
+            if (id < 0 || !ids.add(id)) {
+                throw new IllegalStateException(
+                        "AccountManager user-ID inventory contains an invalid or duplicate ID");
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<Integer>(ids));
+    }
+
     public static void doAttachBaseContext(Application app, final Context base) {
         if (!HostCpuCompatibility.isEngineSupported()) return;
         try {

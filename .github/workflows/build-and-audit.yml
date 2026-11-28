@@ -48,6 +48,8 @@ jobs:
 
       - name: Test Stage 8.37 AccountManager TokenCache virtual-user scope patch
         run: python3 scripts/test_stage_8_37_account_manager_token_user_scope.py
+      - name: Test Stage 8.38 read-only AccountManager numeric user-ID inventory
+        run: python3 scripts/test_stage_8_38_account_manager_id_inventory.py
       - name: Test Stage 8.27 legacy Android compatibility contract
         run: python3 scripts/test_stage_8_27_legacy_android_api_compatibility.py
       - name: Test Stage 8.28 Room runtime Release isolation

@@ -88,6 +88,41 @@ assert "bUserAccounts.userId = userId;" in account_service
 assert "new TokenCache(accounts.userId," in account_service
 assert "next.userId == accounts.userId" in account_service
 
+# Stage 8.38 adds a fail-closed, numeric-key-only AccountManager inventory. It must
+# not return an empty array when accounts.conf failed to load or contains invalid data.
+inventory_start = account_service.index("public int[] getKnownAccountUserIds()")
+inventory_end = account_service.index("\n    private void saveAllAccounts()", inventory_start)
+inventory_body = account_service[inventory_start:inventory_end]
+assert "mAccountsLoadSucceeded" in inventory_body
+assert "throw new RemoteException(" in inventory_body
+assert "Arrays.sort(ids);" in inventory_body
+assert "new int[mUserAccountsMap.size()]" in inventory_body
+assert "entry.getValue() == null" in inventory_body
+assert "getPassword(" not in inventory_body
+assert "getUserData(" not in inventory_body
+assert "authTokens" not in inventory_body
+assert "saveAllAccounts()" not in inventory_body
+
+load_start = account_service.index("private void loadAccounts()")
+load_end = account_service.index("\n    @Override\n    public int[] getKnownAccountUserIds()", load_start)
+load_body = account_service[load_start:load_end]
+assert "mAccountsLoadSucceeded = false;" in load_body
+assert "if (!userInfoConf.exists())" in load_body
+assert "mAccountsLoadSucceeded = true;" in load_body
+assert "if (!userInfoConf.isFile() || !userInfoConf.canRead())" in load_body
+assert "HashMap<?, ?> accountsMap" in load_body
+assert "verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);" in load_body
+assert "mUserAccountsMap.putAll(verifiedAccountsMap);" in load_body
+assert "mAccountsLoadSucceeded = true;" in load_body[load_body.index("mUserAccountsMap.putAll(verifiedAccountsMap);"):]
+
+account_aidl = read(
+    "Bcore/src/main/aidl/top/niunaijun/blackbox/core/system/accounts/IBAccountManagerService.aidl"
+)
+assert "int[] getKnownAccountUserIds();" in account_aidl
+assert "public static List<Integer> getKnownAccountUserIds() throws Exception" in engine_wrapper
+assert "top.niunaijun.blackbox.fake.frameworks.BAccountManager" in engine_wrapper
+assert "IBAccountManagerService" in engine_wrapper
+
 # Listing APIs do have package visibility filtering, but direct credential,
 # user-data and token operations are routed by virtual userId + account handle.
 assert "account.visibility.get(packageName)" in account_service
@@ -157,5 +192,6 @@ print("PASS: user-wide deletion is distinguished from package-scoped Clone unins
 print("PASS: WebView uses the pinned package/user/process suffix before target Application binding.")
 print("PASS: the unused WebViewProxy class is not mistaken for the active mechanism.")
 print("PASS: unverified storage/session fields remain NOT_IMPLEMENTED.")
-print("KNOWN BLOCKER: AccountManager scope can cross package Clones sharing a numeric userId.")
+print("KNOWN BLOCKER: AccountManager scope can cross package Clones sharing a numeric userId; ID inventory reports collisions but does not fix storage scope.")
+print("PASS: AccountManager map-key inventory is read-only, ID-only and fails closed on unverified load state.")
 print("AUDIT ONLY: no Clone data, account, token, session or runtime state was accessed or changed.")

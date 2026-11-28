@@ -425,6 +425,160 @@ def harden_account_manager_token_user_scope(workspace):
         destination.write(source)
 
 
+def harden_account_manager_id_inventory(workspace):
+    """Expose only validated AccountManager map keys; never expose account payloads."""
+    aidl_relative = (
+        "Bcore/src/main/aidl/top/niunaijun/blackbox/core/system/accounts/"
+        "IBAccountManagerService.aidl"
+    )
+    service_relative = (
+        "Bcore/src/main/java/top/niunaijun/blackbox/core/system/accounts/"
+        "BAccountManagerService.java"
+    )
+    aidl_path, aidl_source = _read_engine_source_file(workspace, aidl_relative)
+    service_path, service_source = _read_engine_source_file(workspace, service_relative)
+    if "VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY" not in service_source:
+        expected_stage_837_fragments = (
+            "if (!userInfoConf.exists()) {",
+            "HashMap<Integer, BUserAccounts> accountsMap = parcel.readHashMap(BUserAccounts.class.getClassLoader());",
+            "mUserAccountsMap.clear();",
+            "userAccounts.userId = key.intValue();",
+            "mUserAccountsMap.put(key, userAccounts);",
+        )
+        if any(fragment not in service_source for fragment in expected_stage_837_fragments):
+            raise RuntimeError(
+                "Pinned AccountManager loadAccounts source no longer matches the audited Stage 8.37 layout"
+            )
+
+    aidl_source = _patch_engine_fragment(
+        aidl_source,
+        "VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY_AIDL",
+        r"    void unregisterAccountListener\(in String\[\] accountTypes, String opPackageName, int userId\);",
+        """    void unregisterAccountListener(in String[] accountTypes, String opPackageName, int userId);
+
+    // VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY_AIDL
+    // Returns numeric map keys only; no Account, credential, token or user-data values.
+    int[] getKnownAccountUserIds();""",
+        ("VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY_AIDL",
+         "int[] getKnownAccountUserIds();"),
+        aidl_relative,
+    )
+
+    service_source = _patch_engine_fragment(
+        service_source,
+        "VEYRAVAULT_TRACK_ACCOUNT_MANAGER_ID_INVENTORY_LOAD_STATUS",
+        r"    private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>\(\);",
+        """    private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>();
+    // True only after the persisted AccountManager map was fully loaded and validated.
+    // A missing initial accounts.conf is a valid empty store; parse/I/O/shape failures are not.
+    private volatile boolean mAccountsLoadSucceeded;""",
+        ("VEYRAVAULT_TRACK_ACCOUNT_MANAGER_ID_INVENTORY_LOAD_STATUS",
+         "private volatile boolean mAccountsLoadSucceeded;"),
+        service_relative,
+    )
+
+    service_source = _patch_engine_fragment(
+        service_source,
+        "VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY",
+        r"    private void loadAccounts\(\) \{\n[\s\S]*?\n    \}\n\n    private void saveAllAccounts\(\) \{",
+        """    private void loadAccounts() {
+        mAccountsLoadSucceeded = false;
+        Parcel parcel = Parcel.obtain();
+        InputStream is = null;
+        try {
+            File userInfoConf = BEnvironment.getAccountsConf();
+            if (!userInfoConf.exists()) {
+                // No persisted account file at first boot is an explicit empty inventory.
+                mAccountsLoadSucceeded = true;
+                return;
+            }
+            if (!userInfoConf.isFile() || !userInfoConf.canRead()) {
+                return;
+            }
+            is = new FileInputStream(userInfoConf);
+            byte[] bytes = FileUtils.toByteArray(is);
+            parcel.unmarshall(bytes, 0, bytes.length);
+            parcel.setDataPosition(0);
+
+            HashMap<?, ?> accountsMap = parcel.readHashMap(BUserAccounts.class.getClassLoader());
+            if (accountsMap == null) {
+                return;
+            }
+
+            // Validate the complete persisted map before replacing the in-memory snapshot.
+            // A malformed entry must never turn an incomplete inventory into an empty one.
+            HashMap<Integer, BUserAccounts> verifiedAccountsMap = new HashMap<>();
+            for (Map.Entry<?, ?> entry : accountsMap.entrySet()) {
+                Object rawKey = entry.getKey();
+                Object rawValue = entry.getValue();
+                if (!(rawKey instanceof Integer)
+                        || ((Integer) rawKey).intValue() < 0
+                        || !(rawValue instanceof BUserAccounts)) {
+                    return;
+                }
+                verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);
+            }
+
+            synchronized (mUserAccountsMap) {
+                mUserAccountsMap.clear();
+                mUserAccountsMap.putAll(verifiedAccountsMap);
+            }
+            mAccountsLoadSucceeded = true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            parcel.recycle();
+            CloseUtils.close(is);
+        }
+    }
+
+    @Override
+    public int[] getKnownAccountUserIds() throws RemoteException {
+        if (!mAccountsLoadSucceeded) {
+            throw new RemoteException(
+                    "AccountManager user-ID inventory is unavailable or incomplete");
+        }
+        synchronized (mUserAccountsMap) {
+            int[] ids = new int[mUserAccountsMap.size()];
+            int index = 0;
+            for (Map.Entry<Integer, BUserAccounts> entry : mUserAccountsMap.entrySet()) {
+                Integer key = entry.getKey();
+                if (key == null || key.intValue() < 0 || entry.getValue() == null) {
+                    mAccountsLoadSucceeded = false;
+                    throw new RemoteException(
+                            "AccountManager user-ID inventory contains an invalid bucket");
+                }
+                ids[index++] = key.intValue();
+            }
+            Arrays.sort(ids);
+            return ids;
+        }
+    }
+
+    private void saveAllAccounts() {""",
+        ("VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY",
+         "mAccountsLoadSucceeded = false;",
+         "HashMap<?, ?> accountsMap",
+         "verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);",
+         "mUserAccountsMap.putAll(verifiedAccountsMap);",
+         "mAccountsLoadSucceeded = true;",
+         "public int[] getKnownAccountUserIds() throws RemoteException",
+         "throw new RemoteException(",
+         "Arrays.sort(ids);",
+         "return ids;",
+         "private void saveAllAccounts() {"),
+        service_relative,
+    )
+
+    # Both transformations must succeed before either ephemeral Engine source is written.
+    with open(aidl_path, "w", encoding="utf-8", newline="") as output_file:
+        output_file.write(aidl_source)
+    with open(service_path, "w", encoding="utf-8", newline="") as output_file:
+        output_file.write(service_source)
+
+    print("[+] Added fail-closed, read-only AccountManager numeric user-ID inventory (IDs only).")
+
+
 def accept_android_sdk_licenses():
     print("[*] Accepting Android SDK & NDK licenses...")
     sdk_dirs = []
@@ -634,6 +788,7 @@ def main():
     verify_engine_source(WORKSPACE)
     harden_clone_cleanup_semantics(WORKSPACE)
     harden_account_manager_token_user_scope(WORKSPACE)
+    harden_account_manager_id_inventory(WORKSPACE)
     disable_remote_log_upload(WORKSPACE)
 
     gradlew_path = os.path.join(WORKSPACE, "gradlew")
