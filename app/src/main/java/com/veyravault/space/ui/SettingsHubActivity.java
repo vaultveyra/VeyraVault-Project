@@ -51,9 +51,9 @@ public class SettingsHubActivity extends BaseActivity {
                 fa ? "مدیریت فیلدهای سراسری و وضعیت واقعی هر قابلیت" :
                         "Edit the full registry and review each field's capability and status",
                 ProfileDocumentEditorActivity.class);
-        addRow(root, fa ? "محیط و کنترل موقعیت سراسری" : "Global Environment & Location Controls",
-                fa ? "مدیریت کلید اصلی موقعیت و تنظیمات قدیمی سازگار" :
-                        "Manage the Master Location switch and legacy-compatible controls",
+        addRow(root, fa ? "کنترل پیشرفته موقعیت و سازگاری قدیمی" : "Advanced Location & Legacy Controls",
+                fa ? "این بخش برای Master GPS و سازگاری تنظیمات قدیمی است؛ تمام فیلدهای پروفایل در گزینه پروفایل کامل مدیریت می‌شوند." :
+                        "For Master GPS and legacy-compatible settings only; manage all profile fields in Complete Environment Profile.",
                 GlobalEnvironmentActivity.class);
         addRow(root, fa ? "امنیت و قفل برنامه" : "Security & App Lock",
                 fa ? "مدیریت قفل و گزینه‌های امنیتی" : "Manage app lock and security options",
