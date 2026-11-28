@@ -2,6 +2,8 @@ package com.veyravault.space.ui;
 
 import android.os.Bundle;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -23,8 +25,12 @@ import com.veyravault.space.core.ProfileRuntimeStatusStore;
 import com.veyravault.space.core.VirtualHookManager;
 
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Registry-driven Global / per-Clone profile editor with asynchronous, field-scoped writes. */
@@ -53,6 +59,13 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private ProfileDocument cloneDocument;
     private ProfileDocument globalDocument;
     private LinearLayout root;
+    private EditText searchInput;
+    private TextView searchCount;
+    private TextView searchEmpty;
+    private final List<View> searchableCards = new ArrayList<>();
+    private final Map<View, String> searchableText = new HashMap<>();
+    private final Map<View, String> searchableCategories = new HashMap<>();
+    private final Map<String, View> categoryHeaders = new LinkedHashMap<>();
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -197,6 +210,10 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         root.setPadding(dp(20), dp(24), dp(20), dp(40));
         root.setBackgroundColor(UiPalette.page(this));
         root.addView(title());
+        searchableCards.clear();
+        searchableText.clear();
+        searchableCategories.clear();
+        categoryHeaders.clear();
 
         TextView identity = new TextView(this);
         identity.setText(cloneMode ? packageName + "  ·  user " + userId
@@ -224,6 +241,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                 ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument);
         Map<String, ProfileFieldRegistry.ApplyStatus> displayStatuses = displayStatuses(resolved);
         addSummary(resolved, displayStatuses);
+        addSearchControls(resolved.size());
         String lastCategory = null;
         for (ProfileFieldRegistry.Field field : ProfileFieldRegistry.all()) {
             if (!field.category.equals(lastCategory)) {
@@ -235,11 +253,87 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                 category.setTextColor(UiPalette.textPrimary(this));
                 category.setPadding(0, dp(22), 0, dp(10));
                 root.addView(category);
+                categoryHeaders.put(field.category, category);
             }
-            root.addView(buildFieldCard(field, resolved.get(field.key), displayStatuses.get(field.key)));
+            View fieldCard = buildFieldCard(field, resolved.get(field.key), displayStatuses.get(field.key));
+            String searchable = (field.label + " " + field.key + " " + field.category + " "
+                    + field.note + " " + field.validationRule + " " + field.unsupportedReason + " "
+                    + field.capability + " " + field.adapterId + " " + field.apiSupport + " "
+                    + field.privacyClass + " " + field.readbackMethod).toLowerCase(Locale.ROOT);
+            searchableCards.add(fieldCard);
+            searchableText.put(fieldCard, searchable);
+            searchableCategories.put(fieldCard, field.category);
+            root.addView(fieldCard);
         }
+        searchEmpty = new TextView(this);
+        searchEmpty.setText(fa ? "فیلدی با این عبارت پیدا نشد." : "No profile fields match this search.");
+        searchEmpty.setTextSize(13f);
+        searchEmpty.setTextColor(UiPalette.textSecondary(this));
+        searchEmpty.setPadding(dp(12), dp(16), dp(12), dp(16));
+        searchEmpty.setVisibility(View.GONE);
+        root.addView(searchEmpty);
         scroll.addView(root);
         setContentView(scroll);
+    }
+
+    private void addSearchControls(int totalFields) {
+        TextView label = new TextView(this);
+        label.setText(fa ? "جست‌وجو در فیلدها" : "Search profile fields");
+        label.setTextSize(14f);
+        label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        label.setTextColor(UiPalette.textPrimary(this));
+        label.setPadding(0, dp(18), 0, dp(6));
+        root.addView(label);
+
+        searchInput = new EditText(this);
+        searchInput.setSingleLine(true);
+        searchInput.setTextSize(14f);
+        searchInput.setHint(fa ? "نام فیلد، دسته، قابلیت یا توضیح…" : "Field, category, capability or description…");
+        root.addView(searchInput);
+
+        searchCount = new TextView(this);
+        searchCount.setTextSize(11f);
+        searchCount.setTextColor(UiPalette.textSecondary(this));
+        searchCount.setPadding(0, dp(4), 0, dp(8));
+        root.addView(searchCount);
+        updateSearchCount(totalFields, totalFields);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterFields(s == null ? "" : s.toString());
+            }
+            @Override public void afterTextChanged(Editable editable) { }
+        });
+    }
+
+    private void filterFields(String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        Map<String, Integer> visibleByCategory = new HashMap<>();
+        int visible = 0;
+        for (View card : searchableCards) {
+            boolean matches = normalized.isEmpty()
+                    || searchableText.get(card).contains(normalized);
+            card.setVisibility(matches ? View.VISIBLE : View.GONE);
+            if (matches) {
+                visible++;
+                String category = searchableCategories.get(card);
+                Integer count = visibleByCategory.get(category);
+                visibleByCategory.put(category, count == null ? 1 : count + 1);
+            }
+        }
+        for (Map.Entry<String, View> entry : categoryHeaders.entrySet()) {
+            Integer count = visibleByCategory.get(entry.getKey());
+            entry.getValue().setVisibility(count != null && count > 0 ? View.VISIBLE : View.GONE);
+        }
+        if (searchEmpty != null) searchEmpty.setVisibility(visible == 0 ? View.VISIBLE : View.GONE);
+        updateSearchCount(visible, searchableCards.size());
+    }
+
+    private void updateSearchCount(int visible, int total) {
+        if (searchCount == null) return;
+        searchCount.setText(fa
+                ? "نمایش " + visible + " از " + total + " فیلد"
+                : "Showing " + visible + " of " + total + " fields");
     }
 
     private Map<String, ProfileFieldRegistry.ApplyStatus> displayStatuses(
@@ -372,13 +466,15 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             }
         }
         TextView summary = new TextView(this);
-        summary.setText("Fields: " + resolved.size()
-                + "  ·  Applied: " + applied
-                + "  ·  Stored only: " + stored
-                + "  ·  Unsupported: " + unsupported
-                + "  ·  Not tested: " + notTested
-                + "  ·  Failed: " + failed
-                + "  ·  Not applicable: " + notApplicable);
+        summary.setText(fa
+                ? "فیلدها: " + resolved.size() + "  ·  اعمال‌شده: " + applied
+                        + "  ·  فقط ذخیره‌شده: " + stored + "  ·  پشتیبانی‌نشده: " + unsupported
+                        + "  ·  آزمون‌نشده: " + notTested + "  ·  ناموفق: " + failed
+                        + "  ·  غیرقابل‌اعمال: " + notApplicable
+                : "Fields: " + resolved.size() + "  ·  Applied: " + applied
+                        + "  ·  Stored only: " + stored + "  ·  Unsupported: " + unsupported
+                        + "  ·  Not tested: " + notTested + "  ·  Failed: " + failed
+                        + "  ·  Not applicable: " + notApplicable);
         summary.setTextSize(12f);
         summary.setTextColor(UiPalette.textPrimary(this));
         summary.setPadding(dp(12), dp(12), dp(12), dp(12));
