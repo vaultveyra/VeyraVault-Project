@@ -596,9 +596,9 @@ public class AsyncCloneRepositoryInstrumentationTest {
     }
 
     @Test public void releasingLegacyPendingReservationSeedsGlobalHighWaterMark() throws Exception {
-        String legacyJournal = "{\\"schemaVersion\\":1,\\"reservations\\":[{"
-                + "\\"token\\":\\"legacy-release-token\\","
-                + "\\"pkg\\":\\"com.example.legacyrelease\\",\\"uid\\":41}]}";
+        String legacyJournal = "{\"schemaVersion\":1,\"reservations\":[{"
+                + "\"token\":\"legacy-release-token\","
+                + "\"pkg\":\"com.example.legacyrelease\",\"uid\":41}]}";
         assertTrue(preferences.edit()
                 .putString("pending_clone_reservations_json", legacyJournal).commit());
         assertFalse(preferences.contains("last_reserved_global_user_id"));
