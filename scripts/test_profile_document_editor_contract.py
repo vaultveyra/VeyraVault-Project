@@ -25,7 +25,9 @@ assert "Privacy class:" in editor
 assert "Readback method:" in editor
 assert "if (!field.editable)" in editor
 assert "ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument)" in editor
-assert "effective.source" in editor and "effective.status" in editor
+assert "effective.source" in editor
+assert "displayStatuses.get(field.key)" in editor
+assert "Last readback:" in editor
 assert "repository.loadGlobalProfileDocument" in editor
 assert "repository.loadCloneProfileDocument" in editor
 assert "repository.loadCloneRuntimeStatus" in editor
