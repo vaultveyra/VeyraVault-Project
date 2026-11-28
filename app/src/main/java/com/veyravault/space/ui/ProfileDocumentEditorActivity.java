@@ -48,6 +48,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private boolean locationHookLoaded;
     private boolean locationHookUnavailable;
     private VirtualHookManager.LocationApplyResult locationHookResult;
+    private TextView locationHookStatusView;
     private ProfileDocument cloneDocument;
     private ProfileDocument globalDocument;
     private LinearLayout root;
@@ -107,6 +108,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         locationHookLoaded = !cloneMode;
         locationHookUnavailable = false;
         locationHookResult = null;
+        locationHookStatusView = null;
         loadFailed = false;
         if (cloneMode) {
             repository.loadClones(result -> {
@@ -163,7 +165,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                             locationHookResult = result;
                         }
                         locationHookLoaded = true;
-                        finishLoadIfReady();
+                        updateLocationHookStatusView();
                     });
         } else {
             cloneDocument = new ProfileDocument();
@@ -182,7 +184,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void finishLoadIfReady() {
-        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded || !runtimeStatusLoaded || !locationHookLoaded) return;
+        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded || !runtimeStatusLoaded) return;
         buildEditor();
     }
 
@@ -290,9 +292,19 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         info.setTextColor(UiPalette.textSecondary(this));
         info.setPadding(dp(12), dp(10), dp(12), dp(10));
         info.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+        locationHookStatusView = info;
+        updateLocationHookStatusView();
+        return info;
+    }
 
+    private void updateLocationHookStatusView() {
+        if (locationHookStatusView == null) return;
         String message;
-        if (locationHookUnavailable || locationHookResult == null
+        if (!locationHookLoaded) {
+            message = fa
+                    ? "در حال بررسی وضعیت Hook همین کلون در موتور…"
+                    : "Checking this Clone's location hook in the Engine…";
+        } else if (locationHookUnavailable || locationHookResult == null
                 || !locationHookResult.belongsTo(packageName, userId)) {
             message = fa
                     ? "وضعیت Hook موقعیت مکانی این کلون قابل تأیید نیست؛ هیچ نتیجه‌ای به‌عنوان اعمال‌شده نمایش داده نمی‌شود."
@@ -334,14 +346,13 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                     DateFormat.SHORT, DateFormat.MEDIUM)
                     .format(new Date(locationHookResult.verifiedAt));
             message = (fa ? "تأیید Hook موقعیت مکانی: " : "Location hook readback: ")
-                    + status + "\n" + reason + "\n" + sources
-                    + "\n" + (fa ? "آخرین بررسی: " : "Last check: ") + when;
+                    + status + "\\n" + reason + "\\n" + sources
+                    + "\\n" + (fa ? "آخرین بررسی: " : "Last check: ") + when;
             if (locationHookResult.detail != null && !locationHookResult.detail.trim().isEmpty()) {
-                message += "\n" + (fa ? "جزئیات: " : "Detail: ") + locationHookResult.detail;
+                message += "\\n" + (fa ? "جزئیات: " : "Detail: ") + locationHookResult.detail;
             }
         }
-        info.setText(message);
-        return info;
+        locationHookStatusView.setText(message);
     }
 
     private void addSummary(Map<String, ProfileDocumentResolver.FieldResult> resolved,
