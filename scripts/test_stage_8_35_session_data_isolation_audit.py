@@ -17,6 +17,7 @@ def read(relative: str) -> str:
 
 # VeyraVault identity and allocation.
 clone_store = read("app/src/main/java/com/veyravault/space/core/CloneStore.java")
+clone_id_instrumentation = read("app/src/androidTest/java/com/veyravault/space/core/CloneUserIdScopeInstrumentationTest.java")
 engine_wrapper = read("app/src/main/java/com/veyravault/space/core/Engine.java")
 registry = read("app/src/main/java/com/veyravault/space/core/ProfileFieldRegistry.java")
 
@@ -55,6 +56,18 @@ next_body = clone_store[next_start:next_end]
 assert "entry.packageName.equals(pkg)" in next_body
 assert "reservation.packageName.equals(pkg)" in next_body
 assert "int uid = 0;" in next_body
+
+# Removing a Clone registry row does not create a retired-ID tombstone; the package
+# allocator is therefore allowed to reuse the numeric ID. Instrumentation proves this
+# against the production CloneStore methods using only synthetic registry entries.
+remove_start = clone_store.index("public static synchronized boolean removeClone")
+remove_end = clone_store.index("\n        public static", remove_start)
+remove_body = clone_store[remove_start:remove_end]
+assert "return saveAll(c, kept);" in remove_body
+assert "KEY_PENDING_RESERVATIONS" not in remove_body
+assert "allocatorCanReserveSameNumericUserIdForDifferentPackages" in clone_id_instrumentation
+assert "removedCloneRegistryEntryMakesItsNumericIdAvailableAgain" in clone_id_instrumentation
+assert "CloneStore.removeClone(context, packageName, 0)" in clone_id_instrumentation
 
 # 3. AccountManager persistence is keyed only by virtual userId, not packageName.
 assert "private final Map<Integer, BUserAccounts> mUserAccountsMap = new HashMap<>();" in account_service
