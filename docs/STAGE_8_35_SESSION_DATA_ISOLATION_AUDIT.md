@@ -49,6 +49,24 @@ CloneStore.removeClone removes the package/user registry row without writing a p
 
 The separate BUserManagerService.deleteUser(userId) path is not a safe per-Clone substitute: it asks BPackageManagerService to uninstall that user across all packages and deletes the entire internal and external virtual-user roots. Never invoke this user-wide operation to remove one VeyraVault Clone.
 
+### 1.6 Read-only Engine virtual-user inventory
+
+The pinned BlackBoxCore exposes getUsers(), backed by BUserManagerService.getUsers(). Each returned BUserInfo contains a numeric id. VeyraVault now exposes this through Engine.getKnownVirtualUserIds(), which:
+- invokes only the Engine user-list API;
+- reads only each BUserInfo.id field;
+- validates null, negative and duplicate IDs;
+- returns a sorted immutable list;
+- fails explicitly if the Engine or method is unavailable.
+
+The Settings Clone Identity diagnostics compares three read-only views:
+- cross-package duplicate IDs in the strict current Clone registry;
+- Engine user IDs with no matching current Clone registry row;
+- Clone registry IDs not present in the current Engine user list.
+
+An Engine-only ID is not automatically free: package-scoped uninstall removes that package's user-state/data but leaves the virtual BUserInfo entry. Such an ID may represent an old Clone whose registry record was removed. A Clone-only ID is also not repaired automatically.
+
+Important limitation: BUserManagerService.deleteUser removes the Engine BUserInfo entry and user data roots, but the pinned BAccountManagerService does not show a corresponding purge of its accounts.conf map. Therefore the Engine user list cannot reveal account buckets left behind by a historical full virtual-user deletion. An ID absent from both the current Clone registry and Engine user list must not be assumed safe to reuse until the AccountManager orphan-retention policy is addressed. The diagnostics page says this explicitly and never releases IDs.
+
 ### 1.5 WebView has an active process-scoped suffix; persistence still needs runtime proof
 
 The pinned BActivityThread creates the package Context and, on Android 9 / API 28 and newer, calls:
