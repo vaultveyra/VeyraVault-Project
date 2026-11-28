@@ -115,14 +115,14 @@ public final class ProfileRuntimeProvider extends ContentProvider {
             // the previously saved legacy value. No migration write or destructive rewrite occurs.
             ProfileDocument mergedClone = mergeLegacyFields(documentClone, legacyClone);
             ProfileDocument mergedGlobal = mergeLegacyFields(documentGlobal, legacyGlobal);
-            // Older per-Clone and Global device metadata remains a lower-priority,
-            // read-only profile source until the typed editor replaces it. Explicit
-            // typed values and reset/inherit states always take precedence.
-            mergedClone = ProfileLegacyEnvironmentBridge.mergeClone(
-                    context, packageName, userId, mergedClone);
-            mergedGlobal = ProfileLegacyEnvironmentBridge.mergeGlobal(context, mergedGlobal);
 
             if (documentRequest) {
+                // Older per-Clone and Global device metadata remains a lower-priority,
+                // read-only profile source until the typed editor replaces it. Explicit
+                // typed values and reset/inherit states always take precedence.
+                mergedClone = ProfileLegacyEnvironmentBridge.mergeClone(
+                        context, packageName, userId, mergedClone);
+                mergedGlobal = ProfileLegacyEnvironmentBridge.mergeGlobal(context, mergedGlobal);
                 java.util.Map<String, ProfileDocumentResolver.FieldResult> resolved =
                         ProfileDocumentResolver.resolveAll(mergedClone, mergedGlobal);
                 Bundle fields = new Bundle();
