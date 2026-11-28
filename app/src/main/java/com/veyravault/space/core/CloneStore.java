@@ -553,6 +553,60 @@ public class CloneStore {
         return cfg;
     }
 
+    /**
+     * Read-only compatibility view of explicitly saved Global device metadata.
+     *
+     * The default GlobalEnvConfig values are deliberately NOT imported when the
+     * legacy key is absent. These values remain metadata-only; this method does
+     * not apply Build, SIM, network, or service-owned identity values.
+     */
+    static synchronized ProfileDocument readGlobalEnvironmentMetadataProfileStrict(Context c)
+            throws Exception {
+        if (c == null) throw new IllegalArgumentException("Context is required");
+        Map<String, ?> values = prefs(c).getAll();
+        if (!values.containsKey(KEY_GLOBAL_DEV)) return new ProfileDocument();
+
+        // Validate the complete legacy object before exposing any of its fields.
+        readGlobalEnvStrict(c);
+        Object raw = values.get(KEY_GLOBAL_DEV);
+        if (!(raw instanceof String)) {
+            throw new IllegalStateException("Global device profile is not a String");
+        }
+        String json = (String) raw;
+        if (json.trim().isEmpty()) return new ProfileDocument();
+
+        JSONObject object = new JSONObject(json);
+        if (!readOptionalBoolean(object, "enabled", true)) return new ProfileDocument();
+
+        ProfileDocument metadata = new ProfileDocument();
+        String manufacturer = object.has("manufacturer")
+                ? readOptionalString(object, "manufacturer", null) : null;
+        if (manufacturer == null || manufacturer.trim().isEmpty()) {
+            manufacturer = object.has("brand")
+                    ? readOptionalString(object, "brand", null) : null;
+        }
+        if (manufacturer != null && !manufacturer.trim().isEmpty()) {
+            metadata.put("manufacturer", manufacturer.trim());
+        }
+
+        if (object.has("model")) {
+            String model = readOptionalString(object, "model", null);
+            if (model != null && !model.trim().isEmpty()) {
+                metadata.put("deviceModel", model.trim());
+            }
+        }
+        if (object.has("countryIso")) {
+            String country = readOptionalString(object, "countryIso", null);
+            if (country != null && !country.trim().isEmpty()) {
+                // Registry validation rejects non-ISO alpha-2 values field-by-field.
+                metadata.put("countryCode", country.trim());
+            }
+        }
+        // SIM operator, phone, account, and attestation fields are intentionally
+        // excluded: they are service/platform-owned, not editable profile inputs.
+        return metadata;
+    }
+
     public static GlobalEnvConfig getGlobalEnv(Context c) {
         try { return readGlobalEnvStrict(c); }
         catch (Exception ignored) { return new GlobalEnvConfig(); }
