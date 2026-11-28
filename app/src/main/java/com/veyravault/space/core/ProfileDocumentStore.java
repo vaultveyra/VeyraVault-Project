@@ -110,6 +110,17 @@ public final class ProfileDocumentStore {
                 }
                 throw new IllegalStateException("Profile field is not an editable profile input: " + field.key);
             }
+            // JSON permits integral-looking decimals (for example 0.0) to be
+            // serialized as 0. Normalize numeric values to the registry's canonical
+            // Java type before validation and exposure so round-trips remain typed.
+            if (value instanceof Number) {
+                Number number = (Number) value;
+                if (field.type == ProfileFieldRegistry.ValueType.DECIMAL) {
+                    value = Double.valueOf(number.doubleValue());
+                } else if (field.type == ProfileFieldRegistry.ValueType.INTEGER) {
+                    value = Long.valueOf(number.longValue());
+                }
+            }
             // Semantic invalidity is field-scoped: omit only this field so the resolver
             // can continue to Global or Safe Isolated Default for that field.
             if (ProfileFieldRegistry.isValidValue(field, value)) {
