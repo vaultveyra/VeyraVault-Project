@@ -36,6 +36,36 @@ public class ProfileRuntimeApplierInstrumentationTest {
         assertFalse(ProcessUtils.isBlackBoxWorkerProcess(null, host));
     }
 
+    @Test public void runtimeProviderCallerIdentityRejectsCrossCloneAndUserAndProcess() {
+        assertTrue(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha", 2, null,
+                "com.example.clone.alpha"));
+        assertTrue(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha:sync", "com.example.clone.alpha:sync"));
+
+        assertFalse(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                "com.example.clone.beta", 2, null,
+                "com.example.clone.beta"));
+        assertFalse(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha", 3, null,
+                "com.example.clone.alpha"));
+        assertFalse(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha", 2,
+                "com.example.clone.alpha:sync", "com.example.clone.alpha"));
+        assertFalse(ProfileRuntimeProvider.matchesCloneIdentity(
+                "com.example.clone.alpha", 2,
+                null, 2, null, "com.example.clone.alpha"));
+        assertFalse(ProfileRuntimeProvider.matchesCloneIdentity(
+                null, 2, "com.example.clone.alpha", 2,
+                null, "com.example.clone.alpha"));
+    }
+
     @Test public void cloneLocaleAndTimeZoneAreAppliedToCurrentProcess() {
         Context context = ApplicationProvider.getApplicationContext();
         Locale originalLocale = Locale.getDefault();
