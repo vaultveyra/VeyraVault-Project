@@ -71,6 +71,7 @@ assert "profileFingerprint" in provider
 assert "ProfileRuntimeFingerprint.isValid(profileFingerprint)" in provider
 assert "ProfileRuntimeFingerprint" in status_store
 assert "currentRuntimeFingerprint" in status_store
+assert "revision > currentRevision || !ProfileRuntimeFingerprint.isValid(storedFingerprint)" in status_store
 assert 'profile.put("profileFingerprint", profileFingerprint)' in status_store
 assert "compute(profile.localeTag, profile.timeZoneId)" in fingerprint
 assert "document.runtimeFingerprint" in callback
@@ -78,7 +79,7 @@ assert "profileFingerprint" in client
 assert "runtimeProviderCallerIdentityRejectsCrossCloneAndUserAndProcess" in instrumentation
 assert "matchesCloneIdentity(" in instrumentation
 assert "legacyProfileEditsInvalidateReadbackWithoutTypedRevisionChange" in status_instrumentation
-assert "cloneReadbacksRemainScopedAndTypedRevisionChangesInvalidate" in status_instrumentation
+assert "cloneReadbacksRemainScopedAndOnlyEffectiveRuntimeChangesInvalidate" in status_instrumentation
 assert "ProfileRuntimeStatusStore.record" in status_instrumentation
 assert "ProfileRuntimeStatusStore.read" in status_instrumentation
 assert "ProcessUtils.isMainProcess(this)" in vault
@@ -117,5 +118,5 @@ print("Safe isolated defaults before profile IPC contract: PASS")
 print("Pre-Application package/user profile resolution contract: PASS")
 print("Runtime Provider authenticates virtual callers by Engine PID, package, user and process identity: PASS")
 print("Readback status is fingerprinted against effective Typed+Legacy Locale/Time Zone: PASS")
-print("Legacy-only edits invalidate stale runtime readback metadata: PASS")
+print("Per-Clone runtime readback freshness follows effective Locale/Time Zone values: PASS")
 print("Process-scoped locale/time-zone application contract: PASS")
