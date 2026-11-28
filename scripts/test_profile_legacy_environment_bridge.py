@@ -20,7 +20,7 @@ assert 'metadata.put("deviceModel"' in clone_store
 assert 'metadata.put("countryCode"' in clone_store
 assert "simOperator" not in bridge
 assert "CloneStore.readAllStrict(context)" in bridge
-assert "entry.customDeviceEnabled" in bridge
+assert "match.customDeviceEnabled" in bridge
 assert "entry.packageName.equals(entry.packageName)" not in bridge
 assert "packageName.equals(entry.packageName) && userId == entry.userId" in bridge
 assert "!merged.contains(key) && !merged.isInvalid(key) && !merged.hasState(key)" in bridge
