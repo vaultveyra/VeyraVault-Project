@@ -13,12 +13,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.veyravault.space.core.AsyncCloneRepository;
+import com.veyravault.space.core.AsyncLocationHookRepository;
 import com.veyravault.space.core.CloneStore;
 import com.veyravault.space.core.LocaleHelper;
 import com.veyravault.space.core.ProfileDocument;
 import com.veyravault.space.core.ProfileDocumentResolver;
 import com.veyravault.space.core.ProfileFieldRegistry;
 import com.veyravault.space.core.ProfileRuntimeStatusStore;
+import com.veyravault.space.core.VirtualHookManager;
 
 import java.text.DateFormat;
 import java.util.Date;
@@ -43,6 +45,9 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private boolean runtimeStatusUnavailable;
     private boolean loadFailed;
     private ProfileRuntimeStatusStore.Snapshot runtimeStatus;
+    private boolean locationHookLoaded;
+    private boolean locationHookUnavailable;
+    private VirtualHookManager.LocationApplyResult locationHookResult;
     private ProfileDocument cloneDocument;
     private ProfileDocument globalDocument;
     private LinearLayout root;
@@ -99,6 +104,9 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         runtimeStatusLoaded = !cloneMode;
         runtimeStatusUnavailable = false;
         runtimeStatus = null;
+        locationHookLoaded = !cloneMode;
+        locationHookUnavailable = false;
+        locationHookResult = null;
         loadFailed = false;
         if (cloneMode) {
             repository.loadClones(result -> {
@@ -144,6 +152,19 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                 runtimeStatusLoaded = true;
                 finishLoadIfReady();
             });
+            // Reconcile only this exact Clone and show only a result bound to its package/user.
+            AsyncLocationHookRepository.getInstance(getApplicationContext())
+                    .syncCloneLocationHook(packageName, userId, (result, error) -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (error != null || result == null || !result.belongsTo(packageName, userId)) {
+                            locationHookUnavailable = true;
+                            locationHookResult = null;
+                        } else {
+                            locationHookResult = result;
+                        }
+                        locationHookLoaded = true;
+                        finishLoadIfReady();
+                    });
         } else {
             cloneDocument = new ProfileDocument();
         }
@@ -161,7 +182,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void finishLoadIfReady() {
-        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded || !runtimeStatusLoaded) return;
+        if (loadFailed || !cloneLoaded || !globalLoaded || !registryLoaded || !runtimeStatusLoaded || !locationHookLoaded) return;
         buildEditor();
     }
 
@@ -190,7 +211,10 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         explanation.setTextColor(UiPalette.textSecondary(this));
         explanation.setPadding(0, 0, 0, dp(16));
         root.addView(explanation);
-        if (cloneMode) root.addView(runtimeStatusSummary());
+        if (cloneMode) {
+            root.addView(runtimeStatusSummary());
+            root.addView(locationRuntimeStatusSummary());
+        }
 
         Map<String, ProfileDocumentResolver.FieldResult> resolved =
                 ProfileDocumentResolver.resolveAll(cloneDocument, globalDocument);
@@ -255,6 +279,66 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
                     + when + " · " + (fa ? "پردازه: " : "Process: ") + runtimeStatus.processName
                     + (fa ? " · این سابقه، زنده‌بودن فعلی پردازه را ثابت نمی‌کند."
                             : " · This is historical evidence, not proof that the process is still alive.");
+        }
+        info.setText(message);
+        return info;
+    }
+
+    private TextView locationRuntimeStatusSummary() {
+        TextView info = new TextView(this);
+        info.setTextSize(11f);
+        info.setTextColor(UiPalette.textSecondary(this));
+        info.setPadding(dp(12), dp(10), dp(12), dp(10));
+        info.setBackgroundResource(com.veyravault.space.R.drawable.bg_card_rounded);
+
+        String message;
+        if (locationHookUnavailable || locationHookResult == null
+                || !locationHookResult.belongsTo(packageName, userId)) {
+            message = fa
+                    ? "وضعیت Hook موقعیت مکانی این کلون قابل تأیید نیست؛ هیچ نتیجه‌ای به‌عنوان اعمال‌شده نمایش داده نمی‌شود."
+                    : "This Clone's location-hook status could not be verified; no result is presented as applied.";
+        } else {
+            String status = locationHookResult.status.name();
+            String reason;
+            if (locationHookResult.status == VirtualHookManager.LocationStatus.APPLIED) {
+                reason = fa
+                        ? "الگوی OWN_MODE و مختصات از موتور دوباره خوانده و تأیید شدند."
+                        : "OWN_MODE and the effective coordinates were read back from the Engine.";
+            } else if (locationHookResult.status == VirtualHookManager.LocationStatus.DISABLED) {
+                if (locationHookResult.detail != null
+                        && locationHookResult.detail.contains("MASTER_MOCK_GPS_KILL_SWITCH_DISABLED")) {
+                    reason = fa
+                            ? "کلید اصلی Mock GPS خاموش است و بسته‌شدن Hook تأیید شد."
+                            : "The Master Mock GPS switch is off and the Hook was confirmed closed.";
+                } else {
+                    reason = fa
+                            ? "Hook برای این پروفایل غیرفعال است و بسته‌شدن آن تأیید شد."
+                            : "The Hook is disabled for this effective profile and was confirmed closed.";
+                }
+            } else if (locationHookResult.status == VirtualHookManager.LocationStatus.UNSUPPORTED) {
+                reason = fa
+                        ? "نسخه فعلی موتور این عملیات را پشتیبانی نمی‌کند."
+                        : "The current Engine version does not support this operation.";
+            } else {
+                reason = fa
+                        ? "اعمال یا Readback ناموفق بود؛ نتیجه به‌عنوان موفق ثبت نشده است."
+                        : "Apply or readback failed; this result is not reported as successful.";
+            }
+            String sources = (fa ? "منبع فعال‌سازی: " : "Enabled source: ")
+                    + locationHookResult.enabledSource
+                    + (fa ? " · منبع عرض: " : " · Latitude source: ")
+                    + locationHookResult.latitudeSource
+                    + (fa ? " · منبع طول: " : " · Longitude source: ")
+                    + locationHookResult.longitudeSource;
+            String when = DateFormat.getDateTimeInstance(
+                    DateFormat.SHORT, DateFormat.MEDIUM)
+                    .format(new Date(locationHookResult.verifiedAt));
+            message = (fa ? "تأیید Hook موقعیت مکانی: " : "Location hook readback: ")
+                    + status + "\n" + reason + "\n" + sources
+                    + "\n" + (fa ? "آخرین بررسی: " : "Last check: ") + when;
+            if (locationHookResult.detail != null && !locationHookResult.detail.trim().isEmpty()) {
+                message += "\n" + (fa ? "جزئیات: " : "Detail: ") + locationHookResult.detail;
+            }
         }
         info.setText(message);
         return info;
