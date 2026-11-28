@@ -49,6 +49,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     private boolean locationHookUnavailable;
     private VirtualHookManager.LocationApplyResult locationHookResult;
     private TextView locationHookStatusView;
+    private long loadGeneration;
     private ProfileDocument cloneDocument;
     private ProfileDocument globalDocument;
     private LinearLayout root;
@@ -99,6 +100,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
     }
 
     private void loadDocuments() {
+        final long generation = ++loadGeneration;
         cloneLoaded = !cloneMode;
         globalLoaded = false;
         registryLoaded = !cloneMode;
@@ -157,7 +159,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             // Reconcile only this exact Clone and show only a result bound to its package/user.
             AsyncLocationHookRepository.getInstance(getApplicationContext())
                     .syncCloneLocationHook(packageName, userId, (result, error) -> {
-                        if (isFinishing() || isDestroyed()) return;
+                        if (isFinishing() || isDestroyed() || generation != loadGeneration) return;
                         if (error != null || result == null || !result.belongsTo(packageName, userId)) {
                             locationHookUnavailable = true;
                             locationHookResult = null;
