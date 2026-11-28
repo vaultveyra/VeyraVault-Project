@@ -4,7 +4,7 @@ Status: implementation foundation added; persistence/UI/runtime adoption is sepa
 
 ## What this stage adds
 
-- A single registry for 44 environment and identity fields, including value type, scope, capability boundary and explanatory note.
+- The initial Stage 8.34 registry introduced 44 environment and identity fields. Subsequent reviewed additions expanded the current feature-branch registry to 104 fields, each with value type, scope, capability boundary and explanatory note.
 - A typed ProfileDocument that accepts only registered, valid profile inputs and rejects restricted hardware identifiers and service-owned identity data.
 - A field-by-field resolver implementing Clone override → Global profile → explicit Safe Isolated Default. It never reads Android host configuration.
 - Separate source and application status. A stored value for a supported field remains NOT_TESTED until a verified runtime adapter promotes it to APPLIED.
@@ -23,3 +23,8 @@ Status: implementation foundation added; persistence/UI/runtime adoption is sepa
 ## Not included / next work
 
 This stage does not yet migrate the existing ProfileStore JSON schema, connect the new document model to provider IPC, update Global/Clone settings screens, or add runtime adapters for remaining fields. Existing five-field runtime profile storage and lifecycle application remain authoritative until those separately tested stages land. No CloneStore, Clone identity, app-private data, account/session data or main-branch state is changed.
+
+
+## Inventory evolution
+
+The 44-field count above records the original Stage 8.34 foundation, not the current registry size. The current feature-branch registry contains 104 stable field IDs. The additional fields are not evidence of additional runtime adapters: each retains its own capability and application-status boundary. See `docs/STAGE_8_43_LEGACY_ENVIRONMENT_PROFILE_BRIDGE.md` for the latest additive profile integration.
