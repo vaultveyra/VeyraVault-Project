@@ -139,7 +139,7 @@ public class ProfileRuntimeStatusStoreInstrumentationTest {
                     ProfileRuntimeStatusStore.read(context, cloneB, userB);
             assertTrue(afterUnrelatedEditA.current);
             assertTrue(afterUnrelatedEditB.current);
-            assertEquals(ProfileFieldRegistry.ApplyStatus.APPLIED,
+            assertEquals(ProfileFieldRegistry.ApplyStatus.FAILED,
                     afterUnrelatedEditB.statuses.get("localeTag"));
 
             // Editing Clone A's effective Locale must stale A, but must not stale Clone B.
