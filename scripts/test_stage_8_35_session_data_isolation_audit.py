@@ -24,6 +24,7 @@ registry = read("app/src/main/java/com/veyravault/space/core/ProfileFieldRegistr
 # upstream checkout and applied only the already-audited cleanup hardening patch.
 environment = read("Bcore/src/main/java/top/niunaijun/blackbox/core/env/BEnvironment.java")
 account_service = read("Bcore/src/main/java/top/niunaijun/blackbox/core/system/accounts/BAccountManagerService.java")
+account_facade = read("Bcore/src/main/java/top/niunaijun/blackbox/fake/frameworks/BAccountManager.java")
 user_accounts = read("Bcore/src/main/java/top/niunaijun/blackbox/core/system/accounts/BUserAccounts.java")
 user_manager = read("Bcore/src/main/java/top/niunaijun/blackbox/core/system/user/BUserManagerService.java")
 hook_manager = read("Bcore/src/main/java/top/niunaijun/blackbox/fake/hook/HookManager.java")
@@ -66,6 +67,19 @@ assert "mUserAccountsMap.get(userId)" in get_accounts_body
 assert "mUserAccountsMap.put(userId, bUserAccounts)" in get_accounts_body
 assert "getAccountUserData" in user_accounts
 assert "getAuthToken" in user_accounts
+
+# Listing APIs do have package visibility filtering, but direct credential,
+# user-data and token operations are routed by virtual userId + account handle.
+assert "account.visibility.get(packageName)" in account_service
+assert "filterAccounts(userAccounts" in account_service
+for call in (
+    "getService().getPassword(account, BActivityThread.getUserId())",
+    "getService().getUserData(account, key, BActivityThread.getUserId())",
+    "getService().peekAuthToken(account, authTokenType, BActivityThread.getUserId())",
+    "getService().setAuthToken(account, authTokenType, authToken, BActivityThread.getUserId())",
+    "getService().getAuthToken(response, account, authTokenType, notifyOnAuthFailure, expectActivityLaunch, options, BActivityThread.getUserId())",
+):
+    assert call in account_facade, "Expected virtual-user-scoped AccountManager call missing: " + call
 
 # Account records are retained by the package-uninstall callback; it only reloads
 # authenticator metadata. This must be reviewed before claiming account cleanup.
