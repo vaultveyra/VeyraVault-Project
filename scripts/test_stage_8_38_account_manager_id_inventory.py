@@ -70,6 +70,10 @@ public class BAccountManagerService {
         }
     }
 
+    private void saveAllAccounts() {
+        // Fixture only. Stage 8.38 replaces this boundary atomically.
+    }
+
     public BUserAccounts getUserAccounts(int userId) {
         synchronized (mUserAccountsMap) {
             BUserAccounts bUserAccounts = mUserAccountsMap.get(userId);
@@ -106,10 +110,6 @@ public class BAccountManagerService {
         return new HashMap<>();
     }
     private final LinkedList<TokenCache> mTokenCaches = new LinkedList<>();
-
-    private void saveAllAccounts() {
-        // Fixture only. The inventory operation must never invoke this method.
-    }
 }
 """
 

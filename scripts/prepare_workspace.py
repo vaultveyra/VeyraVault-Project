@@ -383,8 +383,7 @@ def harden_account_manager_token_user_scope(workspace):
                     mUserAccountsMap.put(key, userAccounts);
                 }""",
         ("VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY",
-         "userAccounts.userId = key.intValue();",
-         "mUserAccountsMap.put(key, userAccounts);"),
+         "userAccounts.userId = key.intValue();"),
         relative_path,
     )
 
@@ -516,7 +515,12 @@ def harden_account_manager_id_inventory(workspace):
                         || !(rawValue instanceof BUserAccounts)) {
                     return;
                 }
-                verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);
+                Integer key = (Integer) rawKey;
+                BUserAccounts userAccounts = (BUserAccounts) rawValue;
+                // VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY
+                // Preserve the Stage 8.37 repair when normalizing the persisted bucket.
+                userAccounts.userId = key.intValue();
+                verifiedAccountsMap.put(key, userAccounts);
             }
 
             synchronized (mUserAccountsMap) {
@@ -559,7 +563,9 @@ def harden_account_manager_id_inventory(workspace):
         ("VEYRAVAULT_ACCOUNT_MANAGER_ID_ONLY_INVENTORY",
          "mAccountsLoadSucceeded = false;",
          "HashMap<?, ?> accountsMap",
-         "verifiedAccountsMap.put((Integer) rawKey, (BUserAccounts) rawValue);",
+         "VEYRAVAULT_RESTORE_ACCOUNT_USER_ID_FROM_MAP_KEY",
+         "userAccounts.userId = key.intValue();",
+         "verifiedAccountsMap.put(key, userAccounts);",
          "mUserAccountsMap.putAll(verifiedAccountsMap);",
          "mAccountsLoadSucceeded = true;",
          "public int[] getKnownAccountUserIds() throws RemoteException",
