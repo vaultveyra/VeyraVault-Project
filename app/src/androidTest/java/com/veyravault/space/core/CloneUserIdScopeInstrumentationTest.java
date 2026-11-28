@@ -58,6 +58,22 @@ public class CloneUserIdScopeInstrumentationTest {
         assertEquals(3, CloneStore.readPendingReservationsStrict(context).size());
     }
 
+    @Test public void removedCloneRegistryEntryMakesItsNumericIdAvailableAgain() {
+        String packageName = "com.example.synthetic.recreated";
+        CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
+        entry.packageName = packageName;
+        entry.userId = 0;
+        entry.displayName = "Synthetic Clone";
+
+        assertTrue(CloneStore.upsertClone(context, entry));
+        assertEquals(1, CloneStore.nextFreeUserIdForPackage(context, packageName));
+
+        // This removes only the synthetic registry entry. It does not call Engine or
+        // delete any app/account data; @After restores the exact original preference map.
+        assertTrue(CloneStore.removeClone(context, packageName, 0));
+        assertEquals(0, CloneStore.nextFreeUserIdForPackage(context, packageName));
+    }
+
     private static Map<String, ?> copySnapshot(Map<String, ?> source) {
         Map<String, Object> copy = new HashMap<>();
         for (Map.Entry<String, ?> entry : source.entrySet()) {
