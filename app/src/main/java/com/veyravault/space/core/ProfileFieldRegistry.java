@@ -354,6 +354,9 @@ public final class ProfileFieldRegistry {
 
     private static void add(Map<String, Field> fields, String key, ValueType type,
                             Capability capability, Object safeDefault, String scope, String note) {
+        if (fields.containsKey(key)) {
+            throw new IllegalStateException("Duplicate profile field key: " + key);
+        }
         fields.put(key, new Field(key, type, capability, safeDefault, scope, note));
     }
 
