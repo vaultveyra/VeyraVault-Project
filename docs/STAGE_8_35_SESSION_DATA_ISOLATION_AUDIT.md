@@ -47,9 +47,17 @@ The pinned BAccountManagerService package-uninstall callback reloads authenticat
 
 The separate BUserManagerService.deleteUser(userId) path is not a safe per-Clone substitute: it asks BPackageManagerService to uninstall that user across all packages and deletes the entire internal and external virtual-user roots. Never invoke this user-wide operation to remove one VeyraVault Clone.
 
-### 1.5 WebView-specific isolation remains unverified
+### 1.5 WebView has an active process-scoped suffix; persistence still needs runtime proof
 
-A WebViewProxy class exists in the pinned source, but HookManager does not register that proxy in its active injector list. Its presence in source must not be counted as a functioning WebView isolation adapter. The app-private context path may still separate a Clone's default WebView data directory, but persistent Cookie, DOM storage, database and process-restart behavior have not been proven for this build.
+The pinned BActivityThread creates the package Context and, on Android 9 / API 28 and newer, calls:
+
+    WebView.setDataDirectorySuffix(getUserId() + ":" + packageName + ":" + processName);
+
+The call occurs before VirtualRuntime setup and before the virtual target Application is created. It uses the virtual user ID, package name and process name (not the transient PID), which is the active WebView data-directory separation mechanism in this Engine revision.
+
+A separate WebViewProxy class exists in the source but is not registered in HookManager. Do not mistake that unused class for the active mechanism; the active source path is BActivityThread.
+
+This is positive source-level evidence, not an end-to-end persistence certification. CookieManager, DOM storage, WebView databases and process-restart persistence still require synthetic target-app tests on API 28+ and on older supported APIs where this suffix API is unavailable.
 
 ## 2. Current VeyraVault status
 
