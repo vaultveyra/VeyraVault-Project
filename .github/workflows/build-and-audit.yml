@@ -70,6 +70,8 @@ jobs:
 
       - name: Test registry-driven Global and Clone profile editor
         run: python3 scripts/test_profile_document_editor_contract.py
+      - name: Test read-only legacy environment profile bridge contract
+        run: python3 scripts/test_profile_legacy_environment_bridge.py
 
       - name: Test profile resolver contract
         run: python3 scripts/test_profile_resolver.py
