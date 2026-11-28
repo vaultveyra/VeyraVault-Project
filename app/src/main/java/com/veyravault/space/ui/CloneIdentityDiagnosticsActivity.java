@@ -15,8 +15,8 @@ import com.veyravault.space.core.LocaleHelper;
 import java.util.List;
 
 /**
- * Read-only report of numeric virtual user IDs shared by different package Clones
- * in the current validated Clone registry. It never reads Engine account state.
+ * Read-only comparison of the current Clone registry with Engine virtual-user IDs.
+ * It never reads Engine AccountManager or app-session state.
  */
 public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
     private AsyncCloneRepository repository;
@@ -59,8 +59,8 @@ public final class CloneIdentityDiagnosticsActivity extends BaseActivity {
 
         TextView limitation = new TextView(this);
         limitation.setText(fa
-                ? "محدودیت: این گزارش فقط Cloneهای ثبت‌شدهٔ فعلی را می‌بیند؛ شناسه‌های استفاده‌شده در گذشته یا حساب‌های باقی‌مانده در موتور از این رجیستری قابل مشاهده نیستند. هم‌پوشانی، نشانهٔ اشتراک محدودهٔ کاربر مجازی است، نه اثبات دسترسی قطعی همه برنامه‌ها به همه حساب‌ها."
-                : "Limit: this report sees only currently registered Clones. Historical IDs and account records retained inside the Engine are not visible here. An overlap indicates a shared virtual-user scope; it does not prove every app can see every account.");
+                ? "محدودیت: فهرست موتور فقط کاربران مجازی فعلی را نشان می‌دهد، نه محتوای AccountManager را. کاربری که در پاکسازی قدیمی حذف شده ممکن است دیگر در این فهرست نباشد، حتی اگر رکورد حساب آن در accounts.conf باقی مانده باشد. شناسه غایب را آزاد فرض نکنید. هم‌پوشانی نشانه اشتراک محدوده کاربر مجازی است، نه اثبات دسترسی قطعی همه برنامه‌ها به همه حساب‌ها."
+                : "Limit: the Engine list shows current virtual users, not AccountManager contents. A user explicitly deleted by an older cleanup may no longer appear even if an account bucket remains in accounts.conf. Missing IDs must not be assumed safe to reuse. An overlap indicates a shared virtual-user scope; it does not prove every app can see every account.");
         limitation.setTextSize(12f);
         limitation.setTextColor(UiPalette.warning(this));
         limitation.setPadding(dp(12), dp(12), dp(12), dp(12));
