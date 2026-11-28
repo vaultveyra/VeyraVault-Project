@@ -79,8 +79,13 @@ def _patch_engine_fragment(source, marker, pattern, replacement, required, label
     updated, count = re.subn(pattern, replacement, source, count=1, flags=re.S)
     if count != 1:
         raise RuntimeError("Pinned Engine cleanup source no longer matches the audited layout: " + label)
-    if any(item not in updated for item in required):
-        raise RuntimeError("Engine cleanup patch verification failed in " + label)
+    missing = [item for item in required if item not in updated]
+    if missing:
+        raise RuntimeError(
+            "Engine cleanup patch verification failed in {}: missing required fragment(s): {}".format(
+                label, repr(missing)
+            )
+        )
     return updated
 
 
