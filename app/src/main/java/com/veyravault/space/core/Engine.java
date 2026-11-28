@@ -67,7 +67,12 @@ public class Engine {
         if (userService == null) {
             throw new IllegalStateException("Engine UserManager Binder service is unavailable");
         }
-        Method getUsers = userService.getClass().getMethod("getUsers");
+        Class<?> serviceInterface = Class.forName(
+                "top.niunaijun.blackbox.core.system.user.IBUserManagerService");
+        if (!serviceInterface.isInstance(userService)) {
+            throw new IllegalStateException("Engine UserManager Binder has an unexpected interface");
+        }
+        Method getUsers = serviceInterface.getMethod("getUsers");
         Object rawUsers = getUsers.invoke(userService);
         if (!(rawUsers instanceof List)) {
             throw new IllegalStateException("Engine returned an invalid virtual-user inventory");
