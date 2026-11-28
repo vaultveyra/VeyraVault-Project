@@ -27,7 +27,7 @@ public final class ProfileLegacyEnvironmentBridge {
 
     /**
      * Adds one exact Clone's legacy device metadata beneath typed Clone profile values.
-     * The composite packageName + userId identity is mandatory; a missing Clone fails closed.
+     * The composite packageName + userId identity is mandatory; an unknown identity receives no legacy fallback.
      */
     public static ProfileDocument mergeClone(Context context, String packageName, int userId,
                                              ProfileDocument typed) throws Exception {
@@ -44,7 +44,10 @@ public final class ProfileLegacyEnvironmentBridge {
             }
         }
         if (match == null) {
-            throw new IllegalStateException("Clone identity is not registered");
+            // Trusted host-side callers and isolated tests may resolve a typed document
+            // before a CloneStore row exists. Do not import any legacy Clone metadata
+            // unless the exact composite identity is registered.
+            return typed == null ? new ProfileDocument() : typed.copy();
         }
 
         ProfileDocument legacy = new ProfileDocument();
