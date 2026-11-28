@@ -2,7 +2,7 @@
 
 ## Status
 
-Source audit completed on 2026-11-22. This stage audits the exact BlackBox revision used by VeyraVault and the app's current profile transport. It does not add runtime hooks, modify the Engine, or change any Clone data.
+Source audit completed on 2026-11-22 and refreshed on 2026-11-28. This stage audits the exact BlackBox revision used by VeyraVault and the app's current profile transport. The 2026-11-28 update corrects the inventory count and explicitly records the safe-default precedence; it does not add device-identity runtime hooks, modify the Engine, or change any Clone data.
 
 ## Exact source revision and method
 
@@ -37,8 +37,8 @@ Source references:
 
 | Capability | Exact pinned Engine behavior | Per-Clone configurable value in current VeyraVault profile? | Audit classification |
 |---|---|---:|---|
-| Locale | VeyraVault resolves clone → global → system and applies locale in the virtual app process before target Application creation. | Yes | Implemented in source; physical-device verification remains open. |
-| Time zone | VeyraVault resolves clone → global → system and applies TimeZone.setDefault in the virtual app process before target Application creation. | Yes | Implemented in source; physical-device verification remains open. |
+| Locale | VeyraVault resolves Clone override → Global profile → deterministic safe isolated default (en-US) and applies locale in the virtual app process before target Application creation; host locale is never a target fallback. | Yes | Implemented in source; physical-device verification remains open. |
+| Time zone | VeyraVault resolves Clone override → Global profile → deterministic safe isolated default (UTC) and applies TimeZone.setDefault in the virtual app process before target Application creation; host time zone is never a target fallback. | Yes | Implemented in source; physical-device verification remains open. |
 | GPS location enable/latitude/longitude | Engine BLocationManager and BLocationManagerService accept both userId and package name; VeyraVault calls setLocation/setPattern and reads back pattern and coordinates. | Yes | Package/user-scoped path implemented. App readback verifies live Engine state, not independently durable storage after Engine process death. |
 | Cell information | Engine stores BCell and cell lists in the same user/package BLocationConfig; getAllCellInfo reads the current virtual user/package entry. | Not yet in VeyraVault ProfileSettings | Partial Engine capability; telephony adapter behavior is incomplete (see below). |
 | Build brand/model/device/product/fingerprint | No BuildProxy or BDeviceManager/BDeviceConfig profile setter was found in the pinned source. black.android.os.Build is only an empty BlackReflection class binding to android.os.Build; it is not a profile API. | No | Not supported by the current VeyraVault profile/Engine integration. Do not represent saved metadata as applied Build values. |
@@ -73,7 +73,7 @@ Source references:
 At the current feature-branch implementation, two profile layers coexist intentionally:
 
 - Legacy ProfileSettings/ProfileStore remain the compatibility source for five runtime fields: localeTag, timeZoneId, locationEnabled, latitude and longitude.
-- The additive ProfileDocumentStore uses a typed 97-field ProfileFieldRegistry. It preserves independent Global and per-Clone documents and does not replace or destructively migrate the legacy store.
+- The additive ProfileDocumentStore uses the current typed 104-field ProfileFieldRegistry. It preserves independent Global and per-Clone documents and does not replace or destructively migrate the legacy store.
 - The non-exported ProfileRuntimeProvider checks same-UID callers and returns an immutable per-field snapshot containing effective value, source, capability, editability, adapter mapping, API-support note, privacy class, readback method and unsupported reason.
 - ProfileRuntimeClient validates the complete registry-sized snapshot and its metadata before exposing it to the lifecycle callback.
 - CloneProfileLifecycleCallback resolves the full snapshot before target Application creation. The existing process-scoped Locale/Time Zone adapters remain the only fields promoted to APPLIED by this lifecycle readback. Package/user-scoped location continues through VirtualHookManager and its separate Engine API/readback path.
@@ -125,3 +125,8 @@ The current registry is checked by `ProfileDocumentContractTest` and has these c
 | **Total** | **104** |
 
 Only Locale and Time Zone have the current process-scoped runtime applier. Location enablement/coordinates use the package/user-scoped Engine hook. Device manufacturer/model/country values remain metadata-only and must not be presented as applied. The 3 network-provider fields still require real per-Clone routing and external leak verification.
+
+
+### Dated correction — 2026-11-28
+
+The current typed registry contains **104** fields, not 97. The original 97-field sentence above was stale and has been corrected. The profile resolver's target precedence is Clone override → Global profile → registry-owned safe isolated default. For Locale and Time Zone, the deterministic target defaults are `en-US` and `UTC`; the host baseline is retained only internally for process cleanup between virtual binds and is never selected as a target Clone value. The exact 104-field capability breakdown is listed in the section above.
