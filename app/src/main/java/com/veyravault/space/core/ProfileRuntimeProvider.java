@@ -51,6 +51,13 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                 return response;
             }
             if (statusRequest) {
+                String expectedProcessName = extras.getString("processName");
+                if (expectedProcessName == null || expectedProcessName.trim().isEmpty()
+                        || !isAuthorizedCaller(context, packageName, userId, expectedProcessName)) {
+                    response.putBoolean("ok", false);
+                    response.putString("error", "CALLER_CLONE_IDENTITY_MISMATCH");
+                    return response;
+                }
                 if (!isRegisteredClone(context, packageName, userId)) {
                     response.putBoolean("ok", false);
                     response.putString("error", "CLONE_NOT_REGISTERED");
@@ -74,6 +81,20 @@ public final class ProfileRuntimeProvider extends ContentProvider {
                 response.putBoolean("ok", saved);
                 if (!saved) response.putString("error", "STALE_OR_INVALID_STATUS");
                 else response.putLong("revision", ProfileDocumentStore.readRevisionStrict(context));
+                return response;
+            }
+            // The host main process is trusted internal code. A virtual worker must be
+            // authenticated against the pinned Engine's PID -> ProcessRecord mapping before
+            // it can select any Clone's profile, and must name a Clone still in CloneStore.
+            if (!isAuthorizedCaller(context, packageName, userId, null)) {
+                response.putBoolean("ok", false);
+                response.putString("error", "CALLER_CLONE_IDENTITY_MISMATCH");
+                return response;
+            }
+            if (Binder.getCallingPid() != Process.myPid()
+                    && !isRegisteredClone(context, packageName, userId)) {
+                response.putBoolean("ok", false);
+                response.putString("error", "CLONE_NOT_REGISTERED");
                 return response;
             }
             // Read both stores strictly. The five-field ProfileStore remains a live
@@ -155,6 +176,50 @@ public final class ProfileRuntimeProvider extends ContentProvider {
         // states. Flattening those states into nullable legacy fields would incorrectly
         // allow a Global value to override an explicit Clone Safe Default.
         return ProfileResolver.resolveDocuments(mergedClone, mergedGlobal);
+    }
+
+    /**
+     * Authenticates virtual-worker IPC against the pinned Engine's live PID mapping.
+     * PID comes from Binder, not caller-controlled extras. Reflection keeps the Debug
+     * instrumentation APK independent from the release-only virtual Engine dependency.
+     * Failure to obtain an exact ProcessRecord is a denial, never a fallback to requested IDs.
+     */
+    private static boolean isAuthorizedCaller(Context context, String packageName, int userId,
+                                              String expectedProcessName) {
+        int callingPid = Binder.getCallingPid();
+        if (callingPid == Process.myPid()) {
+            // Only trusted code in VeyraVault's own default process may resolve arbitrary
+            // registered identities; a virtual app must always arrive through its worker PID.
+            return expectedProcessName == null && ProcessUtils.isMainProcess(context);
+        }
+        try {
+            Class<?> managerClass = Class.forName(
+                    "top.niunaijun.blackbox.core.system.BProcessManagerService");
+            Object manager = managerClass.getMethod("get").invoke(null);
+            if (manager == null) return false;
+            Object processRecord = managerClass.getMethod("findProcessByPid", int.class)
+                    .invoke(manager, callingPid);
+            if (processRecord == null) return false;
+            Class<?> recordClass = processRecord.getClass();
+            String callerPackage = (String) recordClass.getMethod("getPackageName")
+                    .invoke(processRecord);
+            int callerUserId = recordClass.getField("userId").getInt(processRecord);
+            String callerProcessName = (String) recordClass.getField("processName")
+                    .get(processRecord);
+            return matchesCloneIdentity(packageName, userId, callerPackage, callerUserId,
+                    expectedProcessName, callerProcessName);
+        } catch (Exception unavailableOrUntrusted) {
+            return false;
+        }
+    }
+
+    static boolean matchesCloneIdentity(String requestedPackage, int requestedUserId,
+                                         String callerPackage, int callerUserId,
+                                         String expectedProcessName, String callerProcessName) {
+        if (requestedPackage == null || requestedPackage.trim().isEmpty() || requestedUserId < 0
+                || callerPackage == null || callerProcessName == null) return false;
+        if (!requestedPackage.equals(callerPackage) || requestedUserId != callerUserId) return false;
+        return expectedProcessName == null || expectedProcessName.equals(callerProcessName);
     }
 
     private static boolean isRegisteredClone(Context context, String packageName, int userId)
