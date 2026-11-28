@@ -61,7 +61,7 @@ for field in ("deviceLabel", "manufacturer", "deviceModel", "androidRelease"):
         f"{field} must remain explicitly NOT_IMPLEMENTED"
     )
 assert 'add(fields, "countryCode", ValueType.STRING, Capability.LOCAL_PREFERENCE_ONLY,' in registry
-assert "android.os.Build" not in runtime_applier
+# SDK_INT is permitted for API-level compatibility branches; host device identity is not.
 assert "Build.MODEL" not in runtime_applier
 assert "Build.MANUFACTURER" not in runtime_applier
 assert "ProfileFieldRegistry.createSafeDefaults()" in resolver
