@@ -56,7 +56,7 @@ public final class CloneIdentityAudit {
                     || entry.userId < 0) {
                 throw new IllegalArgumentException("Clone registry contains an invalid identity");
             }
-            String identityKey = entry.packageName + "\u0000" + entry.userId;
+            String identityKey = entry.packageName.length() + ":" + entry.packageName + ":" + entry.userId;
             if (compositeIdentities.put(identityKey, Boolean.TRUE) != null) {
                 throw new IllegalArgumentException("Clone registry contains a duplicate composite identity");
             }
