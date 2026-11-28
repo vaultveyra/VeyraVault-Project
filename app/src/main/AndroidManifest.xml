@@ -126,6 +126,7 @@
         <activity android:name=".ui.VpnStatusActivity" android:exported="false" />
         <activity android:name=".ui.SettingsHubActivity" android:exported="false" />
         <activity android:name=".ui.PendingReservationsActivity" android:exported="false" />
+        <activity android:name=".ui.CloneIdentityDiagnosticsActivity" android:exported="false" />
 
         <receiver
             android:name=".security.VaultDeviceAdminReceiver"
