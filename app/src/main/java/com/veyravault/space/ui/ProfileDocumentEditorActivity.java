@@ -257,7 +257,7 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
             }
             View fieldCard = buildFieldCard(field, resolved.get(field.key), displayStatuses.get(field.key));
             String searchable = (field.label + " " + field.key + " " + field.category + " "
-                    + field.note + " " + field.validationRule + " " + field.unsupportedReason + " "
+                    + displayCategory(field.category) + " " + field.note + " " + field.validationRule + " " + field.unsupportedReason + " "
                     + field.capability + " " + field.adapterId + " " + field.apiSupport + " "
                     + field.privacyClass + " " + field.readbackMethod).toLowerCase(Locale.ROOT);
             searchableCards.add(fieldCard);
