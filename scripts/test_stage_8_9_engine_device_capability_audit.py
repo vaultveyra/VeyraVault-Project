@@ -4,6 +4,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 workspace = (ROOT / "scripts/prepare_workspace.py").read_text(encoding="utf-8")
 settings = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileSettings.java").read_text(encoding="utf-8")
+registry = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileFieldRegistry.java").read_text(encoding="utf-8")
+resolver = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileDocumentResolver.java").read_text(encoding="utf-8")
 provider = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeProvider.java").read_text(encoding="utf-8")
 client = (ROOT / "app/src/main/java/com/veyravault/space/core/ProfileRuntimeClient.java").read_text(encoding="utf-8")
 lifecycle = (ROOT / "app/src/main/java/com/veyravault/space/core/CloneProfileLifecycleCallback.java").read_text(encoding="utf-8")
@@ -51,6 +53,22 @@ assert "Locale.getDefault()" in runtime_applier
 assert "readResourceLocaleTag(packageContext)" in runtime_applier
 assert "TimeZone.getDefault()" in runtime_applier
 assert "ApplyStatus.APPLIED" in runtime_applier
+
+# Device Build identity remains unsupported metadata until a real per-Clone Engine
+# adapter and target-process readback exist. Never mutate host android.os.Build.
+for field in ("deviceLabel", "manufacturer", "deviceModel", "androidRelease"):
+    assert re.search(
+        r'add\\(fields, "' + re.escape(field)
+        + r'", ValueType\\.STRING, Capability\\.NOT_IMPLEMENTED,',
+        registry,
+    ), f"{field} must remain explicitly NOT_IMPLEMENTED"
+assert 'add(fields, "countryCode", ValueType.STRING, Capability.LOCAL_PREFERENCE_ONLY,' in registry
+assert "android.os.Build" not in runtime_applier
+assert "Build.MODEL" not in runtime_applier
+assert "Build.MANUFACTURER" not in runtime_applier
+assert "ProfileFieldRegistry.createSafeDefaults()" in resolver
+assert "Source.SAFE_DEFAULT" in resolver
+assert "Source.SYSTEM" not in resolver, "Host/system values must never be selected as target profile source"
 assert "PROFILE_READBACK_VERIFIED" in runtime_trace
 assert "PROFILE_READBACK_FAILED" in runtime_trace
 assert "PROFILE_PROCESS_BOUNDARY_REJECTED" in runtime_trace
@@ -112,6 +130,8 @@ print("PASS: The Engine source audit is tied to the exact immutable build pin.")
 print("PASS: The provider transports an immutable, typed per-field profile snapshot; only verified Locale/Time Zone adapters are applied in this lifecycle.")
 print("PASS: Profile runtime IPC remains same-UID and exposes Clone/Global/Safe Default source, capability and status metadata for every registry field.")
 print("PASS: Location hooks use package/user-scoped Engine calls with pattern/coordinate readback.")
-print("PASS: Device identifiers and unsupported Build/Wi-Fi fields are not silently represented as configurable ProfileSettings.")
+print("PASS: Device Build metadata remains NOT_IMPLEMENTED; no host android.os.Build mutation is used.")
+print("PASS: Target resolver uses registry-owned safe defaults and never returns a host/system source.")
+print("PASS: Restricted device identifiers and unsupported Build/Wi-Fi fields are not silently represented as configurable ProfileSettings.")
 print("PASS: The audit documents active Engine proxies separately from genuine per-Clone profile APIs.")
 print("PASS: CI is wired to prevent the capability audit from silently disappearing.")
