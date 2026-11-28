@@ -258,6 +258,18 @@ public final class ProfileDocumentEditorActivity extends BaseActivity {
         capability.setTextColor(UiPalette.textSecondary(this));
         card.addView(capability);
 
+        // Expose the full reviewed capability boundary to the user. These are
+        // declarative support/readback metadata, not a claim that the field is applied.
+        TextView technical = new TextView(this);
+        technical.setText((fa ? "آداپتور: " : "Adapter: ") + field.adapterId
+                + "\n" + (fa ? "پشتیبانی API: " : "API support: ") + field.apiSupport
+                + "\n" + (fa ? "کلاس حریم خصوصی: " : "Privacy class: ") + field.privacyClass
+                + "\n" + (fa ? "روش Readback: " : "Readback method: ") + field.readbackMethod);
+        technical.setTextSize(10.5f);
+        technical.setTextColor(UiPalette.textSecondary(this));
+        technical.setPadding(0, dp(4), 0, dp(6));
+        card.addView(technical);
+
         TextView reason = new TextView(this);
         reason.setText(field.unsupportedReason);
         reason.setTextSize(11f);
