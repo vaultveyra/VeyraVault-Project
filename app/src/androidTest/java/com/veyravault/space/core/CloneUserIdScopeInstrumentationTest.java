@@ -11,6 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -39,25 +40,29 @@ public class CloneUserIdScopeInstrumentationTest {
         restorePreferences(prefs, before);
     }
 
-    @Test public void allocatorCanReserveSameNumericUserIdForDifferentPackages() throws Exception {
+    @Test public void globalAllocatorNeverReservesSameNumericUserIdForDifferentPackages() throws Exception {
         // These are synthetic package identities. No Engine install or app data is created.
         CloneStore.CloneReservation alpha =
-                CloneStore.reserveNextUserId(context, "com.example.synthetic.alpha");
+                CloneStore.reserveNextUserId(context, "com.example.synthetic.alpha",
+                        Collections.<Integer>emptyList(), Collections.<Integer>emptyList());
         CloneStore.CloneReservation beta =
-                CloneStore.reserveNextUserId(context, "com.example.synthetic.beta");
+                CloneStore.reserveNextUserId(context, "com.example.synthetic.beta",
+                        Collections.<Integer>emptyList(), Collections.<Integer>emptyList());
         CloneStore.CloneReservation alphaSecond =
-                CloneStore.reserveNextUserId(context, "com.example.synthetic.alpha");
+                CloneStore.reserveNextUserId(context, "com.example.synthetic.alpha",
+                        Collections.<Integer>emptyList(), Collections.<Integer>emptyList());
 
         assertTrue(!alpha.getPackageName().equals(beta.getPackageName()));
         assertEquals(0, alpha.getUserId());
-        assertEquals(0, beta.getUserId());
-        assertEquals(1, alphaSecond.getUserId());
+        assertEquals(1, beta.getUserId());
+        assertEquals(2, alphaSecond.getUserId());
+        assertEquals(2, prefs.getInt("last_reserved_global_user_id", -1));
 
         // The journal is restored to its pre-test key/value snapshot in @After.
         assertEquals(3, CloneStore.readPendingReservationsStrict(context).size());
     }
 
-    @Test public void removedCloneRegistryEntryMakesItsNumericIdAvailableAgain() {
+    @Test public void removedCloneRegistryEntryDoesNotLowerGlobalHighWaterMark() {
         String packageName = "com.example.synthetic.recreated";
         CloneStore.CloneEntry entry = new CloneStore.CloneEntry();
         entry.packageName = packageName;
@@ -65,12 +70,17 @@ public class CloneUserIdScopeInstrumentationTest {
         entry.displayName = "Synthetic Clone";
 
         assertTrue(CloneStore.upsertClone(context, entry));
-        assertEquals(1, CloneStore.nextFreeUserIdForPackage(context, packageName));
+        CloneStore.CloneReservation first = CloneStore.reserveNextUserId(context, packageName,
+                Collections.singletonList(0), Collections.<Integer>emptyList());
+        assertEquals(1, first.getUserId());
 
         // This removes only the synthetic registry entry. It does not call Engine or
-        // delete any app/account data; @After restores the exact original preference map.
+        // delete any app/account data; the high-water mark must remain advanced.
         assertTrue(CloneStore.removeClone(context, packageName, 0));
-        assertEquals(0, CloneStore.nextFreeUserIdForPackage(context, packageName));
+        CloneStore.CloneReservation next = CloneStore.reserveNextUserId(context, packageName,
+                Collections.singletonList(0), Collections.<Integer>emptyList());
+        assertEquals(2, next.getUserId());
+        assertEquals(2, prefs.getInt("last_reserved_global_user_id", -1));
     }
 
     private static Map<String, ?> copySnapshot(Map<String, ?> source) {

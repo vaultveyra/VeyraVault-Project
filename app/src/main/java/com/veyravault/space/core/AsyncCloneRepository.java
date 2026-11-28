@@ -116,14 +116,19 @@ public final class AsyncCloneRepository implements AutoCloseable {
         enqueue(() -> NativeAbiPreflight.inspectInstalledPackage(appContext, packageName), callback);
     }
 
-    /** Durably reserves the next package-scoped virtual user ID before Engine installation. */
-    public void reserveNextUserId(String packageName, Callback<CloneStore.CloneReservation> callback) {
-        if (packageName == null || packageName.trim().isEmpty()) {
+    /** Durably reserves a global ID only after both Engine ID-only inventories are verified. */
+    public void reserveNextUserId(String packageName, List<Integer> engineUserIds,
+            List<Integer> accountUserIds, Callback<CloneStore.CloneReservation> callback) {
+        if (packageName == null || packageName.trim().isEmpty()
+                || engineUserIds == null || accountUserIds == null) {
             deliver(callback, Result.<CloneStore.CloneReservation>failure(
-                    Failure.INVALID_INPUT, "Package name is required"));
+                    Failure.INVALID_INPUT, "Package name and both Engine ID inventories are required"));
             return;
         }
-        enqueue(() -> CloneStore.reserveNextUserId(appContext, packageName), callback);
+        final List<Integer> engineSnapshot = new ArrayList<Integer>(engineUserIds);
+        final List<Integer> accountSnapshot = new ArrayList<Integer>(accountUserIds);
+        enqueue(() -> CloneStore.reserveNextUserId(
+                appContext, packageName, engineSnapshot, accountSnapshot), callback);
     }
 
     /** Commits the clone record and consumes its exact reservation in one SharedPreferences commit. */
