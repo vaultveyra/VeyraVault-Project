@@ -75,9 +75,9 @@ assert "renderPartialInventory(snapshot, inventories)" in activity
 assert "AccountManager numeric bucket keys" in activity
 assert "No AccountManager key is attributed to a package or specific Clone" in activity
 assert "renderRegistryOnly(snapshot, failure)" in activity
-assert "No all-clear result is reported." in activity
+assert "no all-clear result is reported." in activity
+assert "No clean or all-clear result is reported." in activity
 assert "if (!result.isSuccess() || result.getValue() == null)" in activity
-assert "No all-clear result is reported." in activity
 assert "does not prove historical deleted-user account buckets are empty" in activity
 assert "Engine IDs without a current Clone record" in activity
 assert "Clone IDs missing from the current Engine inventory" in activity
